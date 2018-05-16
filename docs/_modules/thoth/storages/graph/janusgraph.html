@@ -30,21 +30,43 @@
           <div class="body" role="main">
             
   <h1>Source code for thoth.storages.graph.janusgraph</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;A Gremlin server adapter communicating via a web socket.&quot;&quot;&quot;</span>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># thoth-storages</span>
+<span class="c1"># Copyright(C) 2018 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;A Gremlin server adapter communicating via a web socket.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">asyncio</span>
 <span class="kn">import</span> <span class="nn">functools</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">typing</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="k">import</span> <span class="n">datetime</span>
 
 <span class="kn">import</span> <span class="nn">uvloop</span>
+<span class="kn">from</span> <span class="nn">gremlin_python.process.traversal</span> <span class="k">import</span> <span class="n">Order</span>
 <span class="kn">from</span> <span class="nn">gremlin_python.process.graph_traversal</span> <span class="k">import</span> <span class="n">inE</span>
+<span class="kn">from</span> <span class="nn">gremlin_python.process.graph_traversal</span> <span class="k">import</span> <span class="n">constant</span>
 <span class="kn">from</span> <span class="nn">goblin</span> <span class="k">import</span> <span class="n">Goblin</span>
 
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="k">import</span> <span class="n">datetime_str2timestamp</span>
 
 <span class="kn">from</span> <span class="nn">..base</span> <span class="k">import</span> <span class="n">StorageBase</span>
+<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">NotFoundError</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">ALL_MODELS</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">DependsOn</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">EcosystemSolver</span>
@@ -147,6 +169,119 @@
         <span class="n">loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span>
         <span class="n">loop</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">app</span><span class="o">.</span><span class="n">close</span><span class="p">())</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">app</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.get_analysis_metadata"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.janusgraph.GraphDatabase.get_analysis_metadata">[docs]</a>    <span class="k">def</span> <span class="nf">get_analysis_metadata</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">analysis_document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get metadata stored for the given analysis document.&quot;&quot;&quot;</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">.</span><span class="n">E</span><span class="p">()</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__label__&#39;</span><span class="p">,</span> <span class="n">IsPartOf</span><span class="o">.</span><span class="n">__label__</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__type__&#39;</span><span class="p">,</span> <span class="s1">&#39;edge&#39;</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;analysis_document_id&#39;</span><span class="p">,</span> <span class="n">analysis_document_id</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">project</span><span class="p">(</span><span class="s1">&#39;analysis_datetime&#39;</span><span class="p">,</span> <span class="s1">&#39;analysis_document_id&#39;</span><span class="p">,</span> <span class="s1">&#39;analyzer_name&#39;</span><span class="p">,</span> <span class="s1">&#39;analyzer_version&#39;</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;analysis_datetime&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;analysis_document_id&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;analyzer_name&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;analyzer_version&#39;</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">next</span><span class="p">()</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Analysis with analysis document if </span><span class="si">{analysis_document_id}</span><span class="s2"> was not found&quot;</span><span class="p">)</span>
+
+        <span class="n">result</span><span class="p">[</span><span class="s1">&#39;analysis_datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;analysis_datetime&#39;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.runtime_environment_listing"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.janusgraph.GraphDatabase.runtime_environment_listing">[docs]</a>    <span class="k">def</span> <span class="nf">runtime_environment_listing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">start_offset</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">count</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get listing of runtime environments available.&quot;&quot;&quot;</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">.</span><span class="n">V</span><span class="p">()</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__label__&#39;</span><span class="p">,</span> <span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">__label__</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__type__&#39;</span><span class="p">,</span> <span class="s1">&#39;vertex&#39;</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="s1">&#39;runtime_environment_name&#39;</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">dedup</span><span class="p">()</span> \
+            <span class="o">.</span><span class="n">order</span><span class="p">()</span> \
+            <span class="o">.</span><span class="n">range</span><span class="p">(</span><span class="n">start_offset</span><span class="p">,</span> <span class="n">start_offset</span> <span class="o">+</span> <span class="n">count</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">toList</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="n">query</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.runtime_environment_analyses_listing"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.janusgraph.GraphDatabase.runtime_environment_analyses_listing">[docs]</a>    <span class="k">def</span> <span class="nf">runtime_environment_analyses_listing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">runtime_environment_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                                             <span class="n">start_offset</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">count</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">100</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get listing of analyses available for the given runtime environment.&quot;&quot;&quot;</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">.</span><span class="n">V</span><span class="p">()</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__label__&#39;</span><span class="p">,</span> <span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">__label__</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__type__&#39;</span><span class="p">,</span> <span class="s1">&#39;vertex&#39;</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;runtime_environment_name&#39;</span><span class="p">,</span> <span class="n">runtime_environment_name</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">inE</span><span class="p">()</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__label__&#39;</span><span class="p">,</span> <span class="n">IsPartOf</span><span class="o">.</span><span class="n">__label__</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__type__&#39;</span><span class="p">,</span> <span class="s1">&#39;edge&#39;</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">order</span><span class="p">()</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;analysis_datetime&#39;</span><span class="p">,</span> <span class="n">Order</span><span class="o">.</span><span class="n">decr</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">project</span><span class="p">(</span><span class="s1">&#39;analysis_datetime&#39;</span><span class="p">,</span> <span class="s1">&#39;analysis_document_id&#39;</span><span class="p">,</span> <span class="s1">&#39;analyzer_name&#39;</span><span class="p">,</span> <span class="s1">&#39;analyzer_version&#39;</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;analysis_datetime&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;analysis_document_id&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;analyzer_name&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;analyzer_version&#39;</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">dedup</span><span class="p">()</span> \
+            <span class="o">.</span><span class="n">range</span><span class="p">(</span><span class="n">start_offset</span><span class="p">,</span> <span class="n">start_offset</span> <span class="o">+</span> <span class="n">count</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">toList</span><span class="p">()</span>
+
+        <span class="n">entries</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">entries</span><span class="p">:</span>
+            <span class="c1"># TODO: we could optimize this into a single query</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">.</span><span class="n">V</span><span class="p">()</span> \
+                <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__label__&#39;</span><span class="p">,</span> <span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">__label__</span><span class="p">)</span> \
+                <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__type__&#39;</span><span class="p">,</span> <span class="s1">&#39;vertex&#39;</span><span class="p">)</span> \
+                <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;runtime_environment_name&#39;</span><span class="p">,</span> <span class="n">runtime_environment_name</span><span class="p">)</span> \
+                <span class="o">.</span><span class="n">count</span><span class="p">()</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+
+            <span class="n">count</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">count</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;No analyses found for runtime environment </span><span class="si">{runtime_environment_name!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">:</span>
+            <span class="n">entry</span><span class="p">[</span><span class="s1">&#39;analysis_datetime&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s1">&#39;analysis_datetime&#39;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">entries</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.get_runtime_environment"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.janusgraph.GraphDatabase.get_runtime_environment">[docs]</a>    <span class="k">def</span> <span class="nf">get_runtime_environment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">runtime_environment_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">analysis_document_id</span><span class="p">:</span> <span class="nb">str</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get runtime environment dependencies by its name, select the newest analysis if no document id is present.&quot;&quot;&quot;</span>
+        <span class="n">loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_document_id</span><span class="p">:</span>
+            <span class="n">analysis_document_id</span> <span class="o">=</span> <span class="n">loop</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">.</span><span class="n">V</span><span class="p">()</span>
+                    <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__label__&#39;</span><span class="p">,</span> <span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">__label__</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__type__&#39;</span><span class="p">,</span> <span class="s1">&#39;vertex&#39;</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;runtime_environment_name&#39;</span><span class="p">,</span> <span class="n">runtime_environment_name</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">inE</span><span class="p">()</span>
+                    <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__label__&#39;</span><span class="p">,</span> <span class="n">IsPartOf</span><span class="o">.</span><span class="n">__label__</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">order</span><span class="p">()</span><span class="o">.</span><span class="n">by</span><span class="p">(</span><span class="s1">&#39;analysis_datetime&#39;</span><span class="p">,</span> <span class="n">Order</span><span class="o">.</span><span class="n">decr</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">valueMap</span><span class="p">()</span>
+                    <span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="s1">&#39;analysis_document_id&#39;</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">next</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_document_id</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;No entries for runtime environment </span><span class="si">{runtime_environment_name!r}</span><span class="s2"> found&quot;</span><span class="p">)</span>
+
+        <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">g</span><span class="o">.</span><span class="n">V</span><span class="p">()</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__label__&#39;</span><span class="p">,</span> <span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">__label__</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__type__&#39;</span><span class="p">,</span> <span class="s1">&#39;vertex&#39;</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;runtime_environment_name&#39;</span><span class="p">,</span> <span class="n">runtime_environment_name</span><span class="p">)</span> \
+            <span class="o">.</span><span class="n">coalesce</span><span class="p">(</span><span class="n">inE</span><span class="p">()</span>
+                      <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;__label__&#39;</span><span class="p">,</span> <span class="n">IsPartOf</span><span class="o">.</span><span class="n">__label__</span><span class="p">)</span>
+                      <span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s1">&#39;analysis_document_id&#39;</span><span class="p">,</span> <span class="n">analysis_document_id</span><span class="p">)</span>
+                      <span class="o">.</span><span class="n">outV</span><span class="p">(),</span>
+                      <span class="n">constant</span><span class="p">(</span><span class="kc">False</span><span class="p">))</span> \
+            <span class="o">.</span><span class="n">toList</span><span class="p">()</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">loop</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="p">:</span>
+            <span class="c1"># TODO: we are assuming that an analysis has always at least some entries</span>
+            <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;No entries for runtime environment </span><span class="si">{runtime_environment_name!r}</span><span class="s2"> with &quot;</span>
+                                <span class="n">f</span><span class="s2">&quot;analysis document id </span><span class="si">{analysis_document_id!r}</span><span class="s2"> found&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;No entries for runtime environment </span><span class="si">{runtime_environment_name!r}</span><span class="s2"> found&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span><span class="p">,</span> <span class="n">analysis_document_id</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.python_package_version_exists"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.janusgraph.GraphDatabase.python_package_version_exists">[docs]</a>    <span class="k">def</span> <span class="nf">python_package_version_exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Check if the given Python package version exists in the graph database.&quot;&quot;&quot;</span>
@@ -407,6 +542,11 @@
                 <span class="c1"># valuable information for us.</span>
                 <span class="k">continue</span>
 
+            <span class="k">if</span> <span class="s1">&#39;error&#39;</span> <span class="ow">in</span> <span class="n">python_package_info</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">]:</span>
+                <span class="c1"># Mercator was unable to process this - e.g. there was a setup.py that is not distutils setup.py</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Skipping error entry - </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">python_package_info</span><span class="p">)</span>
+                <span class="k">continue</span>
+
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">python_package</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">python_package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_pypi_package_version</span><span class="p">(</span>
                     <span class="n">package_name</span><span class="o">=</span><span class="n">python_package_info</span><span class="p">[</span><span class="s1">&#39;result&#39;</span><span class="p">][</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span>
@@ -458,7 +598,7 @@
       &copy;2018, Author.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.3</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.4</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.10</a>
       
     </div>
