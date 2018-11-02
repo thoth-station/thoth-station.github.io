@@ -13,6 +13,7 @@
     <script type="text/javascript" src="../../../_static/jquery.js"></script>
     <script type="text/javascript" src="../../../_static/underscore.js"></script>
     <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script async="async" type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
    
@@ -53,8 +54,13 @@
 
 <span class="kn">import</span> <span class="nn">datetime</span>
 <span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="k">import</span> <span class="n">timezone</span>
 
 <span class="kn">from</span> <span class="nn">contextlib</span> <span class="k">import</span> <span class="n">contextmanager</span>
+
+<span class="n">SERVICE_TOKEN_FILENAME</span> <span class="o">=</span> <span class="s1">&#39;/var/run/secrets/kubernetes.io/serviceaccount/token&#39;</span>
+<span class="n">SERVICE_CERT_FILENAME</span> <span class="o">=</span> <span class="s1">&#39;/var/run/secrets/kubernetes.io/serviceaccount/ca.crt&#39;</span>
+<span class="n">_DATETIME_FORMAT_STRING</span> <span class="o">=</span> <span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">T%H:%M:%S.</span><span class="si">%f</span><span class="s2">&quot;</span>
 
 
 <div class="viewcode-block" id="cwd"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.helpers.cwd">[docs]</a><span class="nd">@contextmanager</span>
@@ -70,7 +76,9 @@
 
 <div class="viewcode-block" id="parse_datetime"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.helpers.parse_datetime">[docs]</a><span class="k">def</span> <span class="nf">parse_datetime</span><span class="p">(</span><span class="n">datetime_string</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Parse datetime string represented in ISO format.&quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">datetime_string</span><span class="p">,</span> <span class="s2">&quot;%Y-%m-</span><span class="si">%d</span><span class="s2">T%H:%M:%S.</span><span class="si">%f</span><span class="s2">&quot;</span><span class="p">)</span></div>
+    <span class="n">parsed</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">datetime_string</span><span class="p">,</span> <span class="n">_DATETIME_FORMAT_STRING</span><span class="p">)</span>
+    <span class="c1"># Make all timezone unaware datetimes timezone aware.</span>
+    <span class="k">return</span> <span class="n">parsed</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tzinfo</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="datetime_str2timestamp"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.helpers.datetime_str2timestamp">[docs]</a><span class="k">def</span> <span class="nf">datetime_str2timestamp</span><span class="p">(</span><span class="n">datetime_string</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
@@ -78,9 +86,13 @@
     <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">parse_datetime</span><span class="p">(</span><span class="n">datetime_string</span><span class="p">)</span><span class="o">.</span><span class="n">timestamp</span><span class="p">())</span></div>
 
 
-<div class="viewcode-block" id="datetime2datetime_str"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.helpers.datetime2datetime_str">[docs]</a><span class="k">def</span> <span class="nf">datetime2datetime_str</span><span class="p">(</span><span class="n">dt</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<div class="viewcode-block" id="datetime2datetime_str"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.helpers.datetime2datetime_str">[docs]</a><span class="k">def</span> <span class="nf">datetime2datetime_str</span><span class="p">(</span><span class="n">dt</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Create a string representation of a datetime.&quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span></div>
+    <span class="c1"># We use strftime to make sure we do not propagate timezone information. We use UTC all over the places.</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">dt</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">()</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="n">_DATETIME_FORMAT_STRING</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">dt</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="n">_DATETIME_FORMAT_STRING</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="datetime_str_from_timestamp"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.helpers.datetime_str_from_timestamp">[docs]</a><span class="k">def</span> <span class="nf">datetime_str_from_timestamp</span><span class="p">(</span><span class="n">timestamp</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -88,10 +100,18 @@
     <span class="k">return</span> <span class="n">datetime2datetime_str</span><span class="p">(</span><span class="n">datetime</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">fromtimestamp</span><span class="p">(</span><span class="n">timestamp</span><span class="p">))</span></div>
 
 
+<span class="k">def</span> <span class="nf">_get_incluster_token_file</span><span class="p">(</span><span class="n">token_file</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">token_file</span> <span class="k">if</span> <span class="n">token_file</span> <span class="k">else</span> <span class="n">SERVICE_TOKEN_FILENAME</span>
+
+
+<span class="k">def</span> <span class="nf">_get_incluster_ca_file</span><span class="p">(</span><span class="n">ca_file</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">ca_file</span> <span class="k">if</span> <span class="n">ca_file</span> <span class="k">else</span> <span class="n">SERVICE_CERT_FILENAME</span>
+
+
 <div class="viewcode-block" id="get_service_account_token"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.helpers.get_service_account_token">[docs]</a><span class="k">def</span> <span class="nf">get_service_account_token</span><span class="p">():</span>
     <span class="sd">&quot;&quot;&quot;Get token from service account token file.&quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s1">&#39;/var/run/secrets/kubernetes.io/serviceaccount/token&#39;</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">token_file</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">_get_incluster_token_file</span><span class="p">(),</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">token_file</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">token_file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
     <span class="k">except</span> <span class="ne">FileNotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="s2">&quot;Unable to get service account token, please check &quot;</span>
@@ -140,6 +160,14 @@
     </div>
 </div>
 <script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
         </div>
       </div>
       <div class="clearer"></div>
@@ -148,8 +176,8 @@
       &copy;2018, Author.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.7.8</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.11</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.8.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
     </div>
 
