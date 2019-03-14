@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Thoth Adviser &#8212; Thoth Adviser NA documentation</title>
+    <link rel="stylesheet" href="_static/pydoctheme.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/sidebar.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Resolver design document" href="libdependency_graph.html" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <link rel="shortcut icon" type="image/png" href="_static/favicon.png" />
+    <meta name="viewport" content="width=device-width,initial-scale=0.8">
+    
+    
+
+  </head><body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
+        <li><a href="#">Thoth Adviser NA documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="thoth-adviser">
+<h1>Thoth Adviser<a class="headerlink" href="#thoth-adviser" title="Permalink to this headline">¶</a></h1>
+<p>A recommendation engine for project <a class="reference external" href="https://github.com/thoth-station/">Thoth</a>.</p>
+<p>There are the following main goals of thoth-adviser (as of now):</p>
+<ol class="arabic simple">
+<li>Provide a tool that can compute recommendations in project <a class="reference external" href="https://thoth-station.ninja">Thoth</a>.</li>
+<li>Check provenance of installed packages (which package source indexes are used - this is not guaranteed by pip nor Pipenv).</li>
+<li>A tool called “Dependency Monkey” that generates all the possible software stacks for a project respecting dependency resolution.</li>
+</ol>
+<p>To interact with a deployed Thoth, you can use the
+<a class="reference external" href="https://github.com/thoth-station/thamos">Thamos CLI</a>.</p>
+<div class="section" id="dependency-monkey">
+<h2>Dependency Monkey<a class="headerlink" href="#dependency-monkey" title="Permalink to this headline">¶</a></h2>
+<p>Dependency Monkey is a functionality that allows you to generate all the
+possible software stacks for your project. Given the input (direct dependencies
+of your project), Dependency Monkey creates N-ary dependency graph (as
+described above) stating all the dependencies of your direct
+dependencies/libraries as well as dependencies of all the transitive
+dependencies in your application stack.</p>
+<p>The primary use-case for Dependnecy Monkey is to generate software stacks that
+are subsequently validated and scored in the <a class="reference external" href="https://github.com/thoth-station/amun-api">Amun</a> service. Simply when generating
+all the possible software stacks, we can find the best software stack for an
+application by validating it in a CI (or Amun in case of Thoth), running the
+application in the specific runtime environment (e.g. Fedora 28 with installed
+native packages - RPMs) on some specific hardware conifguration. Generating and
+scoring all the possible software stacks is, however, most often not doable in
+a reasonable time. For this purpose, Dependnecy Monkey can create a sample of
+software stacks (see the <code class="docutils literal notranslate"><span class="pre">distribution</span></code> and <code class="docutils literal notranslate"><span class="pre">seed</span></code> parameters) that can be
+taken as representatives. These representatives are scored and aggregated data
+are used for predicting the best application stack (again, generated and run
+through CI/Amun to make predictions more accurate by learning over time).</p>
+<p>See <a class="reference internal" href="dependency_monkey.html#dependency-monkey"><span class="std std-ref">Dependency Monkey Design Document</span></a> for more info.</p>
+</div>
+<div class="section" id="advises-and-recommendations">
+<h2>Advises and Recommendations<a class="headerlink" href="#advises-and-recommendations" title="Permalink to this headline">¶</a></h2>
+<p>In Thoth’s terminology, advises and recommendations are the same. Based on
+aggregated knowledge stored in the graph database, provide the best application
+stack with reasoning on why the given software stack is used. There is reused
+the N-ary dependency graph implementation stated above to compute possible
+candidates of software stacks and based on data aggregated, there is performed
+scoring of software stacks based on solaly package-level data (e.g. the given
+package cannot be installed into the given runtime environment) or software
+stack information - the combination of packages cannot be assembled together or
+there were spotted issues when the some packages were used together in some
+specific versions.</p>
+</div>
+<div class="section" id="provenance-checks">
+<h2>Provenance Checks<a class="headerlink" href="#provenance-checks" title="Permalink to this headline">¶</a></h2>
+<p>As Thoth aggregates information about packages available, it can verify
+a user’s stack against its knowledge base. See <a class="reference internal" href="provenance_checks.html#provenance-checks"><span class="std std-ref">Provenance Checks</span></a>
+for more info.</p>
+<div class="section" id="package-source-configuration">
+<h3>Package source configuration<a class="headerlink" href="#package-source-configuration" title="Permalink to this headline">¶</a></h3>
+<p>When Thoth is deployed in your infrasture that restricts packages installed
+to only trusted package source indexes, you can disable untrusted package
+source indexes by setting <code class="docutils literal notranslate"><span class="pre">THOTH_WHITELISTED_SOURCES</span></code> environment variable.
+This variable holds a comma separated list of URLs pointing to whitelisted
+package source indexes respecting
+<a class="reference external" href="https://www.python.org/dev/peps/pep-0503/">PEP-0503</a> standard (the URL
+is with the <code class="docutils literal notranslate"><span class="pre">/simple</span></code> suffix).</p>
+<p>This environment variable is automatically fed from Thoth’s graph database
+in a deployment. This way Thoth’s operator has full control on what package
+source indexes which are used by users of Thoth.</p>
+</div>
+</div>
+<div class="section" id="installation-and-deployment">
+<h2>Installation and deployment<a class="headerlink" href="#installation-and-deployment" title="Permalink to this headline">¶</a></h2>
+<p>Adviser is built using OpenShift Source-to-Image and deployed
+automatically with Thoth’s deployment playbooks available in the <a class="reference external" href="https://github.com/thoth-station/core">core
+repository</a>.</p>
+<p>In a Thoth deployment, adviser is run based on requests comming to the
+<a class="reference external" href="https://github.com/thoth-station/user-api">user API</a> - each deployed adviser
+is run per a user request. You can run adviser locally as well by installing it
+and using its command line interface:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip3</span> <span class="n">install</span> <span class="n">thoth</span><span class="o">-</span><span class="n">adviser</span>
+<span class="n">thoth</span><span class="o">-</span><span class="n">adviser</span> <span class="o">--</span><span class="n">help</span>
+<span class="c1"># Or use git repo directly for the latest code:</span>
+<span class="c1"># pip3 install git+https://github.com/thoth-station/adviser</span>
+</pre></div>
+</div>
+<p>When thoth-adviser is scheduled in a deployment, it is actually executed as a
+CLI with arguments passed via environment variables.</p>
+<p>See <a class="reference external" href="https://github.com/thoth-station/janusgraph-thoth-config">JanusGraph</a>
+repository on how to run a JanusGraph instance locally and
+example <a class="reference external" href="https://github.com/thoth-station/notebooks">notebooks</a> which can feed
+your JanusGraph instance for experiments.</p>
+</div>
+<div class="section" id="running-adviser-locally">
+<h2>Running adviser locally<a class="headerlink" href="#running-adviser-locally" title="Permalink to this headline">¶</a></h2>
+<p>Often it is useful to run adviser locally to experiment or verify your changes
+in implementation. You can do so easily by running:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pipenv install</span>
+<span class="go">PYTHONPATH=. JANUSGRAPH_SERVICE_HOST=janusgraph.test.thoth-station.ninja pipenv run ./thoth-adviser --help</span>
+</pre></div>
+</div>
+<p>This command will set <cite>janusgraph.test.thoth-station.ninja</cite> (JanusGraph
+deployed in test environment) as your source for advises and information for
+resolver to correctly resovle dependencies. Feel free to use <a class="reference external" href="https://github.com/thoth-station/janusgraph-thoth-config#running-janusgraph-instance-locally">a local
+JanusGraph instance</a>
+if it suits your needs. Also, follow the developer’s guide to get <a class="reference external" href="https://github.com/thoth-station/thoth/blob/master/docs/developers_guide.rst">more
+information about developer’s setup</a>.</p>
+<p>As adviser is very memory intense application, it is recommended to run it in a
+container with memory limit set for large application stacks. To do so, use
+<cite>s2i</cite> utility to build the container and then run it as show below:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">s2i build . centos/python-36-centos7 thoth-adviser</span>
+<span class="go">docker run -m 8G -e THOTH_ADVISER_SUBCOMMAND=advise -e JANUSGRAPH_SERVICE_HOST=janusgraph.test.thoth-station.ninja thoth-adviser</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="information-about-implementation">
+<h2>Information about implementation<a class="headerlink" href="#information-about-implementation" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="libdependency_graph.html">Resolver design document</a></li>
+<li class="toctree-l1"><a class="reference internal" href="provenance_checks.html">Provenance Checks</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dependency_graph.html">Dependency Graph</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dependency_monkey.html">Dependency Monkey Design Document</a></li>
+</ul>
+</div>
+</div>
+<div class="section" id="crossroad">
+<h2>Crossroad<a class="headerlink" href="#crossroad" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
+<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
+<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
+</ul>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="thoth.adviser.html">thoth.adviser package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="thoth.adviser.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="thoth.adviser.python.html">thoth.adviser.python package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.adviser.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.adviser.html#module-thoth.adviser.cli">thoth.adviser.cli module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.adviser.html#module-thoth.adviser.configuration">thoth.adviser.configuration module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.adviser.html#module-thoth.adviser.enums">thoth.adviser.enums module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.adviser.html#module-thoth.adviser.exceptions">thoth.adviser.exceptions module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.adviser.html#module-thoth.adviser.isis">thoth.adviser.isis module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.adviser.html#module-thoth.adviser">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<p>This documentation corresponds to implementation in version 0.3.0,
+documentation was generated on Mar 14, 2019.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+    <a id="sidebar-anchor"></a>
+    
+
+  <h3><a href="#">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Thoth Adviser</a><ul>
+<li><a class="reference internal" href="#dependency-monkey">Dependency Monkey</a></li>
+<li><a class="reference internal" href="#advises-and-recommendations">Advises and Recommendations</a></li>
+<li><a class="reference internal" href="#provenance-checks">Provenance Checks</a><ul>
+<li><a class="reference internal" href="#package-source-configuration">Package source configuration</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#installation-and-deployment">Installation and deployment</a></li>
+<li><a class="reference internal" href="#running-adviser-locally">Running adviser locally</a></li>
+<li><a class="reference internal" href="#information-about-implementation">Information about implementation</a></li>
+<li><a class="reference internal" href="#crossroad">Crossroad</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Next topic</h4>
+  <p class="topless"><a href="libdependency_graph.html"
+                        title="next chapter">Resolver design document</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="libdependency_graph.html" title="Resolver design document"
+             accesskey="N">next</a> |</li>
+      </ul>
+    </div>
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Thoth team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

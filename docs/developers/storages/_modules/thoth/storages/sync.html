@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>thoth.storages.sync &#8212; Thoth Storages  documentation</title>
+    <link rel="stylesheet" href="../../../_static/pydoctheme.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../../_static/sidebar.js"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <link rel="shortcut icon" type="image/png" href="../../../_static/favicon.png" />
+    <meta name="viewport" content="width=device-width,initial-scale=0.8">
+    
+    
+
+  </head><body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
+        <li><a href="../../../index.html">Thoth Storages  documentation</a> &#187;</li>
+          <li><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.storages.sync</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-storages</span>
+<span class="c1"># Copyright(C) 2018, 2019 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Routines for syncing data from Ceph into graph database.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">amun</span> <span class="k">import</span> <span class="n">get_inspection_build_log</span>
+<span class="kn">from</span> <span class="nn">amun</span> <span class="k">import</span> <span class="n">get_inspection_job_log</span>
+<span class="kn">from</span> <span class="nn">amun</span> <span class="k">import</span> <span class="n">get_inspection_specification</span>
+<span class="kn">from</span> <span class="nn">amun</span> <span class="k">import</span> <span class="n">get_inspection_status</span>
+<span class="kn">from</span> <span class="nn">amun</span> <span class="k">import</span> <span class="n">is_inspection_finished</span>
+<span class="kn">from</span> <span class="nn">amun</span> <span class="k">import</span> <span class="n">has_inspection_job</span>
+
+<span class="kn">from</span> <span class="nn">.solvers</span> <span class="k">import</span> <span class="n">SolverResultsStore</span>
+<span class="kn">from</span> <span class="nn">.analyses</span> <span class="k">import</span> <span class="n">AnalysisResultsStore</span>
+<span class="kn">from</span> <span class="nn">.advisers</span> <span class="k">import</span> <span class="n">AdvisersResultsStore</span>
+<span class="kn">from</span> <span class="nn">.inspections</span> <span class="k">import</span> <span class="n">InspectionResultsStore</span>
+<span class="kn">from</span> <span class="nn">.provenance</span> <span class="k">import</span> <span class="n">ProvenanceResultsStore</span>
+<span class="kn">from</span> <span class="nn">.dependency_monkey_reports</span> <span class="k">import</span> <span class="n">DependencyMonkeyReportsStore</span>
+<span class="kn">from</span> <span class="nn">.graph</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="sync_adviser_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_adviser_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_adviser_documents</span><span class="p">(</span>
+        <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Sync adviser documents into graph.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
+        <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">adviser_store</span> <span class="o">=</span> <span class="n">AdvisersResultsStore</span><span class="p">()</span>
+    <span class="n">adviser_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">adviser_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+        <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">adviser_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="n">f</span><span class="s2">&quot;Syncing adviser document from </span><span class="si">{adviser_store.ceph.host}</span><span class="s2"> &quot;</span>
+                <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph </span><span class="si">{graph.hosts}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">document</span> <span class="o">=</span> <span class="n">adviser_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="n">graph</span><span class="o">.</span><span class="n">sync_adviser_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+                <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">graceful</span><span class="p">:</span>
+                    <span class="k">raise</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to sync adviser result with document id </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                <span class="n">failed</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Sync of adviser document with id </span><span class="si">{document_id!r}</span><span class="s2"> skipped - already synced&quot;</span><span class="p">)</span>
+            <span class="n">skipped</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">return</span> <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span></div>
+
+
+<div class="viewcode-block" id="sync_solver_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_solver_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_solver_documents</span><span class="p">(</span>
+        <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Sync solver documents into graph.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
+        <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">solver_store</span> <span class="o">=</span> <span class="n">SolverResultsStore</span><span class="p">()</span>
+    <span class="n">solver_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+        <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">solver_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="n">f</span><span class="s2">&quot;Syncing solver document from </span><span class="si">{solver_store.ceph.host}</span><span class="s2"> &quot;</span>
+                <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph </span><span class="si">{graph.hosts}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">document</span> <span class="o">=</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="n">graph</span><span class="o">.</span><span class="n">sync_solver_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+                <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">graceful</span><span class="p">:</span>
+                    <span class="k">raise</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to sync solver result with document id </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                <span class="n">failed</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Sync of solver document with id </span><span class="si">{document_id!r}</span><span class="s2"> skipped - already synced&quot;</span><span class="p">)</span>
+            <span class="n">skipped</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">return</span> <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span></div>
+
+
+<div class="viewcode-block" id="sync_analysis_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_analysis_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_analysis_documents</span><span class="p">(</span>
+        <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Sync image analysis documents into graph.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
+        <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">analysis_store</span> <span class="o">=</span> <span class="n">AnalysisResultsStore</span><span class="p">()</span>
+    <span class="n">analysis_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">analysis_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+        <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">analysis_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="n">f</span><span class="s2">&quot;Syncing analysis document from </span><span class="si">{analysis_store.ceph.host}</span><span class="s2"> &quot;</span>
+                <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph </span><span class="si">{graph.hosts}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">document</span> <span class="o">=</span> <span class="n">analysis_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="n">graph</span><span class="o">.</span><span class="n">sync_analysis_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+                <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">graceful</span><span class="p">:</span>
+                    <span class="k">raise</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to sync analysis result with document id </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                <span class="n">failed</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Sync of analysis document with id </span><span class="si">{document_id!r}</span><span class="s2"> skipped - already synced&quot;</span><span class="p">)</span>
+            <span class="n">skipped</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">return</span> <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span></div>
+
+
+<div class="viewcode-block" id="sync_provenance_checker_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_provenance_checker_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_provenance_checker_documents</span><span class="p">(</span>
+        <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Sync provenance check documents into graph.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
+        <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">provenance_check_store</span> <span class="o">=</span> <span class="n">ProvenanceResultsStore</span><span class="p">()</span>
+    <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+        <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">provenance_checker_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="n">f</span><span class="s2">&quot;Syncing provenance-checker document from </span><span class="si">{provenance_check_store.ceph.host}</span><span class="s2"> &quot;</span>
+                <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph </span><span class="si">{graph.hosts}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">document</span> <span class="o">=</span> <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="n">graph</span><span class="o">.</span><span class="n">sync_provenance_checker_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+                <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">graceful</span><span class="p">:</span>
+                    <span class="k">raise</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to sync provenance-checker result with document id </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                <span class="n">failed</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Sync of provenance-checker document with id </span><span class="si">{document_id!r}</span><span class="s2"> skipped - already synced&quot;</span><span class="p">)</span>
+            <span class="n">skipped</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">return</span> <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span></div>
+
+
+<div class="viewcode-block" id="sync_inspection_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_inspection_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_inspection_documents</span><span class="p">(</span>
+    <span class="n">amun_api_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">force_sync</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">only_graph_sync</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">only_ceph_sync</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Sync observations made on Amun into graph databaes.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">only_graph_sync</span> <span class="ow">and</span> <span class="n">only_ceph_sync</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;At least one of Ceph or Graph should be performed&quot;</span><span class="p">)</span>
+
+    <span class="n">inspection_store</span> <span class="o">=</span> <span class="n">InspectionResultsStore</span><span class="p">()</span>
+    <span class="n">inspection_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">dependency_mokey_reports_store</span> <span class="o">=</span> <span class="n">DependencyMonkeyReportsStore</span><span class="p">()</span>
+    <span class="n">dependency_mokey_reports_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
+        <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">inspection_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">dependency_mokey_reports_store</span><span class="o">.</span><span class="n">iterate_inspection_ids</span><span class="p">():</span>
+        <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">force_sync</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">inspection_store</span><span class="o">.</span><span class="n">document_exists</span><span class="p">(</span><span class="n">inspection_id</span><span class="p">):</span>
+            <span class="n">finished</span> <span class="o">=</span> <span class="n">is_inspection_finished</span><span class="p">(</span><span class="n">amun_api_url</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">finished</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Obtaining results from Amun API for inspection </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">specification</span> <span class="o">=</span> <span class="n">get_inspection_specification</span><span class="p">(</span><span class="n">amun_api_url</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">)</span>
+                    <span class="n">build_log</span> <span class="o">=</span> <span class="n">get_inspection_build_log</span><span class="p">(</span><span class="n">amun_api_url</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">)</span>
+                    <span class="n">status</span> <span class="o">=</span> <span class="n">get_inspection_status</span><span class="p">(</span><span class="n">amun_api_url</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">)</span>
+                    <span class="n">job_log</span> <span class="o">=</span> <span class="kc">None</span>
+                    <span class="k">if</span> <span class="n">has_inspection_job</span><span class="p">(</span><span class="n">amun_api_url</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">):</span>
+                        <span class="n">job_log</span> <span class="o">=</span> <span class="n">get_inspection_job_log</span><span class="p">(</span><span class="n">amun_api_url</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">)</span>
+
+                    <span class="n">document</span> <span class="o">=</span> <span class="p">{</span>
+                        <span class="s2">&quot;specification&quot;</span><span class="p">:</span> <span class="n">specification</span><span class="p">,</span>
+                        <span class="s2">&quot;build_log&quot;</span><span class="p">:</span> <span class="n">build_log</span><span class="p">,</span>
+                        <span class="s2">&quot;job_log&quot;</span><span class="p">:</span> <span class="n">job_log</span><span class="p">,</span>
+                        <span class="s2">&quot;inspection_id&quot;</span><span class="p">:</span> <span class="n">inspection_id</span><span class="p">,</span>
+                        <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">status</span><span class="p">,</span>
+                    <span class="p">}</span>
+
+                    <span class="c1"># First we store results into graph database and then onto</span>
+                    <span class="c1"># Ceph. This way in the next run we can sync documents that</span>
+                    <span class="c1"># failed to sync to graph - see if statement that is asking</span>
+                    <span class="c1"># for Ceph document presents first.</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">only_ceph_sync</span><span class="p">:</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Syncing inspection </span><span class="si">{inspection_id!r}</span><span class="s2"> to </span><span class="si">{graph.hosts}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="n">graph</span><span class="o">.</span><span class="n">sync_inspection_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">only_graph_sync</span><span class="p">:</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Syncing inspection </span><span class="si">{inspection_id!r}</span><span class="s2"> to </span><span class="si">{inspection_store.ceph.host}</span><span class="s2">&quot;</span><span class="p">)</span>
+                        <span class="n">inspection_store</span><span class="o">.</span><span class="n">store_document</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+
+                    <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">graceful</span><span class="p">:</span>
+                        <span class="k">raise</span>
+
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Failed to sync inspection </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+                    <span class="n">failed</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Skipping inspection </span><span class="si">{inspection_id!r}</span><span class="s2"> - not finised yet&quot;</span><span class="p">)</span>
+                <span class="n">skipped</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Skipping inspection </span><span class="si">{inspection_id!r}</span><span class="s2"> - the given inspection is already synced&quot;</span><span class="p">)</span>
+            <span class="n">skipped</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">return</span> <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+    <a id="sidebar-anchor"></a>
+    
+
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+      </ul>
+    </div>
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Thoth team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>thoth.adviser.python.dependency_graph &#8212; Thoth Adviser NA documentation</title>
+    <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../../../_static/sidebar.js"></script>
+    
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <link rel="shortcut icon" type="image/png" href="../../../../_static/favicon.png" />
+    <meta name="viewport" content="width=device-width,initial-scale=0.8">
+    
+    
+
+  </head><body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
+        <li><a href="../../../../index.html">Thoth Adviser NA documentation</a> &#187;</li>
+          <li><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.adviser.python.dependency_graph</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-adviser</span>
+<span class="c1"># Copyright(C) 2018, 2019 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;In-memory N-ary dependency graph used for traversing software stacks.</span>
+
+<span class="sd">This implementation is talking to the LibDependencyGraph (which talks to C/C++</span>
+<span class="sd">implementation). The aim of this implementation is to prepare arguments for</span>
+<span class="sd">C/C++ implementation and call the scoring routines.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
+<span class="kn">import</span> <span class="nn">typing</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">reduce</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">cmp_to_key</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="k">import</span> <span class="n">chain</span>
+<span class="kn">import</span> <span class="nn">operator</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">PackageVersion</span>
+<span class="kn">from</span> <span class="nn">thoth.python.pipfile</span> <span class="k">import</span> <span class="n">PipfileMeta</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Project</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Source</span>
+<span class="kn">from</span> <span class="nn">thoth.solver.python.base</span> <span class="k">import</span> <span class="n">SolverException</span>
+<span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
+
+<span class="kn">from</span> <span class="nn">.solver</span> <span class="k">import</span> <span class="n">PythonPackageGraphSolver</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">ConstraintClashError</span>
+<span class="kn">from</span> <span class="nn">.bin</span> <span class="k">import</span> <span class="n">LibDependencyGraph</span>
+<span class="kn">from</span> <span class="nn">.bin</span> <span class="k">import</span> <span class="n">PrematureStreamEndError</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="DependencyGraph"><a class="viewcode-back" href="../../../../thoth.adviser.python.html#thoth.adviser.python.dependency_graph.DependencyGraph">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">DependencyGraph</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;N-ary dependency graph stored in memory.&quot;&quot;&quot;</span>
+
+    <span class="n">dependencies_map</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">meta</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">PipfileMeta</span><span class="p">)</span>
+    <span class="n">full_dependencies_map</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">project</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Project</span><span class="p">)</span>
+    <span class="n">limit_latest_versions</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+    <span class="c1"># A list of package tuples (package name, package version, index url) forming paths based on versions.</span>
+    <span class="n">paths</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">])</span>
+    <span class="n">_closed_properly</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">stacks_estimated</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Estimate number of sofware stacks we could end up with (the upper boundary).&quot;&quot;&quot;</span>
+        <span class="c1"># We could estimate based on traversing the tree, it would give us better, but still rough estimate.</span>
+        <span class="n">dependencies</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">dependency_name</span><span class="p">,</span> <span class="n">dependency_versions</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">full_dependencies_map</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">dependencies_total</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">dependency_urls</span> <span class="ow">in</span> <span class="n">dependency_versions</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">dependencies_total</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dependency_urls</span><span class="p">)</span>
+            <span class="n">dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">dependencies_total</span>
+
+        <span class="k">return</span> <span class="n">reduce</span><span class="p">(</span><span class="k">lambda</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="n">a</span> <span class="o">*</span> <span class="n">b</span><span class="p">,</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+
+<div class="viewcode-block" id="DependencyGraph.get_walk_report"><a class="viewcode-back" href="../../../../thoth.adviser.python.html#thoth.adviser.python.dependency_graph.DependencyGraph.get_walk_report">[docs]</a>    <span class="k">def</span> <span class="nf">get_walk_report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve a report for a walk for a user.</span>
+
+<span class="sd">        This function should report back any issues encountered.</span>
+<span class="sd">        &quot;&quot;&quot;</span></div>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_is_package_version_no_index</span><span class="p">(</span>
+        <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">version</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Check if the given package-version entry has given attributes.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">package_version</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">name</span> <span class="ow">and</span> <span class="n">package_version</span><span class="o">.</span><span class="n">version</span> <span class="o">==</span> <span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">version</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="DependencyGraph.create_package_version_record"><a class="viewcode-back" href="../../../../thoth.adviser.python.html#thoth.adviser.python.dependency_graph.DependencyGraph.create_package_version_record">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">create_package_version_record</span><span class="p">(</span>
+        <span class="n">full_dependencies_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create a record of a Python package in dependencies map.&quot;&quot;&quot;</span>
+        <span class="n">version</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">full_dependencies_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">full_dependencies_map</span><span class="p">:</span>
+            <span class="n">full_dependencies_map</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">it</span> <span class="o">=</span> <span class="n">full_dependencies_map</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
+            <span class="n">it</span><span class="p">[</span><span class="n">version</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">it</span> <span class="o">=</span> <span class="n">it</span><span class="p">[</span><span class="n">version</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
+            <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span></div>
+
+<div class="viewcode-block" id="DependencyGraph.create_package_version_record_from_tuple"><a class="viewcode-back" href="../../../../thoth.adviser.python.html#thoth.adviser.python.dependency_graph.DependencyGraph.create_package_version_record_from_tuple">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">create_package_version_record_from_tuple</span><span class="p">(</span>
+        <span class="n">full_dependencies_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">is_develop</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create a record of a Python package in dependencies map.&quot;&quot;&quot;</span>
+        <span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span><span class="p">,</span> <span class="n">index_url</span> <span class="o">=</span> <span class="n">package_tuple</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">full_dependencies_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="k">return</span>
+
+        <span class="k">if</span> <span class="n">package_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">full_dependencies_map</span><span class="p">:</span>
+            <span class="n">full_dependencies_map</span><span class="p">[</span><span class="n">package_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">it</span> <span class="o">=</span> <span class="n">full_dependencies_map</span><span class="p">[</span><span class="n">package_name</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">package_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
+            <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="n">it</span> <span class="o">=</span> <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">index_url</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="n">PackageVersion</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+                <span class="n">version</span><span class="o">=</span><span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">package_version</span><span class="p">,</span>
+                <span class="n">index</span><span class="o">=</span><span class="n">Source</span><span class="p">(</span><span class="n">index_url</span><span class="p">),</span>
+                <span class="n">develop</span><span class="o">=</span><span class="n">is_develop</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">it</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span> <span class="o">=</span> <span class="n">entry</span></div>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_prepare_direct_dependencies</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">solver</span><span class="p">:</span> <span class="n">PythonPackageGraphSolver</span><span class="p">,</span> <span class="n">project</span><span class="p">:</span> <span class="n">Project</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Resolve all the direct dependencies based on the resolution and data available in the graph.&quot;&quot;&quot;</span>
+        <span class="c1"># It&#39;s important that solver preserves order in which packages were inserted.</span>
+        <span class="c1"># This is also a requirement for running under Python3.6+!!!</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Resolving direct dependencies&quot;</span><span class="p">)</span>
+        <span class="n">resolved_direct_dependencies</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
+            <span class="nb">list</span><span class="p">(</span><span class="n">project</span><span class="o">.</span><span class="n">iter_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)),</span>
+            <span class="n">graceful</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">all_versions</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">full_dependencies_map</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">dependencies_map</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">package_name</span><span class="p">,</span> <span class="n">package_versions</span> <span class="ow">in</span> <span class="n">resolved_direct_dependencies</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">dependencies_map</span><span class="p">[</span><span class="n">package_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">package_versions</span><span class="p">:</span>
+                <span class="c1"># This means that there were found versions in the graph</span>
+                <span class="c1"># database but none was matching the given version range.</span>
+                <span class="k">raise</span> <span class="n">SolverException</span><span class="p">(</span>
+                    <span class="n">f</span><span class="s2">&quot;No matching versions found for package </span><span class="si">{package_name!r}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
+                <span class="bp">cls</span><span class="o">.</span><span class="n">create_package_version_record</span><span class="p">(</span>
+                    <span class="n">full_dependencies_map</span><span class="p">,</span> <span class="n">package_version</span>
+                <span class="p">)</span>
+                <span class="n">dependencies_map</span><span class="p">[</span><span class="n">package_name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
+
+        <span class="c1"># dependencies_map maps package_name to a list of PackageVersion objects</span>
+        <span class="c1"># full_dependencies_map maps package_name, package_version, index_url to a PackageVersion object;</span>
+        <span class="c1"># full_dependencies_map is used to discard duplicates</span>
+        <span class="k">return</span> <span class="n">dependencies_map</span><span class="p">,</span> <span class="n">full_dependencies_map</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_limit_latest_versions</span><span class="p">(</span>
+            <span class="bp">cls</span><span class="p">,</span>
+            <span class="n">full_dependencies_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+            <span class="n">paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span>
+            <span class="n">limit_latest_versions</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Remove old versions of dependencies, consider only desired count of latest versions.</span>
+
+<span class="sd">        We traverse available paths horizontally and we check each package version in paths in the same column. If</span>
+<span class="sd">        there are present more versions then the limit provided, paths with additional versions are discarded.</span>
+<span class="sd">        A prerequisite for this function is to have paths sorted according to semver.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">dereference_package_version</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackageVersion</span><span class="p">:</span>
+            <span class="sd">&quot;&quot;&quot;Get package version from the dependencies map based on tuple provided.&quot;&quot;&quot;</span>
+            <span class="k">return</span> <span class="n">full_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
+
+        <span class="k">if</span> <span class="n">limit_latest_versions</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Number of latest versions has to be non-negative number bigger than 0, got </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">limit_latest_versions</span>
+            <span class="p">)</span>
+
+        <span class="n">some_work</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="n">versions_seen</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">to_pop</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="k">while</span> <span class="n">some_work</span><span class="p">:</span>
+            <span class="n">some_work</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">last_package_seen</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="c1"># We traverse in reversed order as we have items sorted from oldest to latest - this is needed for</span>
+            <span class="c1"># libdependency_graph implementation.</span>
+            <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">paths</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">idx</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">some_work</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="n">package_version</span> <span class="o">=</span> <span class="n">dereference_package_version</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">last_package_seen</span> <span class="ow">or</span> <span class="n">last_package_seen</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                    <span class="c1"># First package of a type, always include path.</span>
+                    <span class="n">versions_seen</span> <span class="o">=</span> <span class="mi">0</span>
+                <span class="k">elif</span> <span class="n">last_package_seen</span><span class="o">.</span><span class="n">version</span> <span class="o">!=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="p">:</span>
+                    <span class="n">versions_seen</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="k">if</span> <span class="n">versions_seen</span> <span class="o">&gt;=</span> <span class="n">limit_latest_versions</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Excluding path with </span><span class="si">%r</span><span class="s2">: limiting number of latest versions, index: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">index</span><span class="p">)</span>
+                    <span class="c1"># We traverse the list backwards, adjust index accordingly.</span>
+                    <span class="n">to_pop</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="o">-</span> <span class="n">index</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+                <span class="n">last_package_seen</span> <span class="o">=</span> <span class="n">package_version</span>
+
+        <span class="c1"># As we work paths horizontally, we need to make sure paths we want to excluded are no longer</span>
+        <span class="c1"># present in next iteration.</span>
+        <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">to_pop</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="c1"># Note we are pop&#39;ing from back so that we preserve order.</span>
+            <span class="n">paths</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">index</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">paths</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_cut_off_dependencies</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span><span class="p">,</span>
+        <span class="n">dependencies_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+        <span class="n">transitive_paths</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">list</span><span class="p">],</span>
+        <span class="n">core_packages</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span>
+        <span class="n">project</span><span class="p">:</span> <span class="n">Project</span><span class="p">,</span>
+        <span class="n">restrict_indexes</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">list</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Cut off paths that have not relevant dependencies - dependencies we don&#39;t want to include in the stack.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">core_package_name</span><span class="p">,</span> <span class="n">versions</span> <span class="ow">in</span> <span class="n">core_packages</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">versions</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">versions</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">(</span><span class="n">PackageVersion</span><span class="o">.</span><span class="n">parse_semantic_version</span><span class="p">(</span><span class="n">version</span><span class="p">),</span> <span class="n">version</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">version</span> <span class="ow">in</span> <span class="n">versions</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+            <span class="p">]</span>
+            <span class="c1"># Always pick the latest for now, later ask for observations.</span>
+            <span class="n">version</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">versions</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">index_url</span> <span class="o">=</span> <span class="n">core_packages</span><span class="p">[</span><span class="n">core_package_name</span><span class="p">][</span><span class="n">version</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+            <span class="n">core_packages</span><span class="p">[</span><span class="n">core_package_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">version</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span> <span class="n">index_url</span><span class="p">}</span>
+
+        <span class="n">allowed_indexes</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">restrict_indexes</span> <span class="ow">and</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="p">:</span>
+            <span class="n">allowed_indexes</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
+                <span class="n">source</span><span class="o">.</span><span class="n">url</span> <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+            <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">transitive_paths</span><span class="p">:</span>
+            <span class="n">include_path</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">allowed_indexes</span> <span class="ow">and</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">allowed_indexes</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;Excluding path with package </span><span class="si">%r</span><span class="s2"> - index not in allowed indexes&quot;</span><span class="p">,</span>
+                        <span class="n">package_tuple</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="n">include_path</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="k">break</span>
+
+                <span class="k">if</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">core_packages</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="ow">and</span> <span class="p">(</span>
+                    <span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">core_packages</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+                    <span class="ow">or</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+                    <span class="ow">not</span> <span class="ow">in</span> <span class="n">core_packages</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+                <span class="p">):</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;Excluding a path due to core package </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">package_tuple</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="n">include_path</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="k">break</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">project</span><span class="o">.</span><span class="n">prereleases_allowed</span><span class="p">:</span>
+                    <span class="n">package_version</span> <span class="o">=</span> <span class="n">dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span>
+                        <span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="p">][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
+                    <span class="k">if</span> <span class="p">(</span>
+                        <span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span><span class="o">.</span><span class="n">build</span>
+                        <span class="ow">or</span> <span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span><span class="o">.</span><span class="n">prerelease</span>
+                    <span class="p">):</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;Excluding path with package </span><span class="si">%r</span><span class="s2"> as pre-releases were disabled&quot;</span><span class="p">,</span>
+                            <span class="n">package_tuple</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="n">include_path</span> <span class="o">=</span> <span class="kc">False</span>
+                        <span class="k">break</span>
+
+            <span class="k">if</span> <span class="n">include_path</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_get_python_package_tuples</span><span class="p">(</span>
+        <span class="n">ids_map</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">],</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span><span class="p">,</span>
+        <span class="n">python_package_ids</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Set</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve tuples representing package name, package version and index url for the given set of ids.&quot;&quot;&quot;</span>
+        <span class="n">seen_ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">ids_map</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="n">unseen_ids</span> <span class="o">=</span> <span class="n">python_package_ids</span> <span class="o">-</span> <span class="n">seen_ids</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Retrieving package tuples for transitive dependencies (count: </span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">unseen_ids</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">package_tuples</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">get_python_package_tuples</span><span class="p">(</span><span class="n">unseen_ids</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">python_package_id</span><span class="p">,</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">package_tuples</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">ids_map</span><span class="p">[</span><span class="n">python_package_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_tuple</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_sort_paths</span><span class="p">(</span><span class="n">full_dependencies_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">paths</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Perform sorting of paths to makes sure preserve order of generated stacks.</span>
+
+<span class="sd">        To have stacks sorted from latest down to oldest, ideally we should take into account package release</span>
+<span class="sd">        date. We are approximating the sorting based on semver of packages. This means that a stack which is made</span>
+<span class="sd">        of packages in the following versions:</span>
+
+<span class="sd">        A: 1.0.0, 1.1.0</span>
+<span class="sd">        B: 2.0.0, 2.1.0</span>
+
+<span class="sd">        Will produce stacks:</span>
+
+<span class="sd">        [</span>
+<span class="sd">          [A-1.1.0, B-2.1.0],</span>
+<span class="sd">          [A-1.1.0, B-2.0.0],</span>
+<span class="sd">          [A-1.0.0, B-2.1.0],</span>
+<span class="sd">          [A-1.0.0, B-2.0.0],</span>
+<span class="sd">        ]</span>
+
+<span class="sd">        That means we will sort paths horizontally, where each item in all transitive dependencies will be</span>
+<span class="sd">        checked for its semver version and rows in paths can be swapped accordingly.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">dereference_package_version</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;Get package version from the dependencies map based on tuple provided.&quot;&quot;&quot;</span>
+            <span class="k">return</span> <span class="n">full_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]][</span>
+                <span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="p">]</span>
+
+        <span class="k">def</span> <span class="nf">cmp_function</span><span class="p">(</span><span class="n">path1</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">path2</span><span class="p">:</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;Compare two paths and report which should take precedence.</span>
+
+<span class="sd">            This is the core function which makes sure stacks coming from dependency graph are sorted and</span>
+<span class="sd">            have deterministic ordering. This function should be used as a key with functools.cmp_to_key.</span>
+
+<span class="sd">            The ordering produced by dependency graph is iterating on indirect dependencies on higher frequencies in</span>
+<span class="sd">            comparision to direct dependencies. This way we are trying to keep direct deps as fresh as possible and</span>
+<span class="sd">            making sure just transitive ones could be older.</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">path1</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">path2</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+
+                <span class="n">package_name1</span> <span class="o">=</span> <span class="n">path1</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">package_name2</span> <span class="o">=</span> <span class="n">path2</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">package_version1</span> <span class="o">=</span> <span class="n">path1</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">package_version2</span> <span class="o">=</span> <span class="n">path2</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">index_url1</span> <span class="o">=</span> <span class="n">path1</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+                <span class="n">index_url2</span> <span class="o">=</span> <span class="n">path2</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="n">package_name1</span> <span class="o">!=</span> <span class="n">package_name2</span><span class="p">:</span>
+                    <span class="c1"># We call this function with reverse set to true, to have packages sorted alphabetically we</span>
+                    <span class="c1"># inverse logic here so package names are *really* sorted alphabetically.</span>
+                    <span class="k">return</span> <span class="o">-</span><span class="nb">int</span><span class="p">(</span><span class="n">package_name1</span> <span class="o">&gt;</span> <span class="n">package_name2</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">1</span>
+                <span class="k">elif</span> <span class="n">package_version1</span> <span class="o">!=</span> <span class="n">package_version2</span><span class="p">:</span>
+                    <span class="n">semver1</span> <span class="o">=</span> <span class="n">dereference_package_version</span><span class="p">(</span><span class="n">path1</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span><span class="o">.</span><span class="n">semantic_version</span>
+                    <span class="n">semver2</span> <span class="o">=</span> <span class="n">dereference_package_version</span><span class="p">(</span><span class="n">path2</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span><span class="o">.</span><span class="n">semantic_version</span>
+                    <span class="n">result</span> <span class="o">=</span> <span class="n">semver1</span><span class="o">.</span><span class="n">__cmp__</span><span class="p">(</span><span class="n">semver2</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="bp">NotImplemented</span><span class="p">:</span>
+                        <span class="c1"># Based on semver, this can happen if at least one has build</span>
+                        <span class="c1"># metadata - there is no ordering specified.</span>
+                        <span class="k">if</span> <span class="n">semver1</span><span class="o">.</span><span class="n">build</span><span class="p">:</span>
+                            <span class="k">return</span> <span class="o">-</span><span class="mi">1</span>
+                        <span class="k">return</span> <span class="mi">1</span>
+
+                    <span class="k">return</span> <span class="n">result</span>
+                <span class="k">elif</span> <span class="n">index_url1</span> <span class="o">!=</span> <span class="n">index_url2</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="o">-</span><span class="nb">int</span><span class="p">(</span><span class="n">index_url1</span> <span class="o">&lt;</span> <span class="n">index_url2</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">1</span>
+
+            <span class="c1"># Same paths?! This should be probably unreachable but this can happen if did not take into</span>
+            <span class="c1"># account os or python version when querying graph database. We taken this into account earlier.</span>
+            <span class="k">return</span> <span class="mi">0</span>
+
+        <span class="c1"># The implementation sorts &quot;horizontally&quot; transitive dependencies, we do not do it in-place</span>
+        <span class="c1"># as we need to cast it to list (done implicitly).</span>
+        <span class="k">return</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">paths</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">cmp_to_key</span><span class="p">(</span><span class="n">cmp_function</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DependencyGraph.from_project"><a class="viewcode-back" href="../../../../thoth.adviser.python.html#thoth.adviser.python.dependency_graph.DependencyGraph.from_project">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_project</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span><span class="p">,</span>
+        <span class="n">project</span><span class="p">:</span> <span class="n">Project</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">limit_latest_versions</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">restrict_indexes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Construct a dependency graph from a project.</span>
+
+<span class="sd">        The restrict indexes flag states whether there should be used indexes only as configured from project metadata.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Load from a dump if user requested it.</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Loading file dump </span><span class="si">%r</span><span class="s2"> as per user request&quot;</span><span class="p">,</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">),</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_dump</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file_dump</span><span class="p">)</span>
+
+        <span class="c1"># Place the import statement here to simplify mocks in the testsuite.</span>
+        <span class="n">solver</span> <span class="o">=</span> <span class="n">PythonPackageGraphSolver</span><span class="p">(</span>
+            <span class="n">graph_db</span><span class="o">=</span><span class="n">graph</span><span class="p">,</span> <span class="n">runtime_environment</span><span class="o">=</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span>
+        <span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Parsing and solving direct dependencies of the requested project&quot;</span><span class="p">)</span>
+        <span class="n">dependencies_map</span><span class="p">,</span> <span class="n">full_dependencies_map</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_prepare_direct_dependencies</span><span class="p">(</span>
+            <span class="n">solver</span><span class="p">,</span> <span class="n">project</span><span class="p">,</span> <span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Map id of packages to their tuple representation.</span>
+        <span class="n">package_tuples_map</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="c1"># All the direct dependencies (a list of PackageVersion).</span>
+        <span class="n">all_direct_dependencies</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">dependencies_map</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+        <span class="c1"># All paths that should be included for computed stacks.</span>
+        <span class="n">all_transitive_dependencies_to_include</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># Core python packages as pip, setuptools, six - we need to reduce the amount of software stacks</span>
+        <span class="c1"># generated, pick the most suitable ones when cutting off. These packages are also pre-analyzed by our init-job.</span>
+        <span class="n">core_packages</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">((</span><span class="s2">&quot;pip&quot;</span><span class="p">,</span> <span class="s2">&quot;setuptools&quot;</span><span class="p">,</span> <span class="s2">&quot;six&quot;</span><span class="p">),</span> <span class="p">{})</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Retrieving transitive dependencies of direct dependencies&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">all_direct_dependencies</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Retrieving transitive dependencies for </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">transitive_dependencies</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">retrieve_transitive_dependencies_python</span><span class="p">(</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="c1"># We need to explicitly iterate over these results as gremlin-python wraps result into Path object</span>
+            <span class="c1"># which does not support advanced indexing like 0::2.</span>
+            <span class="n">ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">transitive_dependencies</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">entry</span><span class="p">),</span> <span class="mi">2</span><span class="p">):</span>
+                    <span class="n">ids</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+            <span class="bp">cls</span><span class="o">.</span><span class="n">_get_python_package_tuples</span><span class="p">(</span><span class="n">package_tuples_map</span><span class="p">,</span> <span class="n">graph</span><span class="p">,</span> <span class="n">ids</span><span class="p">)</span>
+
+            <span class="c1"># Fast path - filter out paths that have a version of a direct</span>
+            <span class="c1"># dependency in it that does not correspond to the direct</span>
+            <span class="c1"># dependency. This way we can filter out a lot of nodes in the graph and reduce walks.</span>
+            <span class="n">transitive_dependencies_to_include</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">transitive_dependencies</span><span class="p">:</span>
+                <span class="n">exclude</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="n">new_entry</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">entry</span><span class="p">),</span> <span class="mi">2</span><span class="p">):</span>
+                    <span class="n">item</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+                    <span class="n">solver_error</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># Can be leaf dependency in dependency graph.</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="n">solver_error</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+
+                    <span class="n">item</span> <span class="o">=</span> <span class="n">package_tuples_map</span><span class="p">[</span><span class="n">item</span><span class="p">]</span>
+                    <span class="n">package</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+
+                    <span class="k">if</span> <span class="n">solver_error</span><span class="p">:</span>
+                        <span class="n">item</span> <span class="o">=</span> <span class="n">package_tuples_map</span><span class="p">[</span><span class="n">entry</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]]</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;Excluding a path due to package </span><span class="si">%s</span><span class="s2">: unable to install in the given environment&quot;</span><span class="p">,</span>
+                            <span class="n">item</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="n">exclude</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="k">break</span>
+
+                    <span class="k">if</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">core_packages</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                        <span class="k">if</span> <span class="n">version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">core_packages</span><span class="p">[</span><span class="n">package</span><span class="p">]:</span>
+                            <span class="n">core_packages</span><span class="p">[</span><span class="n">package</span><span class="p">][</span><span class="n">version</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+                        <span class="n">core_packages</span><span class="p">[</span><span class="n">package</span><span class="p">][</span><span class="n">version</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
+
+                    <span class="n">new_entry</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">package</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span><span class="p">))</span>
+                    <span class="n">direct_packages_of_this</span> <span class="o">=</span> <span class="p">[</span>
+                        <span class="n">dep</span> <span class="k">for</span> <span class="n">dep</span> <span class="ow">in</span> <span class="n">all_direct_dependencies</span> <span class="k">if</span> <span class="n">dep</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">package</span>
+                    <span class="p">]</span>
+
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">direct_packages_of_this</span><span class="p">:</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">is_direct</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="bp">cls</span><span class="o">.</span><span class="n">_is_package_version_no_index</span><span class="p">(</span><span class="n">dep</span><span class="p">,</span> <span class="n">package</span><span class="p">,</span> <span class="n">version</span><span class="p">)</span>
+                        <span class="k">for</span> <span class="n">dep</span> <span class="ow">in</span> <span class="n">direct_packages_of_this</span>
+                    <span class="p">)</span>
+                    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">is_direct</span><span class="p">):</span>
+                        <span class="k">continue</span>
+
+                    <span class="c1"># Otherwise do not include it - cut off the un-reachable dependency graph.</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;Excluding a path due to package </span><span class="si">%s</span><span class="s2">: unreachable based on direct dependencies&quot;</span><span class="p">,</span>
+                        <span class="n">item</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="n">exclude</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">break</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">exclude</span><span class="p">:</span>
+                    <span class="n">transitive_dependencies_to_include</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_entry</span><span class="p">)</span>
+
+            <span class="c1"># There are transitive dependencies, but we were not able to construct dependency graph</span>
+            <span class="c1"># with given constraints (e.g. there is always dependency on protobuf, but we asked to remove protobuf).</span>
+            <span class="k">if</span> <span class="n">transitive_dependencies</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">transitive_dependencies_to_include</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConstraintClashError</span><span class="p">(</span>
+                    <span class="s2">&quot;Unable to create a dependency graph for the given set of constraints&quot;</span>
+                <span class="p">)</span>
+
+            <span class="n">all_transitive_dependencies_to_include</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="n">transitive_dependencies_to_include</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Remove possible duplicates. They can occur when if we did not specify os, python version, ... in query</span>
+        <span class="c1"># so multiple edges could be traversed at the same time. We just cast all the lists into tuples so that</span>
+        <span class="c1"># they are hashable.</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Sorting dependencies based on their semver...&quot;</span><span class="p">)</span>
+        <span class="n">all_transitive_dependencies_to_include</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span>
+            <span class="nb">set</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">all_transitive_dependencies_to_include</span><span class="p">))</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Make sure we have all the versions parsed with semver in a PackageVersion instance.</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">all_transitive_dependencies_to_include</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">:</span>
+                <span class="bp">cls</span><span class="o">.</span><span class="n">create_package_version_record_from_tuple</span><span class="p">(</span>
+                    <span class="n">full_dependencies_map</span><span class="p">,</span> <span class="n">package_tuple</span>
+                <span class="p">)</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Sorting dependencies to preserve order of generated stacks&quot;</span><span class="p">)</span>
+        <span class="n">all_transitive_dependencies_to_include</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_sort_paths</span><span class="p">(</span>
+            <span class="n">full_dependencies_map</span><span class="p">,</span> <span class="n">all_transitive_dependencies_to_include</span>
+        <span class="p">)</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Cutting off unwanted dependencies&quot;</span><span class="p">)</span>
+        <span class="n">all_transitive_dependencies_to_include</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_cut_off_dependencies</span><span class="p">(</span>
+            <span class="n">graph</span><span class="p">,</span>
+            <span class="n">full_dependencies_map</span><span class="p">,</span>
+            <span class="n">all_transitive_dependencies_to_include</span><span class="p">,</span>
+            <span class="n">core_packages</span><span class="p">,</span>
+            <span class="n">project</span><span class="p">,</span>
+            <span class="n">restrict_indexes</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Sorting dependencies to preserve order of generated stacks&quot;</span><span class="p">)</span>
+        <span class="n">all_transitive_dependencies_to_include</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_sort_paths</span><span class="p">(</span>
+            <span class="n">full_dependencies_map</span><span class="p">,</span> <span class="n">all_transitive_dependencies_to_include</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">limit_latest_versions</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Removing older versions of packages, considering only </span><span class="si">%d</span><span class="s2"> latest versions for each package&quot;</span><span class="p">,</span>
+                <span class="n">limit_latest_versions</span>
+            <span class="p">)</span>
+            <span class="n">all_transitive_dependencies_to_include</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_limit_latest_versions</span><span class="p">(</span>
+                <span class="n">full_dependencies_map</span><span class="p">,</span>
+                <span class="n">all_transitive_dependencies_to_include</span><span class="p">,</span>
+                <span class="n">limit_latest_versions</span>
+            <span class="p">)</span>
+
+        <span class="n">dependencies_map_2</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">direct_dependencies_map</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">all_transitive_dependencies_to_include</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dependencies_map_2</span><span class="p">:</span>
+                    <span class="n">dependencies_map_2</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+                <span class="n">it</span> <span class="o">=</span> <span class="n">dependencies_map_2</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+                <span class="k">if</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
+                    <span class="n">it</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+                <span class="n">it</span> <span class="o">=</span> <span class="n">it</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+                <span class="k">if</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
+                    <span class="n">it</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span> <span class="o">=</span> <span class="n">full_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
+
+                <span class="k">if</span> <span class="n">idx</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">direct_dependencies_map</span><span class="p">:</span>
+                    <span class="n">direct_dependencies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">it</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]])</span>
+                    <span class="n">direct_dependencies_map</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Creating dependency graph&quot;</span><span class="p">)</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">dependencies_map</span><span class="p">,</span>
+            <span class="n">project</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+            <span class="n">meta</span><span class="o">=</span><span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="p">,</span>
+            <span class="n">full_dependencies_map</span><span class="o">=</span><span class="n">dependencies_map_2</span><span class="p">,</span>
+            <span class="n">paths</span><span class="o">=</span><span class="n">all_transitive_dependencies_to_include</span><span class="p">,</span>
+            <span class="n">direct_dependencies</span><span class="o">=</span><span class="n">direct_dependencies</span><span class="p">,</span>
+            <span class="n">limit_latest_versions</span><span class="o">=</span><span class="n">limit_latest_versions</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Store in a dump if user requested it.</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Storing file dump as per user request&quot;</span><span class="p">)</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">),</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_dump</span><span class="p">:</span>
+                <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">file_dump</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">instance</span></div>
+
+    <span class="k">def</span> <span class="nf">_construct_libdependency_graph_kwargs</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Construct keyword arguments to be passed to the libdependency graph implementation.&quot;&quot;&quot;</span>
+        <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">dependency_types</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">dependency_types_seen</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">reverse_context</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">show_packages</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_SHOW_PACKAGES&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
+        <span class="k">for</span> <span class="n">package_name</span><span class="p">,</span> <span class="n">package_versions</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">full_dependencies_map</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">show_packages</span><span class="p">:</span>
+                <span class="n">count</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">values</span><span class="p">())</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Package </span><span class="si">%r</span><span class="s2">: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_name</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">version</span><span class="p">,</span> <span class="n">package_indexes</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">index_url</span><span class="p">,</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_indexes</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">package_tuple</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
+                        <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="n">reverse_context</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+                    <span class="n">context</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">show_packages</span><span class="p">:</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="si">%r</span><span class="s2"> from </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">context</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">context</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">])</span>
+
+                    <span class="k">if</span> <span class="n">package_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dependency_types_seen</span><span class="p">:</span>
+                        <span class="n">dependency_types_seen</span><span class="p">[</span><span class="n">package_name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dependency_types_seen</span><span class="p">)</span>
+
+                    <span class="n">dependency_types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dependency_types_seen</span><span class="p">[</span><span class="n">package_name</span><span class="p">])</span>
+
+        <span class="c1"># Map direct dependencies to their corresponding numbers based on mapping.</span>
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">direct_dependencies</span><span class="p">:</span>
+            <span class="n">package_tuple</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">direct_dependencies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">reverse_context</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">])</span>
+
+        <span class="n">dependencies_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">paths</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="n">source</span> <span class="o">=</span> <span class="n">reverse_context</span><span class="p">[(</span><span class="n">entry</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">entry</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">entry</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">2</span><span class="p">])]</span>
+                <span class="n">destination</span> <span class="o">=</span> <span class="n">reverse_context</span><span class="p">[</span>
+                    <span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">entry</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">],</span> <span class="n">entry</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">])</span>
+                <span class="p">]</span>
+                <span class="n">dependencies_list</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">source</span><span class="p">,</span> <span class="n">destination</span><span class="p">))</span>
+
+        <span class="n">dependencies_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">dependencies_list</span><span class="p">)</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">context</span><span class="p">,</span>
+            <span class="p">{</span>
+                <span class="s2">&quot;direct_dependencies&quot;</span><span class="p">:</span> <span class="n">direct_dependencies</span><span class="p">,</span>
+                <span class="s2">&quot;dependencies_list&quot;</span><span class="p">:</span> <span class="n">dependencies_list</span><span class="p">,</span>
+                <span class="s2">&quot;dependency_types&quot;</span><span class="p">:</span> <span class="n">dependency_types</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_reconstruct_stack</span><span class="p">(</span><span class="n">context</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">stack</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Reconstruct the stack based on results from libdependency graph walks.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">stack</span><span class="p">:</span>
+            <span class="n">package_entry</span> <span class="o">=</span> <span class="n">context</span><span class="p">[</span><span class="n">item</span><span class="p">]</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_entry</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_create_package_versions</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">stack</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Create package versions out of package tuples.</span>
+
+<span class="sd">        We cache constructed objects in the context so we instantiate them only once.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">stack</span><span class="p">:</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">full_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]][</span>
+                <span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+            <span class="p">]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">PackageVersion</span><span class="p">):</span>
+                <span class="n">entry</span> <span class="o">=</span> <span class="n">PackageVersion</span><span class="p">(</span>
+                    <span class="n">name</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                    <span class="n">version</span><span class="o">=</span><span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                    <span class="n">index</span><span class="o">=</span><span class="n">Source</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+                    <span class="n">develop</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">full_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]][</span>
+                    <span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+                <span class="p">]</span> <span class="o">=</span> <span class="n">entry</span>
+
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+<div class="viewcode-block" id="DependencyGraph.walk"><a class="viewcode-back" href="../../../../thoth.adviser.python.html#thoth.adviser.python.dependency_graph.DependencyGraph.walk">[docs]</a>    <span class="k">def</span> <span class="nf">walk</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">decision_function</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Callable</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Generator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Generate software stacks based on traversing the dependency graph.</span>
+
+<span class="sd">        @param decision_function: function used to filter out stacks</span>
+<span class="sd">        @return: a generator, each item yielded value is one option of a resolved software stack</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Computing possible stack candidates, estimated stacks count: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stacks_estimated</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">context</span><span class="p">,</span> <span class="n">libdependency_kwargs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_libdependency_graph_kwargs</span><span class="p">()</span>
+
+        <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">iter_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">libdependency_graph</span> <span class="o">=</span> <span class="n">LibDependencyGraph</span><span class="p">(</span><span class="o">**</span><span class="n">libdependency_kwargs</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">stack_identifiers</span> <span class="ow">in</span> <span class="n">libdependency_graph</span><span class="o">.</span><span class="n">walk</span><span class="p">():</span>
+                <span class="n">stack</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reconstruct_stack</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">stack_identifiers</span><span class="p">)</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="s2">&quot;Found a new stack, asking decision function for inclusion&quot;</span>
+                <span class="p">)</span>
+                <span class="n">decision_function_result</span> <span class="o">=</span> <span class="n">decision_function</span><span class="p">(</span><span class="n">stack</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">decision_function_result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">False</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;Decision function included the computed stack - result was </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">decision_function_result</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                    <span class="p">)</span>
+                    <span class="n">package_versions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_package_versions</span><span class="p">(</span><span class="n">stack</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Included stack, yielding it: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">stack</span><span class="p">)</span>
+                    <span class="c1"># Discard original sources so they are filled correctly from packages.</span>
+                    <span class="n">pipfile_meta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+                    <span class="n">pipfile_meta</span><span class="p">[</span><span class="s2">&quot;sources&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+                    <span class="k">yield</span> <span class="n">decision_function_result</span><span class="p">,</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">(</span>
+                        <span class="n">packages</span><span class="o">=</span><span class="n">direct_dependencies</span><span class="p">,</span>
+                        <span class="n">packages_locked</span><span class="o">=</span><span class="n">package_versions</span><span class="p">,</span>
+                        <span class="n">meta</span><span class="o">=</span><span class="n">PipfileMeta</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">pipfile_meta</span><span class="p">),</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Decision function excluded the computed stack&quot;</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Excluded stack </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">stack</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">PrematureStreamEndError</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_closed_properly</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Stack stream was closed prematurely (OOM?)&quot;</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+    <a id="sidebar-anchor"></a>
+    
+
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+      </ul>
+    </div>
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Thoth team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>

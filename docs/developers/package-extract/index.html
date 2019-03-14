@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Thoth Package Extract &#8212; Thoth Package Extract NA documentation</title>
+    <link rel="stylesheet" href="_static/pydoctheme.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/sidebar.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="thoth.package_extract package" href="thoth.package_extract.html" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <link rel="shortcut icon" type="image/png" href="_static/favicon.png" />
+    <meta name="viewport" content="width=device-width,initial-scale=0.8">
+    
+    
+
+  </head><body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
+        <li><a href="#">Thoth Package Extract NA documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="thoth-package-extract">
+<h1>Thoth Package Extract<a class="headerlink" href="#thoth-package-extract" title="Permalink to this headline">¶</a></h1>
+<p>A tool to extract dependencies from an image and image build logs.</p>
+<div class="section" id="extracting-installed-packages-from-install-logs">
+<h2>Extracting installed packages from install logs<a class="headerlink" href="#extracting-installed-packages-from-install-logs" title="Permalink to this headline">¶</a></h2>
+<p>You can use this tool to get information about installed packages from install logs. Currently, there is supported parsing of install logs from <code class="docutils literal notranslate"><span class="pre">pip</span></code>, <code class="docutils literal notranslate"><span class="pre">pip3</span></code>, <code class="docutils literal notranslate"><span class="pre">dnf</span></code> and <code class="docutils literal notranslate"><span class="pre">yum</span></code> output. The tool automatically detects based on the output which package manager was used and provides a structured output of installed packages.</p>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">Tools <code class="docutils literal notranslate"><span class="pre">dnf</span></code> and <code class="docutils literal notranslate"><span class="pre">yum</span></code> suppress output of already installed dependencies. This means that already satisfied dependencies do not occur in the resulting JSON.</p>
+</div>
+<div class="admonition warning">
+<p class="first admonition-title">Warning</p>
+<p class="last">When installing packages using <code class="docutils literal notranslate"><span class="pre">pip</span></code> (or <code class="docutils literal notranslate"><span class="pre">pip3</span></code>) the package manager reports already satisfied dependencies but does not report version information. Thus the version information is not available in these cases in the resulting output.</p>
+</div>
+<p>It’s completely fine to use install log extraction for docker build logs. Note however that the already installed packages in the base image will be missing in the output.</p>
+</div>
+<div class="section" id="extracting-dependencies-directly-from-an-image">
+<h2>Extracting dependencies directly from an image<a class="headerlink" href="#extracting-dependencies-directly-from-an-image" title="Permalink to this headline">¶</a></h2>
+<p>Tool thoth-package-extract allows you to extract dependencies from an image directly by inspecting its content. As there is directly inspected the content of image, the output is accurate compared to the pure build log parsing.</p>
+<p>To gather information about python packages installed, there is a need to execute python scripts of installed packages given the Python packaging design. In some cases this can be dangerous as there could be executed potentially malicious parts of code (see <a class="reference external" href="http://www.nbu.gov.sk/skcsirt-sa-20170909-pypi/">this typo squashing</a> as an example).</p>
+</div>
+<div class="section" id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
+<p>Use prepared Dockerfile:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/thoth-station/package-extract</span>
+<span class="go">cd package-extract</span>
+<span class="go">docker build . -t package-extract</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="example-of-parsing-install-logs">
+<h2>Example of parsing install logs<a class="headerlink" href="#example-of-parsing-install-logs" title="Permalink to this headline">¶</a></h2>
+<p>An example of parsing installed packages during:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> pip3 install --user flask <span class="p">|</span> docker run -i package-extract extract-buildlog -i -
+
+<span class="go">{</span>
+<span class="go">  &quot;metadata&quot;: {</span>
+<span class="go">    &quot;analyzer&quot;: &quot;thoth-package-extract&quot;,</span>
+<span class="go">    &quot;analyzer_version&quot;: &quot;1.0.0&quot;,</span>
+<span class="go">    &quot;arguments&quot;: {</span>
+<span class="go">      &quot;extract-buildlog&quot;: {</span>
+<span class="go">        &quot;input_file&quot;: &quot;&lt;_io.TextIOWrapper name=&#39;&lt;stdin&gt;&#39; mode=&#39;r&#39; encoding=&#39;UTF-8&#39;&gt;&quot;,</span>
+<span class="go">        &quot;no_pretty&quot;: false,</span>
+<span class="go">        &quot;output&quot;: null</span>
+<span class="go">      },</span>
+<span class="go">      &quot;thoth-package-extract&quot;: {</span>
+<span class="go">        &quot;no_color&quot;: false,</span>
+<span class="go">        &quot;verbose&quot;: false</span>
+<span class="go">      }</span>
+<span class="go">    },</span>
+<span class="go">    &quot;datetime&quot;: &quot;2018-06-18T15:53:23.129270&quot;,</span>
+<span class="go">    &quot;distribution&quot;: {</span>
+<span class="go">      &quot;codename&quot;: &quot;Twenty Seven&quot;,</span>
+<span class="go">      &quot;id&quot;: &quot;fedora&quot;,</span>
+<span class="go">      &quot;like&quot;: &quot;&quot;,</span>
+<span class="go">      &quot;version&quot;: &quot;27&quot;,</span>
+<span class="go">      &quot;version_parts&quot;: {</span>
+<span class="go">        &quot;build_number&quot;: &quot;&quot;,</span>
+<span class="go">        &quot;major&quot;: &quot;27&quot;,</span>
+<span class="go">        &quot;minor&quot;: &quot;&quot;</span>
+<span class="go">      }</span>
+<span class="go">    },</span>
+<span class="go">    &quot;hostname&quot;: &quot;268f19027ea4&quot;,</span>
+<span class="go">    &quot;python&quot;: {</span>
+<span class="go">      &quot;api_version&quot;: 1013,</span>
+<span class="go">      &quot;implementation_name&quot;: &quot;cpython&quot;,</span>
+<span class="go">      &quot;major&quot;: 3,</span>
+<span class="go">      &quot;micro&quot;: 5,</span>
+<span class="go">      &quot;minor&quot;: 6,</span>
+<span class="go">      &quot;releaselevel&quot;: &quot;final&quot;,</span>
+<span class="go">      &quot;serial&quot;: 0</span>
+<span class="go">    }</span>
+<span class="go">  },</span>
+<span class="go">  &quot;result&quot;: [</span>
+<span class="go">    {</span>
+<span class="go">      &quot;handler&quot;: &quot;yum&quot;,</span>
+<span class="go">      &quot;result&quot;: []</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;handler&quot;: &quot;pip3&quot;,</span>
+<span class="go">      &quot;result&quot;: [</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: &quot;/usr/lib/python3.6/site-packages/click-6.6-py3.6.egg&quot;,</span>
+<span class="go">          &quot;from&quot;: [</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: null</span>
+<span class="go">            }</span>
+<span class="go">          ],</span>
+<span class="go">          &quot;package&quot;: &quot;click&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: null,</span>
+<span class="go">          &quot;version_specified&quot;: &quot;&gt;=5.1&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: null,</span>
+<span class="go">          &quot;artifact&quot;: {</span>
+<span class="go">            &quot;name&quot;: &quot;https://files.pythonhosted.org/packages/7f/ff/ae64bacdfc95f27a016a7bed8e8686763ba4d277a78ca76f32659220a731/Jinja2-2.10-py2.py3-none-any.whl&quot;,</span>
+<span class="go">            &quot;size&quot;: &quot;126kB&quot;</span>
+<span class="go">          },</span>
+<span class="go">          &quot;from&quot;: [</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: null</span>
+<span class="go">            }</span>
+<span class="go">          ],</span>
+<span class="go">          &quot;package&quot;: &quot;Jinja2&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: &quot;2.10&quot;,</span>
+<span class="go">          &quot;version_specified&quot;: &quot;&gt;=2.10&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: null,</span>
+<span class="go">          &quot;artifact&quot;: {</span>
+<span class="go">            &quot;name&quot;: &quot;https://files.pythonhosted.org/packages/20/c4/12e3e56473e52375aa29c4764e70d1b8f3efa6682bef8d0aae04fe335243/Werkzeug-0.14.1-py2.py3-none-any.whl&quot;,</span>
+<span class="go">            &quot;size&quot;: &quot;322kB&quot;</span>
+<span class="go">          },</span>
+<span class="go">          &quot;from&quot;: [</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: null</span>
+<span class="go">            }</span>
+<span class="go">          ],</span>
+<span class="go">          &quot;package&quot;: &quot;Werkzeug&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: &quot;0.14.1&quot;,</span>
+<span class="go">          &quot;version_specified&quot;: &quot;&gt;=0.14&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: &quot;/home/fpokorny/.local/lib/python3.6/site-packages&quot;,</span>
+<span class="go">          &quot;from&quot;: [</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: null</span>
+<span class="go">            }</span>
+<span class="go">          ],</span>
+<span class="go">          &quot;package&quot;: &quot;itsdangerous&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: null,</span>
+<span class="go">          &quot;version_specified&quot;: &quot;&gt;=0.24&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: &quot;/home/fpokorny/.local/lib/python3.6/site-packages&quot;,</span>
+<span class="go">          &quot;from&quot;: [</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;Jinja2&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: &quot;&gt;=2.10&quot;</span>
+<span class="go">            },</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: null</span>
+<span class="go">            }</span>
+<span class="go">          ],</span>
+<span class="go">          &quot;package&quot;: &quot;MarkupSafe&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: null,</span>
+<span class="go">          &quot;version_specified&quot;: &quot;&gt;=0.23&quot;</span>
+<span class="go">        }</span>
+<span class="go">      ]</span>
+<span class="go">    }</span>
+<span class="go">  ]</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+<p>Or you can also use this tool to extract information about packages that were installed during docker build:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> docker build . -f Dockerfile.test --no-cache <span class="p">|</span> docker run -i package-extract extract-buildlog -i -
+<span class="go">{</span>
+<span class="go">  &quot;metadata&quot;: {</span>
+<span class="go">    &quot;analyzer&quot;: &quot;thoth-package-extract&quot;,</span>
+<span class="go">    &quot;analyzer_version&quot;: &quot;1.0.0&quot;,</span>
+<span class="go">    &quot;arguments&quot;: {</span>
+<span class="go">      &quot;extract-buildlog&quot;: {</span>
+<span class="go">        &quot;input_file&quot;: &quot;&lt;_io.TextIOWrapper name=&#39;&lt;stdin&gt;&#39; mode=&#39;r&#39; encoding=&#39;UTF-8&#39;&gt;&quot;,</span>
+<span class="go">        &quot;no_pretty&quot;: false,</span>
+<span class="go">        &quot;output&quot;: null</span>
+<span class="go">      },</span>
+<span class="go">      &quot;thoth-package-extract&quot;: {</span>
+<span class="go">        &quot;no_color&quot;: false,</span>
+<span class="go">        &quot;verbose&quot;: false</span>
+<span class="go">      }</span>
+<span class="go">    },</span>
+<span class="go">    &quot;datetime&quot;: &quot;2018-06-18T18:08:47.259811&quot;,</span>
+<span class="go">    &quot;distribution&quot;: {</span>
+<span class="go">      &quot;codename&quot;: &quot;Twenty Seven&quot;,</span>
+<span class="go">      &quot;id&quot;: &quot;fedora&quot;,</span>
+<span class="go">      &quot;like&quot;: &quot;&quot;,</span>
+<span class="go">      &quot;version&quot;: &quot;27&quot;,</span>
+<span class="go">      &quot;version_parts&quot;: {</span>
+<span class="go">        &quot;build_number&quot;: &quot;&quot;,</span>
+<span class="go">        &quot;major&quot;: &quot;27&quot;,</span>
+<span class="go">        &quot;minor&quot;: &quot;&quot;</span>
+<span class="go">      }</span>
+<span class="go">    },</span>
+<span class="go">    &quot;hostname&quot;: &quot;b8c6f33cf757&quot;,</span>
+<span class="go">    &quot;python&quot;: {</span>
+<span class="go">      &quot;api_version&quot;: 1013,</span>
+<span class="go">      &quot;implementation_name&quot;: &quot;cpython&quot;,</span>
+<span class="go">      &quot;major&quot;: 3,</span>
+<span class="go">      &quot;micro&quot;: 5,</span>
+<span class="go">      &quot;minor&quot;: 6,</span>
+<span class="go">      &quot;releaselevel&quot;: &quot;final&quot;,</span>
+<span class="go">      &quot;serial&quot;: 0</span>
+<span class="go">    }</span>
+<span class="go">  },</span>
+<span class="go">  &quot;result&quot;: [</span>
+<span class="go">    {</span>
+<span class="go">      &quot;handler&quot;: &quot;yum&quot;,</span>
+<span class="go">      &quot;result&quot;: [</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;noarch&quot;,</span>
+<span class="go">          &quot;dependency&quot;: false,</span>
+<span class="go">          &quot;epoch&quot;: null,</span>
+<span class="go">          &quot;name&quot;: &quot;ca-certificates&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;updates&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;392k&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: true,</span>
+<span class="go">          &quot;version&quot;: &quot;2018.2.24-1.0.fc28&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">          &quot;dependency&quot;: false,</span>
+<span class="go">          &quot;epoch&quot;: null,</span>
+<span class="go">          &quot;name&quot;: &quot;coreutils-single&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;updates&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;623k&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: true,</span>
+<span class="go">          &quot;version&quot;: &quot;8.29-7.fc28&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;noarch&quot;,</span>
+<span class="go">          &quot;dependency&quot;: false,</span>
+<span class="go">          &quot;epoch&quot;: null,</span>
+<span class="go">          &quot;name&quot;: &quot;crypto-policies&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;updates&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;40k&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: true,</span>
+<span class="go">          &quot;version&quot;: &quot;20180425-5.git6ad4018.fc28&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">          &quot;dependency&quot;: false,</span>
+<span class="go">          &quot;epoch&quot;: null,</span>
+<span class="go">          &quot;name&quot;: &quot;cryptsetup-libs&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;updates&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;291k&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: true,</span>
+<span class="go">          &quot;version&quot;: &quot;2.0.3-4.fc28&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">          &quot;dependency&quot;: false,</span>
+<span class="go">          &quot;epoch&quot;: null,</span>
+<span class="go">          &quot;name&quot;: &quot;curl&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;updates&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;343k&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: true,</span>
+<span class="go">          &quot;version&quot;: &quot;7.59.0-4.fc28&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">          &quot;dependency&quot;: false,</span>
+<span class="go">          &quot;epoch&quot;: null,</span>
+<span class="go">          &quot;name&quot;: &quot;cyrus-sasl-lib&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;updates&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;114k&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: true,</span>
+<span class="go">          &quot;version&quot;: &quot;2.1.27-0.2rc7.fc28&quot;</span>
+<span class="go">        },</span>
+<span class="go">...</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">          &quot;dependency&quot;: false,</span>
+<span class="go">          &quot;epoch&quot;: 2,</span>
+<span class="go">          &quot;name&quot;: &quot;vim-enhanced&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;updates&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;1.4M&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: false,</span>
+<span class="go">          &quot;version&quot;: &quot;8.1.042-1.fc28&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">          &quot;dependency&quot;: true,</span>
+<span class="go">          &quot;epoch&quot;: null,</span>
+<span class="go">          &quot;name&quot;: &quot;gpm-libs&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;fedora&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;38k&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: false,</span>
+<span class="go">          &quot;version&quot;: &quot;1.20.7-15.fc28&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">          &quot;dependency&quot;: true,</span>
+<span class="go">          &quot;epoch&quot;: 2,</span>
+<span class="go">          &quot;name&quot;: &quot;vim-common&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;updates&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;6.4M&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: false,</span>
+<span class="go">          &quot;version&quot;: &quot;8.1.042-1.fc28&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;noarch&quot;,</span>
+<span class="go">          &quot;dependency&quot;: true,</span>
+<span class="go">          &quot;epoch&quot;: 2,</span>
+<span class="go">          &quot;name&quot;: &quot;vim-filesystem&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;updates&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;47k&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: false,</span>
+<span class="go">          &quot;version&quot;: &quot;8.1.042-1.fc28&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">          &quot;dependency&quot;: true,</span>
+<span class="go">          &quot;epoch&quot;: null,</span>
+<span class="go">          &quot;name&quot;: &quot;which&quot;,</span>
+<span class="go">          &quot;repository&quot;: &quot;fedora&quot;,</span>
+<span class="go">          &quot;size&quot;: &quot;47k&quot;,</span>
+<span class="go">          &quot;upgrading&quot;: false,</span>
+<span class="go">          &quot;version&quot;: &quot;2.21-8.fc28&quot;</span>
+<span class="go">        }</span>
+<span class="go">      ]</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;handler&quot;: &quot;pip3&quot;,</span>
+<span class="go">      &quot;result&quot;: [</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: null,</span>
+<span class="go">          &quot;artifact&quot;: {</span>
+<span class="go">            &quot;name&quot;: &quot;https://files.pythonhosted.org/packages/7f/e7/08578774ed4536d3242b14dacb4696386634607af824ea997202cd0edb4b/Flask-1.0.2-py2.py3-none-any.whl&quot;,</span>
+<span class="go">            &quot;size&quot;: &quot;91kB&quot;</span>
+<span class="go">          },</span>
+<span class="go">          &quot;from&quot;: null,</span>
+<span class="go">          &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: &quot;1.0.2&quot;,</span>
+<span class="go">          &quot;version_specified&quot;: null</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: null,</span>
+<span class="go">          &quot;artifact&quot;: {</span>
+<span class="go">            &quot;name&quot;: &quot;https://files.pythonhosted.org/packages/7f/ff/ae64bacdfc95f27a016a7bed8e8686763ba4d277a78ca76f32659220a731/Jinja2-2.10-py2.py3-none-any.whl&quot;,</span>
+<span class="go">            &quot;size&quot;: &quot;126kB&quot;</span>
+<span class="go">          },</span>
+<span class="go">          &quot;from&quot;: [</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: null</span>
+<span class="go">            }</span>
+<span class="go">          ],</span>
+<span class="go">          &quot;package&quot;: &quot;Jinja2&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: &quot;2.10&quot;,</span>
+<span class="go">          &quot;version_specified&quot;: &quot;&gt;=2.10&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: null,</span>
+<span class="go">          &quot;artifact&quot;: {</span>
+<span class="go">            &quot;name&quot;: &quot;https://files.pythonhosted.org/packages/20/c4/12e3e56473e52375aa29c4764e70d1b8f3efa6682bef8d0aae04fe335243/Werkzeug-0.14.1-py2.py3-none-any.whl&quot;,</span>
+<span class="go">            &quot;size&quot;: &quot;322kB&quot;</span>
+<span class="go">          },</span>
+<span class="go">          &quot;from&quot;: [</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: null</span>
+<span class="go">            }</span>
+<span class="go">          ],</span>
+<span class="go">          &quot;package&quot;: &quot;Werkzeug&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: &quot;0.14.1&quot;,</span>
+<span class="go">          &quot;version_specified&quot;: &quot;&gt;=0.14&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: null,</span>
+<span class="go">          &quot;artifact&quot;: {</span>
+<span class="go">            &quot;name&quot;: &quot;https://files.pythonhosted.org/packages/dc/b4/a60bcdba945c00f6d608d8975131ab3f25b22f2bcfe1dab221165194b2d4/itsdangerous-0.24.tar.gz&quot;,</span>
+<span class="go">            &quot;size&quot;: &quot;46kB&quot;</span>
+<span class="go">          },</span>
+<span class="go">          &quot;from&quot;: [</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: null</span>
+<span class="go">            }</span>
+<span class="go">          ],</span>
+<span class="go">          &quot;package&quot;: &quot;itsdangerous&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: &quot;0.24&quot;,</span>
+<span class="go">          &quot;version_specified&quot;: &quot;&gt;=0.24&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: null,</span>
+<span class="go">          &quot;artifact&quot;: {</span>
+<span class="go">            &quot;name&quot;: &quot;https://files.pythonhosted.org/packages/34/c1/8806f99713ddb993c5366c362b2f908f18269f8d792aff1abfd700775a77/click-6.7-py2.py3-none-any.whl&quot;,</span>
+<span class="go">            &quot;size&quot;: &quot;71kB&quot;</span>
+<span class="go">          },</span>
+<span class="go">          &quot;from&quot;: [</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: null</span>
+<span class="go">            }</span>
+<span class="go">          ],</span>
+<span class="go">          &quot;package&quot;: &quot;click&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: &quot;6.7&quot;,</span>
+<span class="go">          &quot;version_specified&quot;: &quot;&gt;=5.1&quot;</span>
+<span class="go">        },</span>
+<span class="go">        {</span>
+<span class="go">          &quot;already_satisfied&quot;: null,</span>
+<span class="go">          &quot;artifact&quot;: {</span>
+<span class="go">            &quot;name&quot;: &quot;https://files.pythonhosted.org/packages/4d/de/32d741db316d8fdb7680822dd37001ef7a448255de9699ab4bfcbdf4172b/MarkupSafe-1.0.tar.gz&quot;,</span>
+<span class="go">            &quot;size&quot;: null</span>
+<span class="go">          },</span>
+<span class="go">          &quot;from&quot;: [</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;Jinja2&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: &quot;&gt;=2.10&quot;</span>
+<span class="go">            },</span>
+<span class="go">            {</span>
+<span class="go">              &quot;package&quot;: &quot;flask&quot;,</span>
+<span class="go">              &quot;version_specified&quot;: null</span>
+<span class="go">            }</span>
+<span class="go">          ],</span>
+<span class="go">          &quot;package&quot;: &quot;MarkupSafe&quot;,</span>
+<span class="go">          &quot;version_installed&quot;: &quot;1.0&quot;,</span>
+<span class="go">          &quot;version_specified&quot;: &quot;&gt;=0.23&quot;</span>
+<span class="go">        }</span>
+<span class="go">      ]</span>
+<span class="go">    }</span>
+<span class="go">  ]</span>
+<span class="go">}</span>
+
+<span class="gp">$</span> cat Dockerfile.test
+<span class="go">FROM fedora:28</span>
+<span class="go">RUN dnf install python3-pip &amp;&amp; pip3 install flask &amp;&amp; dnf update -y &amp;&amp; dnf install -y vim</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="example-of-extracting-installed-packages-inside-an-image">
+<h2>Example of extracting installed packages inside an image<a class="headerlink" href="#example-of-extracting-installed-packages-inside-an-image" title="Permalink to this headline">¶</a></h2>
+<p>To extract packages present on the resulting image run:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> docker run -i package-extract -v extract-image -i fedora:27
+<span class="go">2018-06-18 19:06:46,611 [1] DEBUG    thoth.package_extract.image: Downloading image &#39;fedora:27&#39;</span>
+<span class="go">2018-06-18 19:06:46,611 [1] DEBUG    thoth.analyzer.command: Running command &#39;skopeo copy docker://fedora:27 dir://tmp/tmp9jmeuw__&#39;</span>
+<span class="go">2018-06-18 19:06:51,669 [1] DEBUG    thoth.package_extract.image: skopeo stdout: Getting image source signatures</span>
+<span class="go">Copying blob sha256:2176639d844bbe1386912e1d9952cebdb8249923a16691025cf693963f8aec53</span>
+
+<span class="go"> 0 B / 77.54 MB</span>
+<span class="go"> 3.60 MB / 77.54 MB</span>
+<span class="go"> 9.65 MB / 77.54 MB</span>
+<span class="go"> 16.34 MB / 77.54 MB</span>
+<span class="go"> 22.86 MB / 77.54 MB</span>
+<span class="go"> 29.22 MB / 77.54 MB</span>
+<span class="go"> 35.59 MB / 77.54 MB</span>
+<span class="go"> 41.26 MB / 77.54 MB</span>
+<span class="go"> 47.86 MB / 77.54 MB</span>
+<span class="go"> 54.40 MB / 77.54 MB</span>
+<span class="go"> 61.01 MB / 77.54 MB</span>
+<span class="go"> 66.34 MB / 77.54 MB</span>
+<span class="go"> 72.99 MB / 77.54 MB</span>
+<span class="go"> 77.54 MB / 77.54 MB</span>
+<span class="go"> 77.54 MB / 77.54 MB  2s</span>
+<span class="go">Copying config sha256:9110ae7f579f35ee0c3938696f23fe0f5fbe641738ea52eb83c2df7e9995fa17</span>
+
+<span class="go"> 0 B / 2.29 KB</span>
+<span class="go"> 2.29 KB / 2.29 KB  0s</span>
+<span class="go">Writing manifest to image destination</span>
+<span class="go">Storing signatures</span>
+
+<span class="go">2018-06-18 19:06:51,671 [1] DEBUG    thoth.package_extract.image: Layers found: [{&#39;mediaType&#39;: &#39;application/vnd.docker.image.rootfs.diff.tar.gzip&#39;, &#39;size&#39;: 81308994, &#39;digest&#39;: &#39;sha256:2176639d844bbe1386912e1d9952cebdb8249923a16691025cf693963f8aec53&#39;}]</span>
+<span class="go">2018-06-18 19:06:51,671 [1] DEBUG    thoth.package_extract.image: Extracting layer &#39;2176639d844bbe1386912e1d9952cebdb8249923a16691025cf693963f8aec53&#39;</span>
+<span class="go">2018-06-18 19:06:55,444 [1] DEBUG    thoth.analyzer.command: Running command &#39;mercator -config /usr/share/mercator/handlers.yml /tmp/tmp9jmeuw__/rootfs&#39;</span>
+<span class="go">2018-06-18 19:06:55,776 [1] DEBUG    thoth.analyzer.command: Running command &quot;rpm -qa --root &#39;/tmp/tmp9jmeuw__/rootfs&#39;&quot;</span>
+<span class="go">2018-06-18 19:06:55,874 [1] DEBUG    thoth.analyzer.command: Running command &quot;repoquery --deplist --installed --installroot &#39;/tmp/tmp9jmeuw__/rootfs&#39;&quot;</span>
+<span class="go">{</span>
+<span class="go">&quot;metadata&quot;: {</span>
+<span class="go">  &quot;analyzer&quot;: &quot;thoth-package-extract&quot;,</span>
+<span class="go">  &quot;analyzer_version&quot;: &quot;1.0.0&quot;,</span>
+<span class="go">  &quot;arguments&quot;: {</span>
+<span class="go">    &quot;extract-image&quot;: {</span>
+<span class="go">      &quot;image&quot;: &quot;fedora:27&quot;,</span>
+<span class="go">      &quot;no_pretty&quot;: false,</span>
+<span class="go">      &quot;no_tls_verify&quot;: false,</span>
+<span class="go">      &quot;output&quot;: null,</span>
+<span class="go">      &quot;registry_credentials&quot;: null,</span>
+<span class="go">      &quot;timeout&quot;: null</span>
+<span class="go">    },</span>
+<span class="go">    &quot;thoth-package-extract&quot;: {</span>
+<span class="go">      &quot;no_color&quot;: false,</span>
+<span class="go">      &quot;verbose&quot;: false</span>
+<span class="go">    }</span>
+<span class="go">  },</span>
+<span class="go">  &quot;datetime&quot;: &quot;2018-06-18T19:05:33.205504&quot;,</span>
+<span class="go">  &quot;distribution&quot;: {</span>
+<span class="go">    &quot;codename&quot;: &quot;Twenty Seven&quot;,</span>
+<span class="go">    &quot;id&quot;: &quot;fedora&quot;,</span>
+<span class="go">    &quot;like&quot;: &quot;&quot;,</span>
+<span class="go">    &quot;version&quot;: &quot;27&quot;,</span>
+<span class="go">    &quot;version_parts&quot;: {</span>
+<span class="go">      &quot;build_number&quot;: &quot;&quot;,</span>
+<span class="go">      &quot;major&quot;: &quot;27&quot;,</span>
+<span class="go">      &quot;minor&quot;: &quot;&quot;</span>
+<span class="go">    }</span>
+<span class="go">  },</span>
+<span class="go">  &quot;hostname&quot;: &quot;bfd10ad99fd4&quot;,</span>
+<span class="go">  &quot;python&quot;: {</span>
+<span class="go">    &quot;api_version&quot;: 1013,</span>
+<span class="go">    &quot;implementation_name&quot;: &quot;cpython&quot;,</span>
+<span class="go">    &quot;major&quot;: 3,</span>
+<span class="go">    &quot;micro&quot;: 5,</span>
+<span class="go">    &quot;minor&quot;: 6,</span>
+<span class="go">    &quot;releaselevel&quot;: &quot;final&quot;,</span>
+<span class="go">    &quot;serial&quot;: 0</span>
+<span class="go">  }</span>
+<span class="go">},</span>
+<span class="go">&quot;result&quot;: {</span>
+<span class="go">  &quot;layers&quot;: [</span>
+<span class="go">    &quot;2176639d844bbe1386912e1d9952cebdb8249923a16691025cf693963f8aec53&quot;</span>
+<span class="go">  ],</span>
+<span class="go">  &quot;mercator&quot;: [</span>
+<span class="go">    {</span>
+<span class="go">      &quot;digests&quot;: {</span>
+<span class="go">        &quot;manifest&quot;: &quot;10460bb1fe6c167f6ef25f56cf940fab6fb40dd1&quot;</span>
+<span class="go">      },</span>
+<span class="go">      &quot;ecosystem&quot;: &quot;Python-Dist&quot;,</span>
+<span class="go">      &quot;path&quot;: &quot;/usr/lib/python3.6/site-packages/iniparse-0.4-py3.6.egg-info/PKG-INFO&quot;,</span>
+<span class="go">      &quot;result&quot;: {</span>
+<span class="go">        &quot;author&quot;: &quot;Paramjit Oberoi&quot;,</span>
+<span class="go">        &quot;author-email&quot;: &quot;param@cs.wisc.edu&quot;,</span>
+<span class="go">        &quot;classifier&quot;: &quot;Development Status :: 5 - Production/Stable\nIntended Audience :: Developers\nLicense :: OSI Approved :: MIT License\nLicense :: OSI Approved :: Python Software Foundation License\nOperating System :: OS Independent\nProgramming Language :: Python\nProgramming Language :: Python :: 2Programming Language :: Python :: 2.6\nProgramming Language :: Python :: 2.7\nProgramming Language :: Python :: 3\nProgramming Language :: Python :: 3.3\nProgramming Language :: Python :: 3.4Topic :: Software Development :: Libraries :: Python Modules&quot;,</span>
+<span class="go">        &quot;description&quot;: &quot;iniparse is an INI parser for  Python which is API compatible\nwith the standard library&#39;s ConfigParser, preserves structure of INI\nfiles (order of sections &amp; options, indentation, comments, and blank\nlines are preserved when data is updated), and is more convenient to\nuse.&quot;,</span>
+<span class="go">        &quot;home-page&quot;: &quot;http://code.google.com/p/iniparse/&quot;,</span>
+<span class="go">        &quot;license&quot;: &quot;MIT&quot;,</span>
+<span class="go">        &quot;name&quot;: &quot;iniparse&quot;,</span>
+<span class="go">        &quot;platform&quot;: &quot;UNKNOWN&quot;,</span>
+<span class="go">        &quot;summary&quot;: &quot;Accessing and Modifying INI files&quot;,</span>
+<span class="go">        &quot;version&quot;: &quot;0.4&quot;</span>
+<span class="go">      }</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;digests&quot;: {</span>
+<span class="go">        &quot;manifest&quot;: &quot;638db309ccb9ca512fc1c7c9ac207028038b8d5c&quot;</span>
+<span class="go">      },</span>
+<span class="go">      &quot;ecosystem&quot;: &quot;Python-Dist&quot;,</span>
+<span class="go">      &quot;path&quot;: &quot;/usr/lib/python3.6/site-packages/pip-9.0.1.dist-info/metadata.json&quot;,</span>
+<span class="go">      &quot;result&quot;: {</span>
+<span class="go">        &quot;classifiers&quot;: [</span>
+<span class="go">          &quot;Development Status :: 5 - Production/Stable&quot;,</span>
+<span class="go">          &quot;Intended Audience :: Developers&quot;,</span>
+<span class="go">          &quot;License :: OSI Approved :: MIT License&quot;,</span>
+<span class="go">          &quot;Topic :: Software Development :: Build Tools&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 2&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 2.6&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 2.7&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 3&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 3.3&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 3.4&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 3.5&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: Implementation :: PyPy&quot;</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;extensions&quot;: {</span>
+<span class="go">          &quot;python.commands&quot;: {</span>
+<span class="go">            &quot;wrap_console&quot;: {</span>
+<span class="go">              &quot;pip&quot;: &quot;pip:main&quot;,</span>
+<span class="go">              &quot;pip3&quot;: &quot;pip:main&quot;,</span>
+<span class="go">              &quot;pip3.6&quot;: &quot;pip:main&quot;</span>
+<span class="go">            }</span>
+<span class="go">          },</span>
+<span class="go">          &quot;python.details&quot;: {</span>
+<span class="go">            &quot;contacts&quot;: [</span>
+<span class="go">              {</span>
+<span class="go">                &quot;email&quot;: &quot;python-virtualenv@groups.google.com&quot;,</span>
+<span class="go">                &quot;name&quot;: &quot;The pip developers&quot;,</span>
+<span class="go">                &quot;role&quot;: &quot;author&quot;</span>
+<span class="go">              }</span>
+<span class="go">            ],</span>
+<span class="go">            &quot;document_names&quot;: {</span>
+<span class="go">              &quot;description&quot;: &quot;DESCRIPTION.rst&quot;</span>
+<span class="go">            },</span>
+<span class="go">            &quot;project_urls&quot;: {</span>
+<span class="go">              &quot;Home&quot;: &quot;https://pip.pypa.io/&quot;</span>
+<span class="go">            }</span>
+<span class="go">          },</span>
+<span class="go">          &quot;python.exports&quot;: {</span>
+<span class="go">            &quot;console_scripts&quot;: {</span>
+<span class="go">              &quot;pip&quot;: &quot;pip:main&quot;,</span>
+<span class="go">              &quot;pip3&quot;: &quot;pip:main&quot;,</span>
+<span class="go">              &quot;pip3.6&quot;: &quot;pip:main&quot;</span>
+<span class="go">            }</span>
+<span class="go">          }</span>
+<span class="go">        },</span>
+<span class="go">        &quot;extras&quot;: [</span>
+<span class="go">          &quot;testing&quot;</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;generator&quot;: &quot;bdist_wheel (0.30.0.a0)&quot;,</span>
+<span class="go">        &quot;keywords&quot;: [</span>
+<span class="go">          &quot;easy_install&quot;,</span>
+<span class="go">          &quot;distutils&quot;,</span>
+<span class="go">          &quot;setuptools&quot;,</span>
+<span class="go">          &quot;egg&quot;,</span>
+<span class="go">          &quot;virtualenv&quot;</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;license&quot;: &quot;MIT&quot;,</span>
+<span class="go">        &quot;metadata_version&quot;: &quot;2.0&quot;,</span>
+<span class="go">        &quot;name&quot;: &quot;pip&quot;,</span>
+<span class="go">        &quot;requires_python&quot;: &quot;&gt;=2.6,!=3.0.*,!=3.1.*,!=3.2.*&quot;,</span>
+<span class="go">        &quot;run_requires&quot;: [</span>
+<span class="go">          {</span>
+<span class="go">            &quot;extra&quot;: &quot;testing&quot;,</span>
+<span class="go">            &quot;requires&quot;: [</span>
+<span class="go">              &quot;mock&quot;,</span>
+<span class="go">              &quot;pretend&quot;,</span>
+<span class="go">              &quot;pytest&quot;,</span>
+<span class="go">              &quot;scripttest (&gt;=1.3)&quot;,</span>
+<span class="go">              &quot;virtualenv (&gt;=1.10)&quot;</span>
+<span class="go">            ]</span>
+<span class="go">          }</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;summary&quot;: &quot;The PyPA recommended tool for installing Python packages.&quot;,</span>
+<span class="go">        &quot;test_requires&quot;: [</span>
+<span class="go">          {</span>
+<span class="go">            &quot;requires&quot;: [</span>
+<span class="go">              &quot;mock&quot;,</span>
+<span class="go">              &quot;pretend&quot;,</span>
+<span class="go">              &quot;pytest&quot;,</span>
+<span class="go">              &quot;scripttest (&gt;=1.3)&quot;,</span>
+<span class="go">              &quot;virtualenv (&gt;=1.10)&quot;</span>
+<span class="go">            ]</span>
+<span class="go">          }</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;version&quot;: &quot;9.0.1&quot;</span>
+<span class="go">      }</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;digests&quot;: {</span>
+<span class="go">        &quot;manifest&quot;: &quot;17b684b084a699aac2d70e4ceb03ac69b652b493&quot;</span>
+<span class="go">      },</span>
+<span class="go">      &quot;ecosystem&quot;: &quot;Python-Dist&quot;,</span>
+<span class="go">      &quot;path&quot;: &quot;/usr/lib/python3.6/site-packages/setuptools-37.0.0.dist-info/metadata.json&quot;,</span>
+<span class="go">      &quot;result&quot;: {</span>
+<span class="go">        &quot;classifiers&quot;: [</span>
+<span class="go">          &quot;Development Status :: 5 - Production/Stable&quot;,</span>
+<span class="go">          &quot;Intended Audience :: Developers&quot;,</span>
+<span class="go">          &quot;License :: OSI Approved :: MIT License&quot;,</span>
+<span class="go">          &quot;Operating System :: OS Independent&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 2&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 2.7&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 3&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 3.3&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 3.4&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 3.5&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 3.6&quot;,</span>
+<span class="go">          &quot;Topic :: Software Development :: Libraries :: Python Modules&quot;,</span>
+<span class="go">          &quot;Topic :: System :: Archiving :: Packaging&quot;,</span>
+<span class="go">          &quot;Topic :: System :: Systems Administration&quot;,</span>
+<span class="go">          &quot;Topic :: Utilities&quot;</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;description_content_type&quot;: &quot;text/x-rst; charset=UTF-8&quot;,</span>
+<span class="go">        &quot;extensions&quot;: {</span>
+<span class="go">          &quot;python.commands&quot;: {</span>
+<span class="go">            &quot;wrap_console&quot;: {</span>
+<span class="go">              &quot;easy_install&quot;: &quot;setuptools.command.easy_install:main&quot;,</span>
+<span class="go">              &quot;easy_install-3.6&quot;: &quot;setuptools.command.easy_install:main&quot;</span>
+<span class="go">            }</span>
+<span class="go">          },</span>
+<span class="go">          &quot;python.details&quot;: {</span>
+<span class="go">            &quot;contacts&quot;: [</span>
+<span class="go">              {</span>
+<span class="go">                &quot;email&quot;: &quot;distutils-sig@python.org&quot;,</span>
+<span class="go">                &quot;name&quot;: &quot;Python Packaging Authority&quot;,</span>
+<span class="go">                &quot;role&quot;: &quot;author&quot;</span>
+<span class="go">              }</span>
+<span class="go">            ],</span>
+<span class="go">            &quot;document_names&quot;: {</span>
+<span class="go">              &quot;description&quot;: &quot;DESCRIPTION.rst&quot;,</span>
+<span class="go">              &quot;license&quot;: &quot;LICENSE.txt&quot;</span>
+<span class="go">            },</span>
+<span class="go">            &quot;project_urls&quot;: {</span>
+<span class="go">              &quot;Home&quot;: &quot;https://github.com/pypa/setuptools&quot;</span>
+<span class="go">            }</span>
+<span class="go">          },</span>
+<span class="go">          &quot;python.exports&quot;: {</span>
+<span class="go">            &quot;console_scripts&quot;: {</span>
+<span class="go">              &quot;easy_install&quot;: &quot;setuptools.command.easy_install:main&quot;,</span>
+<span class="go">              &quot;easy_install-3.6&quot;: &quot;setuptools.command.easy_install:main&quot;</span>
+<span class="go">            },</span>
+<span class="go">            &quot;distutils.commands&quot;: {</span>
+<span class="go">              &quot;alias&quot;: &quot;setuptools.command.alias:alias&quot;,</span>
+<span class="go">              &quot;bdist_egg&quot;: &quot;setuptools.command.bdist_egg:bdist_egg&quot;,</span>
+<span class="go">              &quot;bdist_rpm&quot;: &quot;setuptools.command.bdist_rpm:bdist_rpm&quot;,</span>
+<span class="go">              &quot;bdist_wininst&quot;: &quot;setuptools.command.bdist_wininst:bdist_wininst&quot;,</span>
+<span class="go">              &quot;build_clib&quot;: &quot;setuptools.command.build_clib:build_clib&quot;,</span>
+<span class="go">              &quot;build_ext&quot;: &quot;setuptools.command.build_ext:build_ext&quot;,</span>
+<span class="go">              &quot;build_py&quot;: &quot;setuptools.command.build_py:build_py&quot;,</span>
+<span class="go">              &quot;develop&quot;: &quot;setuptools.command.develop:develop&quot;,</span>
+<span class="go">              &quot;dist_info&quot;: &quot;setuptools.command.dist_info:dist_info&quot;,</span>
+<span class="go">              &quot;easy_install&quot;: &quot;setuptools.command.easy_install:easy_install&quot;,</span>
+<span class="go">              &quot;egg_info&quot;: &quot;setuptools.command.egg_info:egg_info&quot;,</span>
+<span class="go">              &quot;install&quot;: &quot;setuptools.command.install:install&quot;,</span>
+<span class="go">              &quot;install_egg_info&quot;: &quot;setuptools.command.install_egg_info:install_egg_info&quot;,</span>
+<span class="go">              &quot;install_lib&quot;: &quot;setuptools.command.install_lib:install_lib&quot;,</span>
+<span class="go">              &quot;install_scripts&quot;: &quot;setuptools.command.install_scripts:install_scripts&quot;,</span>
+<span class="go">              &quot;register&quot;: &quot;setuptools.command.register:register&quot;,</span>
+<span class="go">              &quot;rotate&quot;: &quot;setuptools.command.rotate:rotate&quot;,</span>
+<span class="go">              &quot;saveopts&quot;: &quot;setuptools.command.saveopts:saveopts&quot;,</span>
+<span class="go">              &quot;sdist&quot;: &quot;setuptools.command.sdist:sdist&quot;,</span>
+<span class="go">              &quot;setopt&quot;: &quot;setuptools.command.setopt:setopt&quot;,</span>
+<span class="go">              &quot;test&quot;: &quot;setuptools.command.test:test&quot;,</span>
+<span class="go">              &quot;upload&quot;: &quot;setuptools.command.upload:upload&quot;,</span>
+<span class="go">              &quot;upload_docs&quot;: &quot;setuptools.command.upload_docs:upload_docs&quot;</span>
+<span class="go">            },</span>
+<span class="go">            &quot;distutils.setup_keywords&quot;: {</span>
+<span class="go">              &quot;convert_2to3_doctests&quot;: &quot;setuptools.dist:assert_string_list&quot;,</span>
+<span class="go">              &quot;dependency_links&quot;: &quot;setuptools.dist:assert_string_list&quot;,</span>
+<span class="go">              &quot;eager_resources&quot;: &quot;setuptools.dist:assert_string_list&quot;,</span>
+<span class="go">              &quot;entry_points&quot;: &quot;setuptools.dist:check_entry_points&quot;,</span>
+<span class="go">              &quot;exclude_package_data&quot;: &quot;setuptools.dist:check_package_data&quot;,</span>
+<span class="go">              &quot;extras_require&quot;: &quot;setuptools.dist:check_extras&quot;,</span>
+<span class="go">              &quot;include_package_data&quot;: &quot;setuptools.dist:assert_bool&quot;,</span>
+<span class="go">              &quot;install_requires&quot;: &quot;setuptools.dist:check_requirements&quot;,</span>
+<span class="go">              &quot;namespace_packages&quot;: &quot;setuptools.dist:check_nsp&quot;,</span>
+<span class="go">              &quot;package_data&quot;: &quot;setuptools.dist:check_package_data&quot;,</span>
+<span class="go">              &quot;packages&quot;: &quot;setuptools.dist:check_packages&quot;,</span>
+<span class="go">              &quot;python_requires&quot;: &quot;setuptools.dist:check_specifier&quot;,</span>
+<span class="go">              &quot;setup_requires&quot;: &quot;setuptools.dist:check_requirements&quot;,</span>
+<span class="go">              &quot;test_loader&quot;: &quot;setuptools.dist:check_importable&quot;,</span>
+<span class="go">              &quot;test_runner&quot;: &quot;setuptools.dist:check_importable&quot;,</span>
+<span class="go">              &quot;test_suite&quot;: &quot;setuptools.dist:check_test_suite&quot;,</span>
+<span class="go">              &quot;tests_require&quot;: &quot;setuptools.dist:check_requirements&quot;,</span>
+<span class="go">              &quot;use_2to3&quot;: &quot;setuptools.dist:assert_bool&quot;,</span>
+<span class="go">              &quot;use_2to3_exclude_fixers&quot;: &quot;setuptools.dist:assert_string_list&quot;,</span>
+<span class="go">              &quot;use_2to3_fixers&quot;: &quot;setuptools.dist:assert_string_list&quot;,</span>
+<span class="go">              &quot;zip_safe&quot;: &quot;setuptools.dist:assert_bool&quot;</span>
+<span class="go">            },</span>
+<span class="go">            &quot;egg_info.writers&quot;: {</span>
+<span class="go">              &quot;PKG-INFO&quot;: &quot;setuptools.command.egg_info:write_pkg_info&quot;,</span>
+<span class="go">              &quot;dependency_links.txt&quot;: &quot;setuptools.command.egg_info:overwrite_arg&quot;,</span>
+<span class="go">              &quot;depends.txt&quot;: &quot;setuptools.command.egg_info:warn_depends_obsolete&quot;,</span>
+<span class="go">              &quot;eager_resources.txt&quot;: &quot;setuptools.command.egg_info:overwrite_arg&quot;,</span>
+<span class="go">              &quot;entry_points.txt&quot;: &quot;setuptools.command.egg_info:write_entries&quot;,</span>
+<span class="go">              &quot;namespace_packages.txt&quot;: &quot;setuptools.command.egg_info:overwrite_arg&quot;,</span>
+<span class="go">              &quot;requires.txt&quot;: &quot;setuptools.command.egg_info:write_requirements&quot;,</span>
+<span class="go">              &quot;top_level.txt&quot;: &quot;setuptools.command.egg_info:write_toplevel_names&quot;</span>
+<span class="go">            },</span>
+<span class="go">            &quot;setuptools.installation&quot;: {</span>
+<span class="go">              &quot;eggsecutable&quot;: &quot;setuptools.command.easy_install:bootstrap&quot;</span>
+<span class="go">            }</span>
+<span class="go">          }</span>
+<span class="go">        },</span>
+<span class="go">        &quot;extras&quot;: [</span>
+<span class="go">          &quot;certs&quot;,</span>
+<span class="go">          &quot;ssl&quot;</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;generator&quot;: &quot;bdist_wheel (0.30.0.a0)&quot;,</span>
+<span class="go">        &quot;keywords&quot;: [</span>
+<span class="go">          &quot;CPAN&quot;,</span>
+<span class="go">          &quot;PyPI&quot;,</span>
+<span class="go">          &quot;distutils&quot;,</span>
+<span class="go">          &quot;eggs&quot;,</span>
+<span class="go">          &quot;package&quot;,</span>
+<span class="go">          &quot;management&quot;</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;metadata_version&quot;: &quot;2.0&quot;,</span>
+<span class="go">        &quot;name&quot;: &quot;setuptools&quot;,</span>
+<span class="go">        &quot;requires_python&quot;: &quot;&gt;=2.7,!=3.0.*,!=3.1.*,!=3.2.*&quot;,</span>
+<span class="go">        &quot;run_requires&quot;: [</span>
+<span class="go">          {</span>
+<span class="go">            &quot;extra&quot;: &quot;certs&quot;,</span>
+<span class="go">            &quot;requires&quot;: [</span>
+<span class="go">              &quot;certifi (==2016.9.26)&quot;</span>
+<span class="go">            ]</span>
+<span class="go">          },</span>
+<span class="go">          {</span>
+<span class="go">            &quot;environment&quot;: &quot;sys_platform==&#39;win32&#39;&quot;,</span>
+<span class="go">            &quot;extra&quot;: &quot;ssl&quot;,</span>
+<span class="go">            &quot;requires&quot;: [</span>
+<span class="go">              &quot;wincertstore (==0.2)&quot;</span>
+<span class="go">            ]</span>
+<span class="go">          }</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;summary&quot;: &quot;Easily download, build, install, upgrade, and uninstall Python packages&quot;,</span>
+<span class="go">        &quot;version&quot;: &quot;37.0.0&quot;</span>
+<span class="go">      }</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;digests&quot;: {</span>
+<span class="go">        &quot;manifest&quot;: &quot;1153f208db7328880763cf52bdcf940baf221071&quot;</span>
+<span class="go">      },</span>
+<span class="go">      &quot;ecosystem&quot;: &quot;Python-Dist&quot;,</span>
+<span class="go">      &quot;path&quot;: &quot;/usr/lib/python3.6/site-packages/six-1.11.0.dist-info/metadata.json&quot;,</span>
+<span class="go">      &quot;result&quot;: {</span>
+<span class="go">        &quot;classifiers&quot;: [</span>
+<span class="go">          &quot;Programming Language :: Python :: 2&quot;,</span>
+<span class="go">          &quot;Programming Language :: Python :: 3&quot;,</span>
+<span class="go">          &quot;Intended Audience :: Developers&quot;,</span>
+<span class="go">          &quot;License :: OSI Approved :: MIT License&quot;,</span>
+<span class="go">          &quot;Topic :: Software Development :: Libraries&quot;,</span>
+<span class="go">          &quot;Topic :: Utilities&quot;</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;extensions&quot;: {</span>
+<span class="go">          &quot;python.details&quot;: {</span>
+<span class="go">            &quot;contacts&quot;: [</span>
+<span class="go">              {</span>
+<span class="go">                &quot;email&quot;: &quot;benjamin@python.org&quot;,</span>
+<span class="go">                &quot;name&quot;: &quot;Benjamin Peterson&quot;,</span>
+<span class="go">                &quot;role&quot;: &quot;author&quot;</span>
+<span class="go">              }</span>
+<span class="go">            ],</span>
+<span class="go">            &quot;document_names&quot;: {</span>
+<span class="go">              &quot;description&quot;: &quot;DESCRIPTION.rst&quot;</span>
+<span class="go">            },</span>
+<span class="go">            &quot;project_urls&quot;: {</span>
+<span class="go">              &quot;Home&quot;: &quot;http://pypi.python.org/pypi/six/&quot;</span>
+<span class="go">            }</span>
+<span class="go">          }</span>
+<span class="go">        },</span>
+<span class="go">        &quot;generator&quot;: &quot;bdist_wheel (0.30.0.a0)&quot;,</span>
+<span class="go">        &quot;license&quot;: &quot;MIT&quot;,</span>
+<span class="go">        &quot;metadata_version&quot;: &quot;2.0&quot;,</span>
+<span class="go">        &quot;name&quot;: &quot;six&quot;,</span>
+<span class="go">        &quot;summary&quot;: &quot;Python 2 and 3 compatibility utilities&quot;,</span>
+<span class="go">        &quot;test_requires&quot;: [</span>
+<span class="go">          {</span>
+<span class="go">            &quot;requires&quot;: [</span>
+<span class="go">              &quot;pytest&quot;</span>
+<span class="go">            ]</span>
+<span class="go">          }</span>
+<span class="go">        ],</span>
+<span class="go">        &quot;version&quot;: &quot;1.11.0&quot;</span>
+<span class="go">      }</span>
+<span class="go">    }</span>
+<span class="go">  ],</span>
+<span class="go">  &quot;rpm&quot;: [</span>
+<span class="go">    &quot;xkeyboard-config-2.22-1.fc27.noarch&quot;,</span>
+<span class="go">    &quot;emacs-filesystem-25.3-3.fc27.noarch&quot;,</span>
+<span class="go">    &quot;fedora-repos-27-2.noarch&quot;,</span>
+<span class="go">    &quot;setup-2.10.10-1.fc27.noarch&quot;,</span>
+<span class="go">    &quot;basesystem-11-4.fc27.noarch&quot;,</span>
+<span class="go">    &quot;libreport-filesystem-2.9.3-2.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;tzdata-2018c-1.fc27.noarch&quot;,</span>
+<span class="go">    &quot;glibc-langpack-en-2.26-26.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;ncurses-libs-6.0-13.20170722.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libsepol-2.7-2.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libselinux-2.7-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;info-6.4-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;bzip2-libs-1.0.6-24.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;expat-2.2.5-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;nspr-4.18.0-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;elfutils-libelf-0.170-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libgcrypt-1.8.2-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libxml2-2.9.7-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;gmp-6.1.2-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libzstd-1.3.3-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;chkconfig-1.10-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libcom_err-1.43.5-2.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libattr-2.4.47-21.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;sed-4.4-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libunistring-0.9.7-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;lz4-libs-1.8.0-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libcap-ng-0.7.8-5.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;nss-softokn-freebl-3.35.0-1.0.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;nss-softokn-3.35.0-1.0.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;keyutils-libs-1.5.10-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;grep-3.1-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;dbus-libs-1.12.0-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;p11-kit-trust-0.23.9-2.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libusbx-1.0.21-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libpsl-0.18.0-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;mpfr-3.1.6-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;gdbm-1.13-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libdb-utils-5.3.28-27.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;kmod-libs-25-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;coreutils-common-8.27-20.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;elfutils-default-yama-scope-0.170-1.fc27.noarch&quot;,</span>
+<span class="go">    &quot;ncurses-6.0-13.20170722.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;coreutils-8.27-20.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;python3-pip-9.0.1-14.fc27.noarch&quot;,</span>
+<span class="go">    &quot;python3-3.6.4-8.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libblkid-2.30.2-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libmount-2.30.2-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;dbus-glib-0.108-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libutempter-1.1.6-11.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;python3-libcomps-0.1.8-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;python3-iniparse-0.4-26.fc27.noarch&quot;,</span>
+<span class="go">    &quot;gzip-1.8-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libpwquality-1.4.0-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;nss-pem-1.0.3-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;nss-sysinit-3.35.0-1.1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libarchive-3.3.1-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;trousers-lib-0.3.13-9.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libsss_nss_idmap-1.16.0-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libsigsegv-2.11-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;krb5-libs-1.15.2-7.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;openldap-2.4.45-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;qrencode-libs-3.4.4-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;gnupg2-2.2.5-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;python3-gpg-1.9.0-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;util-linux-2.30.2-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;iptables-libs-1.6.1-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;device-mapper-libs-1.02.144-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;systemd-pam-234-10.git5f8984e.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;dbus-1.12.0-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libcurl-7.55.1-9.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;python3-librepo-1.8.0-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;rpm-plugin-selinux-4.14.1-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;rpm-4.14.1-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libdnf-0.11.1-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;deltarpm-3.6-24.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;python3-rpm-4.14.1-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;dnf-2.7.5-2.fc27.noarch&quot;,</span>
+<span class="go">    &quot;rpm-plugin-systemd-inhibit-4.14.1-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;gnupg2-smime-2.2.5-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;nss-tools-3.35.0-1.1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;pinentry-0.9.7-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;shared-mime-info-1.9-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;tar-1.29-7.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libxkbcommon-0.7.1-5.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;rootfiles-8.1-21.fc27.noarch&quot;,</span>
+<span class="go">    &quot;libgcc-7.3.1-5.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;publicsuffix-list-dafsa-20180223-1.fc27.noarch&quot;,</span>
+<span class="go">    &quot;fedora-gpg-keys-27-2.noarch&quot;,</span>
+<span class="go">    &quot;fedora-release-27-1.noarch&quot;,</span>
+<span class="go">    &quot;filesystem-3.3-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;ncurses-base-6.0-13.20170722.fc27.noarch&quot;,</span>
+<span class="go">    &quot;dnf-conf-2.7.5-2.fc27.noarch&quot;,</span>
+<span class="go">    &quot;glibc-common-2.26-26.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;glibc-2.26-26.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;bash-4.4.19-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;pcre2-10.31-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;zlib-1.2.11-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;xz-libs-5.2.3-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libgpg-error-1.27-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libdb-5.3.28-27.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;nss-util-3.35.0-1.0.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libcap-2.25-7.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;popt-1.16-12.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;readline-7.0-7.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libuuid-2.30.2-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;lua-libs-5.3.4-7.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libassuan-2.5.1-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libffi-3.1-14.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libacl-2.2.52-18.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;p11-kit-0.23.9-2.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libidn2-2.0.4-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;sqlite-libs-3.20.1-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;audit-libs-2.8.2-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libcrypt-nss-2.26-26.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libksba-1.3.5-5.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;pcre-8.41-5.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;systemd-libs-234-10.git5f8984e.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libtasn1-4.13-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;ca-certificates-2018.2.22-1.0.fc27.noarch&quot;,</span>
+<span class="go">    &quot;libsemanage-2.7-2.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;acl-2.2.52-18.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;nettle-3.4-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libcomps-0.1.8-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libmetalink-0.1.3-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libidn-1.33-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;file-libs-5.31-10.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;elfutils-libs-0.170-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;openssl-libs-1.1.0g-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;crypto-policies-20170816-2.gite0a4066.fc27.noarch&quot;,</span>
+<span class="go">    &quot;python3-setuptools-37.0.0-1.fc27.noarch&quot;,</span>
+<span class="go">    &quot;python3-libs-3.6.4-8.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;shadow-utils-4.5-4.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;glib2-2.54.3-2.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libsecret-0.18.5-5.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libfdisk-2.30.2-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;python3-six-1.11.0-1.fc27.noarch&quot;,</span>
+<span class="go">    &quot;gnutls-3.5.18-2.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;cracklib-2.9.6-7.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;pam-1.3.0-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;nss-3.35.0-1.1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;ima-evm-utils-1.1-2.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libssh2-1.8.0-5.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libsss_idmap-1.16.0-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libverto-0.2.6-11.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;gawk-4.1.4-8.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;cyrus-sasl-lib-2.1.26-34.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libseccomp-2.3.3-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;npth-1.5-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;gpgme-1.9.0-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libsmartcols-2.30.2-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libpcap-1.8.1-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;device-mapper-1.02.144-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;cryptsetup-libs-1.7.5-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;systemd-234-10.git5f8984e.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libnghttp2-1.25.0-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;librepo-1.8.0-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;curl-7.55.1-9.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;rpm-libs-4.14.1-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;libsolv-0.6.33-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;python3-hawkey-0.11.1-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;rpm-build-libs-4.14.1-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;python3-dnf-2.7.5-2.fc27.noarch&quot;,</span>
+<span class="go">    &quot;dnf-yum-2.7.5-2.fc27.noarch&quot;,</span>
+<span class="go">    &quot;trousers-0.3.13-9.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;sssd-client-1.16.0-6.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;cracklib-dicts-2.9.6-7.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;python3-dbus-1.2.4-8.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;vim-minimal-8.0.1553-1.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;diffutils-3.6-3.fc27.x86_64&quot;,</span>
+<span class="go">    &quot;langpacks-en-1.0-10.fc27.noarch&quot;,</span>
+<span class="go">    &quot;gpg-pubkey-f5282ee4-58ac92a3&quot;</span>
+<span class="go">  ],</span>
+<span class="go">  &quot;rpm-dependencies&quot;: [</span>
+<span class="go">    {</span>
+<span class="go">      &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">      &quot;dependencies&quot;: [</span>
+<span class="go">        &quot;libacl = 2.2.52-18.fc27&quot;,</span>
+<span class="go">        &quot;libacl.so.1()(64bit)&quot;,</span>
+<span class="go">        &quot;libacl.so.1(ACL_1.0)(64bit)&quot;,</span>
+<span class="go">        &quot;libattr.so.1()(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6()(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.14)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.2.5)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3.4)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.4)(64bit)&quot;,</span>
+<span class="go">        &quot;rpmlib(CompressedFileNames) &lt;= 3.0.4-1&quot;,</span>
+<span class="go">        &quot;rpmlib(FileDigests) &lt;= 4.6.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadIsXz) &lt;= 5.2-1&quot;,</span>
+<span class="go">        &quot;rtld(GNU_HASH)&quot;</span>
+<span class="go">      ],</span>
+<span class="go">      &quot;epoch&quot;: null,</span>
+<span class="go">      &quot;name&quot;: &quot;acl&quot;,</span>
+<span class="go">      &quot;package_identifier&quot;: &quot;acl-2.2.52-18.fc27.x86_64&quot;,</span>
+<span class="go">      &quot;release&quot;: &quot;18.fc27&quot;,</span>
+<span class="go">      &quot;src&quot;: false,</span>
+<span class="go">      &quot;version&quot;: &quot;2.2.52&quot;</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">      &quot;dependencies&quot;: [</span>
+<span class="go">        &quot;/sbin/ldconfig&quot;,</span>
+<span class="go">        &quot;/sbin/ldconfig&quot;,</span>
+<span class="go">        &quot;config(audit-libs) = 2.8.2-1.fc27&quot;,</span>
+<span class="go">        &quot;libaudit.so.1()(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6()(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.14)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.2.5)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3.4)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.4)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.8)(64bit)&quot;,</span>
+<span class="go">        &quot;libcap-ng.so.0()(64bit)&quot;,</span>
+<span class="go">        &quot;rpmlib(CompressedFileNames) &lt;= 3.0.4-1&quot;,</span>
+<span class="go">        &quot;rpmlib(FileDigests) &lt;= 4.6.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadIsXz) &lt;= 5.2-1&quot;,</span>
+<span class="go">        &quot;rtld(GNU_HASH)&quot;</span>
+<span class="go">      ],</span>
+<span class="go">      &quot;epoch&quot;: null,</span>
+<span class="go">      &quot;name&quot;: &quot;audit-libs&quot;,</span>
+<span class="go">      &quot;package_identifier&quot;: &quot;audit-libs-2.8.2-1.fc27.x86_64&quot;,</span>
+<span class="go">      &quot;release&quot;: &quot;1.fc27&quot;,</span>
+<span class="go">      &quot;src&quot;: false,</span>
+<span class="go">      &quot;version&quot;: &quot;2.8.2&quot;</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;arch&quot;: &quot;noarch&quot;,</span>
+<span class="go">      &quot;dependencies&quot;: [</span>
+<span class="go">        &quot;filesystem&quot;,</span>
+<span class="go">        &quot;rpmlib(CompressedFileNames) &lt;= 3.0.4-1&quot;,</span>
+<span class="go">        &quot;rpmlib(FileDigests) &lt;= 4.6.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadIsXz) &lt;= 5.2-1&quot;,</span>
+<span class="go">        &quot;setup&quot;</span>
+<span class="go">      ],</span>
+<span class="go">      &quot;epoch&quot;: null,</span>
+<span class="go">      &quot;name&quot;: &quot;basesystem&quot;,</span>
+<span class="go">      &quot;package_identifier&quot;: &quot;basesystem-11-4.fc27.noarch&quot;,</span>
+<span class="go">      &quot;release&quot;: &quot;4.fc27&quot;,</span>
+<span class="go">      &quot;src&quot;: false,</span>
+<span class="go">      &quot;version&quot;: &quot;11&quot;</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">      &quot;dependencies&quot;: [</span>
+<span class="go">        &quot;/bin/sh&quot;,</span>
+<span class="go">        &quot;config(bash) = 4.4.19-1.fc27&quot;,</span>
+<span class="go">        &quot;filesystem &gt;= 3&quot;,</span>
+<span class="go">        &quot;libc.so.6()(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.11)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.14)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.15)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.2.5)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3.4)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.4)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.8)(64bit)&quot;,</span>
+<span class="go">        &quot;libdl.so.2()(64bit)&quot;,</span>
+<span class="go">        &quot;libdl.so.2(GLIBC_2.2.5)(64bit)&quot;,</span>
+<span class="go">        &quot;libtinfo.so.6()(64bit)&quot;,</span>
+<span class="go">        &quot;rpmlib(BuiltinLuaScripts) &lt;= 4.2.2-1&quot;,</span>
+<span class="go">        &quot;rpmlib(CompressedFileNames) &lt;= 3.0.4-1&quot;,</span>
+<span class="go">        &quot;rpmlib(FileDigests) &lt;= 4.6.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadIsXz) &lt;= 5.2-1&quot;,</span>
+<span class="go">        &quot;rtld(GNU_HASH)&quot;</span>
+<span class="go">      ],</span>
+<span class="go">      &quot;epoch&quot;: null,</span>
+<span class="go">      &quot;name&quot;: &quot;bash&quot;,</span>
+<span class="go">      &quot;package_identifier&quot;: &quot;bash-4.4.19-1.fc27.x86_64&quot;,</span>
+<span class="go">      &quot;release&quot;: &quot;1.fc27&quot;,</span>
+<span class="go">      &quot;src&quot;: false,</span>
+<span class="go">      &quot;version&quot;: &quot;4.4.19&quot;</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">      &quot;dependencies&quot;: [</span>
+<span class="go">        &quot;/sbin/ldconfig&quot;,</span>
+<span class="go">        &quot;/sbin/ldconfig&quot;,</span>
+<span class="go">        &quot;libc.so.6()(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.2.5)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3.4)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.4)(64bit)&quot;,</span>
+<span class="go">        &quot;rpmlib(CompressedFileNames) &lt;= 3.0.4-1&quot;,</span>
+<span class="go">        &quot;rpmlib(FileDigests) &lt;= 4.6.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadIsXz) &lt;= 5.2-1&quot;,</span>
+<span class="go">        &quot;rtld(GNU_HASH)&quot;</span>
+<span class="go">      ],</span>
+<span class="go">      &quot;epoch&quot;: null,</span>
+<span class="go">      &quot;name&quot;: &quot;bzip2-libs&quot;,</span>
+<span class="go">      &quot;package_identifier&quot;: &quot;bzip2-libs-1.0.6-24.fc27.x86_64&quot;,</span>
+<span class="go">      &quot;release&quot;: &quot;24.fc27&quot;,</span>
+<span class="go">      &quot;src&quot;: false,</span>
+<span class="go">      &quot;version&quot;: &quot;1.0.6&quot;</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;arch&quot;: &quot;noarch&quot;,</span>
+<span class="go">      &quot;dependencies&quot;: [</span>
+<span class="go">        &quot;/bin/sh&quot;,</span>
+<span class="go">        &quot;/bin/sh&quot;,</span>
+<span class="go">        &quot;/bin/sh&quot;,</span>
+<span class="go">        &quot;config(ca-certificates) = 2018.2.22-1.0.fc27&quot;,</span>
+<span class="go">        &quot;p11-kit &gt;= 0.23.4&quot;,</span>
+<span class="go">        &quot;p11-kit-trust &gt;= 0.23.4&quot;,</span>
+<span class="go">        &quot;rpmlib(CompressedFileNames) &lt;= 3.0.4-1&quot;,</span>
+<span class="go">        &quot;rpmlib(FileDigests) &lt;= 4.6.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadIsXz) &lt;= 5.2-1&quot;</span>
+<span class="go">      ],</span>
+<span class="go">      &quot;epoch&quot;: null,</span>
+<span class="go">      &quot;name&quot;: &quot;ca-certificates&quot;,</span>
+<span class="go">      &quot;package_identifier&quot;: &quot;ca-certificates-2018.2.22-1.0.fc27.noarch&quot;,</span>
+<span class="go">      &quot;release&quot;: &quot;1.0.fc27&quot;,</span>
+<span class="go">      &quot;src&quot;: false,</span>
+<span class="go">      &quot;version&quot;: &quot;2018.2.22&quot;</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">      &quot;dependencies&quot;: [</span>
+<span class="go">        &quot;libc.so.6()(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.14)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.2.5)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3.4)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.4)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.8)(64bit)&quot;,</span>
+<span class="go">        &quot;libpopt.so.0()(64bit)&quot;,</span>
+<span class="go">        &quot;libpopt.so.0(LIBPOPT_0)(64bit)&quot;,</span>
+<span class="go">        &quot;libselinux.so.1()(64bit)&quot;,</span>
+<span class="go">        &quot;libsepol.so.1()(64bit)&quot;,</span>
+<span class="go">        &quot;rpmlib(CompressedFileNames) &lt;= 3.0.4-1&quot;,</span>
+<span class="go">        &quot;rpmlib(FileDigests) &lt;= 4.6.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadIsXz) &lt;= 5.2-1&quot;,</span>
+<span class="go">        &quot;rtld(GNU_HASH)&quot;</span>
+<span class="go">      ],</span>
+<span class="go">      &quot;epoch&quot;: null,</span>
+<span class="go">      &quot;name&quot;: &quot;chkconfig&quot;,</span>
+<span class="go">      &quot;package_identifier&quot;: &quot;chkconfig-1.10-3.fc27.x86_64&quot;,</span>
+<span class="go">      &quot;release&quot;: &quot;3.fc27&quot;,</span>
+<span class="go">      &quot;src&quot;: false,</span>
+<span class="go">      &quot;version&quot;: &quot;1.10&quot;</span>
+<span class="go">    },</span>
+<span class="go">    {</span>
+<span class="go">      &quot;arch&quot;: &quot;x86_64&quot;,</span>
+<span class="go">      &quot;dependencies&quot;: [</span>
+<span class="go">        &quot;coreutils-common = 8.27-20.fc27&quot;,</span>
+<span class="go">        &quot;libacl.so.1()(64bit)&quot;,</span>
+<span class="go">        &quot;libacl.so.1(ACL_1.0)(64bit)&quot;,</span>
+<span class="go">        &quot;libattr.so.1()(64bit)&quot;,</span>
+<span class="go">        &quot;libattr.so.1(ATTR_1.1)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6()(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.10)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.14)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.15)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.17)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.2.5)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.3.4)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.4)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.6)(64bit)&quot;,</span>
+<span class="go">        &quot;libc.so.6(GLIBC_2.7)(64bit)&quot;,</span>
+<span class="go">        &quot;libcap.so.2()(64bit)&quot;,</span>
+<span class="go">        &quot;libcrypto.so.1.1()(64bit)&quot;,</span>
+<span class="go">        &quot;libcrypto.so.1.1(OPENSSL_1_1_0)(64bit)&quot;,</span>
+<span class="go">        &quot;libgmp.so.10()(64bit)&quot;,</span>
+<span class="go">        &quot;libpthread.so.0()(64bit)&quot;,</span>
+<span class="go">        &quot;libpthread.so.0(GLIBC_2.2.5)(64bit)&quot;,</span>
+<span class="go">        &quot;libpthread.so.0(GLIBC_2.3.2)(64bit)&quot;,</span>
+<span class="go">        &quot;librt.so.1()(64bit)&quot;,</span>
+<span class="go">        &quot;librt.so.1(GLIBC_2.3.3)(64bit)&quot;,</span>
+<span class="go">        &quot;libselinux.so.1()(64bit)&quot;,</span>
+<span class="go">        &quot;ncurses&quot;,</span>
+<span class="go">        &quot;rpmlib(CompressedFileNames) &lt;= 3.0.4-1&quot;,</span>
+<span class="go">        &quot;rpmlib(FileDigests) &lt;= 4.6.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadFilesHavePrefix) &lt;= 4.0-1&quot;,</span>
+<span class="go">        &quot;rpmlib(PayloadIsXz) &lt;= 5.2-1&quot;,</span>
+<span class="go">        &quot;rtld(GNU_HASH)&quot;</span>
+<span class="go">      ],</span>
+<span class="go">      &quot;epoch&quot;: null,</span>
+<span class="go">      &quot;name&quot;: &quot;coreutils&quot;,</span>
+<span class="go">      &quot;package_identifier&quot;: &quot;coreutils-8.27-20.fc27.x86_64&quot;,</span>
+<span class="go">      &quot;release&quot;: &quot;20.fc27&quot;,</span>
+<span class="go">      &quot;src&quot;: false,</span>
+<span class="go">      &quot;version&quot;: &quot;8.27&quot;</span>
+<span class="go">    },</span>
+
+<span class="go">    ...</span>
+<span class="go">}</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="crossroad">
+<h2>Crossroad<a class="headerlink" href="#crossroad" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
+<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
+<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
+</ul>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="thoth.package_extract.html">thoth.package_extract package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="thoth.package_extract.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="thoth.package_extract.handlers.html">thoth.package_extract.handlers package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.package_extract.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.package_extract.html#module-thoth.package_extract.cli">thoth.package_extract.cli module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.package_extract.html#module-thoth.package_extract.core">thoth.package_extract.core module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.package_extract.html#module-thoth.package_extract.exceptions">thoth.package_extract.exceptions module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.package_extract.html#module-thoth.package_extract.image">thoth.package_extract.image module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.package_extract.html#module-thoth.package_extract.rpmlib">thoth.package_extract.rpmlib module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.package_extract.html#module-thoth.package_extract">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<p>This documentation corresponds to implementation in version 1.0.1,
+documentation was generated on Mar 14, 2019.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+    <a id="sidebar-anchor"></a>
+    
+
+  <h3><a href="#">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Thoth Package Extract</a><ul>
+<li><a class="reference internal" href="#extracting-installed-packages-from-install-logs">Extracting installed packages from install logs</a></li>
+<li><a class="reference internal" href="#extracting-dependencies-directly-from-an-image">Extracting dependencies directly from an image</a></li>
+<li><a class="reference internal" href="#installation">Installation</a></li>
+<li><a class="reference internal" href="#example-of-parsing-install-logs">Example of parsing install logs</a></li>
+<li><a class="reference internal" href="#example-of-extracting-installed-packages-inside-an-image">Example of extracting installed packages inside an image</a></li>
+<li><a class="reference internal" href="#crossroad">Crossroad</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Next topic</h4>
+  <p class="topless"><a href="thoth.package_extract.html"
+                        title="next chapter">thoth.package_extract package</a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="thoth.package_extract.html" title="thoth.package_extract package"
+             accesskey="N">next</a> |</li>
+      </ul>
+    </div>
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Thoth team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+    </div>
+  </body>
+</html>
