@@ -2,8 +2,7 @@
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8" />
     <title>thoth.adviser.python.advise &#8212; Thoth Adviser NA documentation</title>
     <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
@@ -112,6 +111,7 @@
     <span class="p">)</span>
     <span class="n">_computed_stacks_heap</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">RuntimeEnvironment</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
     <span class="n">_visited</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">_walk_report</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">list</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
 
 <div class="viewcode-block" id="Adviser.compute"><a class="viewcode-back" href="../../../../thoth.adviser.python.html#thoth.adviser.python.advise.Adviser.compute">[docs]</a>    <span class="k">def</span> <span class="nf">compute</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -126,7 +126,7 @@
             <span class="n">graph</span><span class="p">,</span>
             <span class="n">project</span><span class="p">,</span>
             <span class="n">limit_latest_versions</span><span class="o">=</span><span class="n">limit_latest_versions</span><span class="p">,</span>
-            <span class="n">restrict_indexes</span><span class="o">=</span><span class="kc">False</span>
+            <span class="n">restrict_indexes</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="k">try</span><span class="p">:</span>
@@ -156,6 +156,17 @@
                     <span class="p">)</span>
                     <span class="k">break</span>
 
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="o">==</span> <span class="n">RecommendationType</span><span class="o">.</span><span class="n">LATEST</span>
+                    <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">count</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                    <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_visited</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">count</span>
+                <span class="p">):</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;Reached number of latest stacks requested (</span><span class="si">%d</span><span class="s2">), stopping dependency graph traversal&quot;</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">break</span>
+
             <span class="k">if</span> <span class="n">dry_run</span><span class="p">:</span>
                 <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_visited</span>
 
@@ -174,7 +185,8 @@
             <span class="k">return</span> <span class="n">result</span>
         <span class="k">finally</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_computed_stacks_heap</span> <span class="o">=</span> <span class="p">[]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_visited</span> <span class="o">=</span> <span class="mi">0</span></div>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_visited</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_walk_report</span> <span class="o">=</span> <span class="n">dependency_graph</span><span class="o">.</span><span class="n">get_walk_report</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="Adviser.compute_on_project"><a class="viewcode-back" href="../../../../thoth.adviser.python.html#thoth.adviser.python.advise.Adviser.compute_on_project">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">compute_on_project</span><span class="p">(</span>
@@ -192,17 +204,17 @@
         <span class="n">stack_report</span> <span class="o">=</span> <span class="p">[]</span>
 
         <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
-            <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
-            <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span>
-            <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span>
+            <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span> <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span>
         <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">project</span><span class="o">.</span><span class="n">python_version</span><span class="p">:</span>
-            <span class="n">stack_report</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
-                <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="s2">&quot;Use specific Python version in Pipfile based on Thoth&#39;s configuration to &quot;</span>
-                <span class="s2">&quot;ensure correct Python version usage on deployment&quot;</span><span class="p">,</span>
-            <span class="p">})</span>
+            <span class="n">stack_report</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="s2">&quot;Use specific Python version in Pipfile based on Thoth&#39;s configuration to &quot;</span>
+                    <span class="s2">&quot;ensure correct Python version usage on deployment&quot;</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
             <span class="n">project</span><span class="o">.</span><span class="n">set_python_version</span><span class="p">(</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
@@ -230,8 +242,13 @@
         <span class="n">advised_configuration</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">configuration_check_report</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">get_configuration_check_report</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">configuration_check_report</span><span class="p">:</span>
-            <span class="n">advised_configuration</span><span class="p">,</span> <span class="n">configuration_check_report</span> <span class="o">=</span> <span class="n">configuration_check_report</span>
+            <span class="n">advised_configuration</span><span class="p">,</span> <span class="n">configuration_check_report</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">configuration_check_report</span>
+            <span class="p">)</span>
             <span class="n">stack_report</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">configuration_check_report</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">instance</span><span class="o">.</span><span class="n">_walk_report</span><span class="p">:</span>
+            <span class="n">stack_report</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">instance</span><span class="o">.</span><span class="n">_walk_report</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">stack_report</span><span class="p">,</span> <span class="n">advised_configuration</span><span class="p">,</span> <span class="n">report</span></div></div>
 </pre></div>
@@ -250,8 +267,6 @@
     <form class="search" action="../../../../search.html" method="get">
       <input type="text" name="q" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -274,7 +289,7 @@
 
     <div class="footer" role="contentinfo">
         &#169; Copyright 2019, Thoth team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.0.0.
     </div>
   </body>
 </html>

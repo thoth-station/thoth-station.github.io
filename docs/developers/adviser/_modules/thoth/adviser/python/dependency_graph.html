@@ -2,8 +2,7 @@
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta charset="utf-8" />
     <title>thoth.adviser.python.dependency_graph &#8212; Thoth Adviser NA documentation</title>
     <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
@@ -122,7 +121,15 @@
         <span class="sd">&quot;&quot;&quot;Retrieve a report for a walk for a user.</span>
 
 <span class="sd">        This function should report back any issues encountered.</span>
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_closed_properly</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[{</span>
+                <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="s2">&quot;Resolver was closed prematurely because of memory or time-out, consider &quot;</span>
+                                 <span class="s2">&quot;decreasing latest versions considered in software stacks&quot;</span>
+            <span class="p">}]</span>
+
+        <span class="k">return</span> <span class="p">[]</span></div>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">_is_package_version_no_index</span><span class="p">(</span>
@@ -273,7 +280,10 @@
                     <span class="n">versions_seen</span> <span class="o">+=</span> <span class="mi">1</span>
 
                 <span class="k">if</span> <span class="n">versions_seen</span> <span class="o">&gt;=</span> <span class="n">limit_latest_versions</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Excluding path with </span><span class="si">%r</span><span class="s2">: limiting number of latest versions, index: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">path</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">index</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;Excluding path with </span><span class="si">%r</span><span class="s2">: limiting number of latest versions, index: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">path</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">index</span>
+                    <span class="p">)</span>
                     <span class="c1"># We traverse the list backwards, adjust index accordingly.</span>
                     <span class="n">to_pop</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">paths</span><span class="p">)</span> <span class="o">-</span> <span class="n">index</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
 
@@ -789,13 +799,13 @@
             <span class="k">for</span> <span class="n">stack_identifiers</span> <span class="ow">in</span> <span class="n">libdependency_graph</span><span class="o">.</span><span class="n">walk</span><span class="p">():</span>
                 <span class="n">stack</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reconstruct_stack</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">stack_identifiers</span><span class="p">)</span>
 
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                     <span class="s2">&quot;Found a new stack, asking decision function for inclusion&quot;</span>
                 <span class="p">)</span>
                 <span class="n">decision_function_result</span> <span class="o">=</span> <span class="n">decision_function</span><span class="p">(</span><span class="n">stack</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">decision_function_result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">False</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                        <span class="s2">&quot;Decision function included the computed stack - result was </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;Found a new stack with total score of </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
                         <span class="n">decision_function_result</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
                     <span class="p">)</span>
                     <span class="n">package_versions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_package_versions</span><span class="p">(</span><span class="n">stack</span><span class="p">)</span>
@@ -809,11 +819,11 @@
                         <span class="n">meta</span><span class="o">=</span><span class="n">PipfileMeta</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">pipfile_meta</span><span class="p">),</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Decision function excluded the computed stack&quot;</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Found a new stack but stack is not present due to negative results&quot;</span><span class="p">)</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Excluded stack </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">stack</span><span class="p">)</span>
         <span class="k">except</span> <span class="n">PrematureStreamEndError</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_closed_properly</span> <span class="o">=</span> <span class="kc">False</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Stack stream was closed prematurely (OOM?)&quot;</span><span class="p">)</span></div></div>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Stack stream was closed prematurely: OOM or stack scoring timed out&quot;</span><span class="p">)</span></div></div>
 </pre></div>
 
           </div>
@@ -830,8 +840,6 @@
     <form class="search" action="../../../../search.html" method="get">
       <input type="text" name="q" />
       <input type="submit" value="Go" />
-      <input type="hidden" name="check_keywords" value="yes" />
-      <input type="hidden" name="area" value="default" />
     </form>
     </div>
 </div>
@@ -854,7 +862,7 @@
 
     <div class="footer" role="contentinfo">
         &#169; Copyright 2019, Thoth team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 1.8.5.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.0.0.
     </div>
   </body>
 </html>
