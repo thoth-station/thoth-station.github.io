@@ -171,7 +171,9 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_token</span> <span class="o">=</span> <span class="n">token</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">kubernetes_verify_tls</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;TLS verification when communicating with k8s/okd master is disabled&quot;</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;TLS verification when communicating with k8s/okd master is disabled&quot;</span>
+            <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">token</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -482,7 +484,7 @@
                     <span class="s2">&quot;finished_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
                     <span class="s2">&quot;reason&quot;</span><span class="p">:</span> <span class="s2">&quot;WorkloadRegistered&quot;</span><span class="p">,</span>
                     <span class="s2">&quot;started_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                    <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="s2">&quot;registered&quot;</span>
+                    <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="s2">&quot;registered&quot;</span><span class="p">,</span>
                 <span class="p">}</span>
             <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                 <span class="k">pass</span>
@@ -515,6 +517,19 @@
 
         <span class="k">return</span> <span class="n">response</span></div>
 
+    <span class="k">def</span> <span class="nf">_get_template</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">_label_selector</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get template from infra namespace, use label_selector to identify which template to get.&quot;&quot;&quot;</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;template.openshift.io/v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="n">_label_selector</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;OpenShift response for getting template by label_selector &#39;</span><span class="si">{_label_selector}</span><span class="s2">&#39;: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">template</span>
+
 <div class="viewcode-block" id="OpenShift.create_inspection_imagestream"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.create_inspection_imagestream">[docs]</a>    <span class="k">def</span> <span class="nf">create_inspection_imagestream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Create imagestream for Amun.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">:</span>
@@ -527,19 +542,7 @@
                 <span class="s2">&quot;Unable to create inspection image stream without Amun inspection namespace being set&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">,</span>
-            <span class="n">label_selector</span><span class="o">=</span><span class="s2">&quot;template=amun-inspect-imagestream&quot;</span><span class="p">,</span>
-        <span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-
-        <span class="n">response</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for getting Amun inspect ImageStream template: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-            <span class="n">response</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="n">template</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="s2">&quot;template=amun-inspect-imagestream&quot;</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">set_template_parameters</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="n">AMUN_INSPECTION_ID</span><span class="o">=</span><span class="n">inspection_id</span><span class="p">)</span>
         <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">oc_process</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
@@ -555,7 +558,7 @@
         <span class="k">return</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_inspection_build"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_inspection_build">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_inspection_build</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Schedule inspection build.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">:</span>
@@ -566,13 +569,18 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workload</span><span class="p">(</span>
             <span class="n">run_method_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">run_inspection_build</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
             <span class="n">template_method_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">get_inspection_build_template</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-            <span class="n">template_method_parameters</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;parameters&quot;</span><span class="p">:</span> <span class="n">parameters</span><span class="p">,</span> <span class="s2">&quot;use_hw_template&quot;</span><span class="p">:</span> <span class="n">use_hw_template</span><span class="p">},</span>
+            <span class="n">template_method_parameters</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">&quot;parameters&quot;</span><span class="p">:</span> <span class="n">parameters</span><span class="p">,</span>
+                <span class="s2">&quot;use_hw_template&quot;</span><span class="p">:</span> <span class="n">use_hw_template</span><span class="p">,</span>
+            <span class="p">},</span>
             <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">,</span>
             <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;amun-inspection-build&quot;</span><span class="p">,</span> <span class="s2">&quot;inspection&quot;</span><span class="p">:</span> <span class="n">inspection_id</span><span class="p">},</span>
-            <span class="n">job_id</span><span class="o">=</span><span class="n">inspection_id</span> <span class="o">+</span> <span class="s1">&#39;-build&#39;</span>
+            <span class="n">job_id</span><span class="o">=</span><span class="n">inspection_id</span> <span class="o">+</span> <span class="s2">&quot;-build&quot;</span><span class="p">,</span>
         <span class="p">)</span></div>
 
-<div class="viewcode-block" id="OpenShift.get_inspection_build_template"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_inspection_build_template">[docs]</a>    <span class="k">def</span> <span class="nf">get_inspection_build_template</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<div class="viewcode-block" id="OpenShift.get_inspection_build_template"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_inspection_build_template">[docs]</a>    <span class="k">def</span> <span class="nf">get_inspection_build_template</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="nb">dict</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get inspection buildconfig that should be run.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">:</span>
             <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
@@ -589,18 +597,8 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="n">label_selector</span> <span class="o">=</span> <span class="s2">&quot;template=amun-inspect-buildconfig&quot;</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="n">label_selector</span>
-        <span class="p">)</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="n">label_selector</span><span class="p">)</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-        <span class="n">response</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for getting Amun inspect BuildConfig template: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-            <span class="n">response</span><span class="p">,</span>
-        <span class="p">)</span>
-
-        <span class="n">template</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">set_template_parameters</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="o">**</span><span class="n">parameters</span><span class="p">)</span>
 
         <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">oc_process</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
@@ -619,7 +617,12 @@
         <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">name</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_inspection_job"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_inspection_job">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_inspection_job</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">cpu_requests</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">memory_requests</span><span class="p">:</span> <span class="nb">str</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">inspection_id</span><span class="p">,</span>
+        <span class="n">parameters</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+        <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+        <span class="n">cpu_requests</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">memory_requests</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Schedule the given job run, the scheduled job is handled by workload operator based resources available.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">:</span>
@@ -637,11 +640,11 @@
             <span class="n">template_method_parameters</span><span class="o">=</span><span class="p">{</span>
                 <span class="s2">&quot;use_hw_template&quot;</span><span class="p">:</span> <span class="n">use_hw_template</span><span class="p">,</span>
                 <span class="s2">&quot;cpu_requests&quot;</span><span class="p">:</span> <span class="n">cpu_requests</span><span class="p">,</span>
-                <span class="s2">&quot;memory_requests&quot;</span><span class="p">:</span> <span class="n">memory_requests</span>
+                <span class="s2">&quot;memory_requests&quot;</span><span class="p">:</span> <span class="n">memory_requests</span><span class="p">,</span>
             <span class="p">},</span>
             <span class="n">job_id</span><span class="o">=</span><span class="n">inspection_id</span><span class="p">,</span>
             <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">,</span>
-            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;amun-inspection&quot;</span><span class="p">}</span>
+            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;amun-inspection&quot;</span><span class="p">},</span>
         <span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.run_inspection_job"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.run_inspection_job">[docs]</a>    <span class="k">def</span> <span class="nf">run_inspection_job</span><span class="p">(</span>
@@ -651,7 +654,7 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">cpu_requests</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">memory_requests</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">memory_requests</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Create the actual inspect job.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">:</span>
@@ -662,7 +665,7 @@
         <span class="n">template</span> <span class="o">=</span> <span class="n">template</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_inspection_job_template</span><span class="p">(</span>
             <span class="n">use_hw_template</span><span class="o">=</span><span class="n">use_hw_template</span><span class="p">,</span>
             <span class="n">cpu_requests</span><span class="o">=</span><span class="n">cpu_requests</span><span class="p">,</span>
-            <span class="n">memory_requests</span><span class="o">=</span><span class="n">memory_requests</span>
+            <span class="n">memory_requests</span><span class="o">=</span><span class="n">memory_requests</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">set_template_parameters</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="o">**</span><span class="n">parameters</span><span class="p">)</span>
 
@@ -683,7 +686,7 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
         <span class="n">cpu_requests</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">memory_requests</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">memory_requests</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get template for an inspection job.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">:</span>
@@ -696,22 +699,14 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="n">label_selector</span> <span class="o">=</span> <span class="s2">&quot;template=amun-inspect-job&quot;</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="n">label_selector</span>
-        <span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-        <span class="n">response</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for getting Amun inspect Job template: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span>
-        <span class="p">)</span>
-
-        <span class="n">template</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="n">label_selector</span><span class="p">)</span>
 
         <span class="c1"># We explicitly set template CPU and memory here so that we can schedule based</span>
         <span class="c1"># on resources needed in the workload-operator. We cannot do this as a partial oc process,</span>
         <span class="c1"># so we explicitly modify template here (other parameters are about to be expanded later).</span>
-        <span class="n">container_spec</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">][</span><span class="s2">&quot;template&quot;</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">][</span><span class="s2">&quot;containers&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">container_spec</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">][</span><span class="s2">&quot;template&quot;</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">][</span>
+            <span class="s2">&quot;containers&quot;</span>
+        <span class="p">][</span><span class="mi">0</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="n">cpu_requests</span><span class="p">:</span>
             <span class="n">container_spec</span><span class="p">[</span><span class="s2">&quot;resources&quot;</span><span class="p">][</span><span class="s2">&quot;limits&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cpu_requests</span>
@@ -730,9 +725,10 @@
                 <span class="s2">&quot;Infra namespace is required in order to list solvers&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="s2">&quot;template=solver&quot;</span>
-        <span class="p">)</span>
+        <span class="c1"># TODO can we refactor this to use _get_template() ?</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;template.openshift.io/v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="s2">&quot;template=solver&quot;</span><span class="p">)</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
             <span class="s2">&quot;OpenShift response for getting solver template: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
         <span class="p">)</span>
@@ -762,7 +758,7 @@
                 <span class="n">indexes</span><span class="o">=</span><span class="n">indexes</span><span class="p">,</span>
                 <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
                 <span class="n">subgraph_check_api</span><span class="o">=</span><span class="n">subgraph_check_api</span><span class="p">,</span>
-                <span class="n">transitive</span><span class="o">=</span><span class="n">transitive</span>
+                <span class="n">transitive</span><span class="o">=</span><span class="n">transitive</span><span class="p">,</span>
             <span class="p">)</span>
 
             <span class="n">solver_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">solver_id</span><span class="p">)</span>
@@ -837,7 +833,7 @@
             <span class="n">template_method_parameters</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;solver&quot;</span><span class="p">:</span> <span class="n">solver</span><span class="p">},</span>
             <span class="n">job_id</span><span class="o">=</span><span class="n">job_id</span><span class="p">,</span>
             <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">middletier_namespace</span><span class="p">,</span>
-            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;solver&quot;</span><span class="p">}</span>
+            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;solver&quot;</span><span class="p">},</span>
         <span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.get_solver_template"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_solver_template">[docs]</a>    <span class="k">def</span> <span class="nf">get_solver_template</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
@@ -847,17 +843,7 @@
                 <span class="s2">&quot;Infra namespace is required to gather solver template when running solver&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span>
-            <span class="n">label_selector</span><span class="o">=</span><span class="n">f</span><span class="s2">&quot;template=solver,component=</span><span class="si">{solver}</span><span class="s2">&quot;</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for getting solver template: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-        <span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-        <span class="n">template</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">template</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;template=solver,component=</span><span class="si">{solver}</span><span class="s2">&quot;</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_package_extract"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_package_extract">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_package_extract</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -878,8 +864,10 @@
                 <span class="s2">&quot;Unable to schedule package extract job without backend namespace being set&quot;</span>
             <span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">environment_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;runtime&#39;</span><span class="p">,</span> <span class="s1">&#39;buildtime&#39;</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown environment type </span><span class="si">%r</span><span class="s2">, has to be runtime or buildtime&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">environment_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;runtime&quot;</span><span class="p">,</span> <span class="s2">&quot;buildtime&quot;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Unknown environment type </span><span class="si">%r</span><span class="s2">, has to be runtime or buildtime&quot;</span>
+            <span class="p">)</span>
 
         <span class="n">job_id</span> <span class="o">=</span> <span class="n">job_id</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_id</span><span class="p">(</span><span class="s2">&quot;package-extract&quot;</span><span class="p">)</span>
         <span class="n">parameters</span> <span class="o">=</span> <span class="nb">locals</span><span class="p">()</span>
@@ -890,7 +878,7 @@
             <span class="n">template_method_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">get_package_extract_template</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
             <span class="n">job_id</span><span class="o">=</span><span class="n">job_id</span><span class="p">,</span>
             <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">backend_namespace</span><span class="p">,</span>
-            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;package-extract&quot;</span><span class="p">}</span>
+            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;package-extract&quot;</span><span class="p">},</span>
         <span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.run_package_extract"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.run_package_extract">[docs]</a>    <span class="k">def</span> <span class="nf">run_package_extract</span><span class="p">(</span>
@@ -913,8 +901,10 @@
                 <span class="s2">&quot;Running package-extract requires middletier namespace to be specified&quot;</span>
             <span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">environment_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;runtime&#39;</span><span class="p">,</span> <span class="s1">&#39;buildtime&#39;</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Unknown environment type </span><span class="si">%r</span><span class="s2">, has to be runtime or buildtime&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">environment_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;runtime&quot;</span><span class="p">,</span> <span class="s2">&quot;buildtime&quot;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Unknown environment type </span><span class="si">%r</span><span class="s2">, has to be runtime or buildtime&quot;</span>
+            <span class="p">)</span>
 
         <span class="n">template</span> <span class="o">=</span> <span class="n">template</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_package_extract_template</span><span class="p">()</span>
 
@@ -925,10 +915,9 @@
             <span class="n">THOTH_ANALYZER_NO_TLS_VERIFY</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="ow">not</span> <span class="n">verify_tls</span><span class="p">),</span>
             <span class="n">THOTH_ANALYZER_OUTPUT</span><span class="o">=</span><span class="n">output</span><span class="p">,</span>
             <span class="n">THOTH_PACKAGE_EXTRACT_JOB_ID</span><span class="o">=</span><span class="n">job_id</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_id</span><span class="p">(</span><span class="s2">&quot;package-extract&quot;</span><span class="p">),</span>
-            <span class="n">THOTH_PACKAGE_EXTRACT_METADATA</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span>
-                <span class="s2">&quot;origin&quot;</span><span class="p">:</span> <span class="n">origin</span><span class="p">,</span>
-                <span class="s2">&quot;environment_type&quot;</span><span class="p">:</span> <span class="n">environment_type</span><span class="p">,</span>
-            <span class="p">}),</span>
+            <span class="n">THOTH_PACKAGE_EXTRACT_METADATA</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;origin&quot;</span><span class="p">:</span> <span class="n">origin</span><span class="p">,</span> <span class="s2">&quot;environment_type&quot;</span><span class="p">:</span> <span class="n">environment_type</span><span class="p">}</span>
+            <span class="p">),</span>
         <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">registry_user</span> <span class="ow">and</span> <span class="n">registry_password</span><span class="p">:</span>
@@ -954,16 +943,7 @@
                 <span class="s2">&quot;Infra namespace is required to gather package-extract template when running it&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="s2">&quot;template=package-extract&quot;</span>
-        <span class="p">)</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for getting package-extract template: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-            <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-        <span class="n">template</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">template</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="s2">&quot;template=package-extract&quot;</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.create_config_map"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.create_config_map">[docs]</a>    <span class="k">def</span> <span class="nf">create_config_map</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">configmap_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">labels</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span>
@@ -995,7 +975,7 @@
         <span class="n">template_method_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">run_method_parameters</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">template_method_parameters</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">labels</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">labels</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Schedule the given job run, the scheduled job is handled by workload operator based resources available.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">labels</span><span class="p">:</span>
@@ -1052,7 +1032,7 @@
             <span class="n">template_method_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">get_dependency_monkey_template</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
             <span class="n">job_id</span><span class="o">=</span><span class="n">job_id</span><span class="p">,</span>
             <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">middletier_namespace</span><span class="p">,</span>
-            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;dependency-monkey&quot;</span><span class="p">}</span>
+            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;dependency-monkey&quot;</span><span class="p">},</span>
         <span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.run_dependency_monkey"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.run_dependency_monkey">[docs]</a>    <span class="k">def</span> <span class="nf">run_dependency_monkey</span><span class="p">(</span>
@@ -1125,16 +1105,7 @@
                 <span class="s2">&quot;Infra namespace is required to gather Dependency Monkey template when running it&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="s2">&quot;template=dependency-monkey&quot;</span>
-        <span class="p">)</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for getting dependency-monkey template: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-            <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-        <span class="n">template</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">template</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="s2">&quot;template=dependency-monkey&quot;</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_adviser"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_adviser">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_adviser</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1165,7 +1136,7 @@
             <span class="n">template_method_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">get_adviser_template</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
             <span class="n">job_id</span><span class="o">=</span><span class="n">job_id</span><span class="p">,</span>
             <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">backend_namespace</span><span class="p">,</span>
-            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;adviser&quot;</span><span class="p">}</span>
+            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;adviser&quot;</span><span class="p">},</span>
         <span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.run_adviser"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.run_adviser">[docs]</a>    <span class="k">def</span> <span class="nf">run_adviser</span><span class="p">(</span>
@@ -1240,15 +1211,7 @@
                 <span class="s2">&quot;Infra namespace is required to gather adviser template when running it&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="s2">&quot;template=adviser&quot;</span>
-        <span class="p">)</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for getting adviser template: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-        <span class="n">template</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">template</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="s2">&quot;template=adviser&quot;</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_provenance_checker"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_provenance_checker">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_provenance_checker</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1275,7 +1238,7 @@
             <span class="n">template_method_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">get_provenance_checker_template</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
             <span class="n">job_id</span><span class="o">=</span><span class="n">job_id</span><span class="p">,</span>
             <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">backend_namespace</span><span class="p">,</span>
-            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;provenance-checker&quot;</span><span class="p">}</span>
+            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;provenance-checker&quot;</span><span class="p">},</span>
         <span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.run_provenance_checker"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.run_provenance_checker">[docs]</a>    <span class="k">def</span> <span class="nf">run_provenance_checker</span><span class="p">(</span>
@@ -1332,16 +1295,7 @@
                 <span class="s2">&quot;Infra namespace is required to gather provenance template when running it&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="s2">&quot;template=provenance-checker&quot;</span>
-        <span class="p">)</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for getting provenance-checker template: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-            <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-        <span class="n">template</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">template</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="s2">&quot;template=provenance-checker&quot;</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_graph_sync"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_graph_sync">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_graph_sync</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">template_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
@@ -1357,32 +1311,34 @@
             <span class="n">template_method_parameters</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;template_name&quot;</span><span class="p">:</span> <span class="n">template_name</span><span class="p">},</span>
             <span class="n">job_id</span><span class="o">=</span><span class="n">job_id</span><span class="p">,</span>
             <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span><span class="p">,</span>
-            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;graph-sync&quot;</span><span class="p">}</span>
+            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;graph-sync&quot;</span><span class="p">},</span>
         <span class="p">)</span></div>
 
-<div class="viewcode-block" id="OpenShift.schedule_graph_sync_adviser"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_graph_sync_adviser">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_graph_sync_adviser</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<div class="viewcode-block" id="OpenShift.schedule_graph_sync_adviser"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_graph_sync_adviser">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_graph_sync_adviser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Schedule a sync of an adviser document - a sugar for user.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">schedule_graph_sync</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">template_name</span><span class="o">=</span><span class="s2">&quot;graph-sync-job-adviser&quot;</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">schedule_graph_sync</span><span class="p">(</span>
+            <span class="n">document_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">template_name</span><span class="o">=</span><span class="s2">&quot;graph-sync-job-adviser&quot;</span>
+        <span class="p">)</span></div>
 
-<div class="viewcode-block" id="OpenShift.schedule_graph_sync_inspection"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_graph_sync_inspection">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_graph_sync_inspection</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<div class="viewcode-block" id="OpenShift.schedule_graph_sync_inspection"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_graph_sync_inspection">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_graph_sync_inspection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Schedule a sync of inspection - a sugar for user.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">schedule_graph_sync</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">template_name</span><span class="o">=</span><span class="s2">&quot;graph-sync-job-inspection&quot;</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">schedule_graph_sync</span><span class="p">(</span>
+            <span class="n">document_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">template_name</span><span class="o">=</span><span class="s2">&quot;graph-sync-job-inspection&quot;</span>
+        <span class="p">)</span></div>
 
-<div class="viewcode-block" id="OpenShift.schedule_graph_sync_solver"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_graph_sync_solver">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_graph_sync_solver</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<div class="viewcode-block" id="OpenShift.schedule_graph_sync_solver"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_graph_sync_solver">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_graph_sync_solver</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Schedule a sync of solver result - a sugar for user.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">schedule_graph_sync</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">template_name</span><span class="o">=</span><span class="s2">&quot;graph-sync-job-solver&quot;</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">schedule_graph_sync</span><span class="p">(</span>
+            <span class="n">document_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">template_name</span><span class="o">=</span><span class="s2">&quot;graph-sync-job-solver&quot;</span>
+        <span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_graph_sync_package_extract"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_graph_sync_package_extract">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_graph_sync_package_extract</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Schedule a sync of package-extract - a sugar for user.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">schedule_graph_sync</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">template_name</span><span class="o">=</span><span class="s2">&quot;graph-sync-job-package-extract&quot;</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">schedule_graph_sync</span><span class="p">(</span>
+            <span class="n">document_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">template_name</span><span class="o">=</span><span class="s2">&quot;graph-sync-job-package-extract&quot;</span>
+        <span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.run_graph_sync"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.run_graph_sync">[docs]</a>    <span class="k">def</span> <span class="nf">run_graph_sync</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1408,7 +1364,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">set_template_parameters</span><span class="p">(</span>
             <span class="n">template</span><span class="p">,</span>
             <span class="n">THOTH_SYNC_DOCUMENT_ID</span><span class="o">=</span><span class="n">document_id</span><span class="p">,</span>
-            <span class="n">THOTH_JOB_ID</span><span class="o">=</span><span class="n">job_id</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_id</span><span class="p">(</span><span class="n">template_name</span><span class="p">)</span>
+            <span class="n">THOTH_JOB_ID</span><span class="o">=</span><span class="n">job_id</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_id</span><span class="p">(</span><span class="n">template_name</span><span class="p">),</span>
         <span class="p">)</span>
         <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">oc_process</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
         <span class="n">graph_sync</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
@@ -1432,22 +1388,17 @@
                 <span class="s2">&quot;Unable to get graph sync template without template name being specified&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span>
-            <span class="n">label_selector</span><span class="o">=</span><span class="n">f</span><span class="s2">&quot;component=graph-sync,template=</span><span class="si">{template_name}</span><span class="s2">&quot;</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-        <span class="n">template</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-
-        <span class="k">return</span> <span class="n">template</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;component=graph-sync,template=</span><span class="si">{template_name}</span><span class="s2">&quot;</span><span class="p">)</span></div>
 
     <span class="k">def</span> <span class="nf">_raise_on_invalid_response_size</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;It is expected that there is only one object type for the given item.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Expect that there is only one object type for the given item.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">items</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
                 <span class="n">f</span><span class="s2">&quot;Application misconfiguration - number of templates available in the infra namespace &quot;</span>
                 <span class="n">f</span><span class="s2">&quot;</span><span class="si">{self.infra_namespace!r}</span><span class="s2"> is {len(response.items)}, should be 1.&quot;</span>
             <span class="p">)</span>
+
+            <span class="c1"># TODO add name of template we were looking for...</span>
 
 <div class="viewcode-block" id="OpenShift.oc_process"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.oc_process">[docs]</a>    <span class="k">def</span> <span class="nf">oc_process</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">template</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Process the given template in OpenShift.&quot;&quot;&quot;</span>
@@ -1577,12 +1528,14 @@
         <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;used&quot;</span><span class="p">:</span> <span class="p">{</span>
                 <span class="s2">&quot;cpu&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_cpu_spec</span><span class="p">(</span><span class="n">status</span><span class="p">[</span><span class="s2">&quot;used&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;limits.cpu&quot;</span><span class="p">))</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
-                <span class="s2">&quot;memory&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_memory_spec</span><span class="p">(</span><span class="n">status</span><span class="p">[</span><span class="s2">&quot;used&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;limits.memory&quot;</span><span class="p">))</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;memory&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_memory_spec</span><span class="p">(</span><span class="n">status</span><span class="p">[</span><span class="s2">&quot;used&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;limits.memory&quot;</span><span class="p">))</span>
+                <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
                 <span class="s2">&quot;pods&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">pods_used</span><span class="p">)</span> <span class="k">if</span> <span class="n">pods_used</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
             <span class="p">},</span>
             <span class="s2">&quot;hard&quot;</span><span class="p">:</span> <span class="p">{</span>
                 <span class="s2">&quot;cpu&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_cpu_spec</span><span class="p">(</span><span class="n">status</span><span class="p">[</span><span class="s2">&quot;hard&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;limits.cpu&quot;</span><span class="p">))</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
-                <span class="s2">&quot;memory&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_memory_spec</span><span class="p">(</span><span class="n">status</span><span class="p">[</span><span class="s2">&quot;hard&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;limits.memory&quot;</span><span class="p">))</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="s2">&quot;memory&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_memory_spec</span><span class="p">(</span><span class="n">status</span><span class="p">[</span><span class="s2">&quot;hard&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;limits.memory&quot;</span><span class="p">))</span>
+                <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
                 <span class="s2">&quot;pods&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">pods_hard</span><span class="p">)</span> <span class="k">if</span> <span class="n">pods_hard</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
             <span class="p">},</span>
         <span class="p">}</span>
@@ -1619,10 +1572,7 @@
 
             <span class="k">return</span> <span class="kc">False</span>
 
-        <span class="k">if</span> <span class="p">(</span>
-            <span class="n">quota_status</span><span class="p">[</span><span class="s2">&quot;used&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">cpu_requested</span>
-            <span class="o">&gt;</span> <span class="n">quota_status</span><span class="p">[</span><span class="s2">&quot;hard&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">]</span>
-        <span class="p">):</span>
+        <span class="k">if</span> <span class="n">quota_status</span><span class="p">[</span><span class="s2">&quot;used&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">cpu_requested</span> <span class="o">&gt;</span> <span class="n">quota_status</span><span class="p">[</span><span class="s2">&quot;hard&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">]:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cannot run workload </span><span class="si">%r</span><span class="s2">, no CPU available&quot;</span><span class="p">,</span> <span class="n">template_name</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
@@ -1643,7 +1593,9 @@
         <span class="k">for</span> <span class="n">container</span> <span class="ow">in</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">][</span><span class="s2">&quot;template&quot;</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">][</span>
             <span class="s2">&quot;containers&quot;</span>
         <span class="p">]:</span>
-            <span class="n">container_mem_requested</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resources&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;memory&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">container_mem_requested</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resources&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;memory&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="p">)</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">container_mem_requested</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                     <span class="s2">&quot;No memory requests for container </span><span class="si">%r</span><span class="s2"> in template </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
@@ -1651,11 +1603,15 @@
                     <span class="n">template_name</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">container_mem_requested</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_memory_spec</span><span class="p">(</span><span class="n">container_mem_requested</span><span class="p">)</span>
+                <span class="n">container_mem_requested</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_memory_spec</span><span class="p">(</span>
+                    <span class="n">container_mem_requested</span>
+                <span class="p">)</span>
                 <span class="k">if</span> <span class="n">container_mem_requested</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="n">pod_mem_requested</span> <span class="o">+=</span> <span class="n">container_mem_requested</span>
 
-            <span class="n">container_cpu_requested</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resources&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">container_cpu_requested</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resources&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="p">)</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">container_cpu_requested</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                     <span class="s2">&quot;No CPU requests for container </span><span class="si">%r</span><span class="s2"> in template </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
@@ -1678,21 +1634,27 @@
                 <span class="n">template_name</span><span class="p">,</span>
             <span class="p">)</span>
 
-        <span class="n">build_memory</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resources&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;memory&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">build_memory</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">]</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resources&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;memory&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">build_memory</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="s2">&quot;No memory requests for build in template </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                <span class="n">template_name</span><span class="p">,</span>
+                <span class="s2">&quot;No memory requests for build in template </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">template_name</span>
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">build_memory</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_memory_spec</span><span class="p">(</span><span class="n">build_memory</span><span class="p">)</span>
 
-        <span class="n">build_cpu</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resources&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">build_cpu</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">]</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resources&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requests&quot;</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">build_cpu</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="s2">&quot;No CPU requests for build in template </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                <span class="n">template_name</span>
-            <span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No CPU requests for build in template </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">template_name</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">build_cpu</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_cpu_spec</span><span class="p">(</span><span class="n">build_cpu</span><span class="p">)</span>
 
