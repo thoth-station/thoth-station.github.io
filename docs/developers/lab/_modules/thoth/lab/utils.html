@@ -59,14 +59,21 @@
 <span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
 
 <span class="sd">&quot;&quot;&quot;Various utilities for notebooks.&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">typing</span>
+
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span>
 
 <span class="kn">from</span> <span class="nn">pkgutil</span> <span class="k">import</span> <span class="n">walk_packages</span>
 <span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="k">import</span> <span class="n">urlparse</span>
+
 <span class="kn">import</span> <span class="nn">importlib</span>
 <span class="kn">import</span> <span class="nn">urllib3</span>
 
 <span class="kn">import</span> <span class="nn">requests</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+
+<span class="n">DEFAULT</span> <span class="o">=</span> <span class="nb">object</span><span class="p">()</span>
 
 
 <div class="viewcode-block" id="obtain_location"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.obtain_location">[docs]</a><span class="k">def</span> <span class="nf">obtain_location</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">verify</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">only_netloc</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -142,22 +149,116 @@
     <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;package&#39;</span><span class="p">:</span> <span class="n">packages</span><span class="p">,</span> <span class="s1">&#39;version&#39;</span><span class="p">:</span> <span class="n">versions</span><span class="p">,</span> <span class="s1">&#39;importable&#39;</span><span class="p">:</span> <span class="n">importable</span><span class="p">})</span></div>
 
 
-<span class="c1"># Pandas utilities</span>
+<span class="k">def</span> <span class="nf">_rhas</span><span class="p">(</span><span class="n">fhas</span><span class="p">,</span> <span class="n">fget</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">,</span> <span class="n">attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Recursively check nested attributes of an object.</span>
 
-<div class="viewcode-block" id="str_join"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.str_join">[docs]</a><span class="k">def</span> <span class="nf">str_join</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">cols</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">sep</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Combine two or more columns into one joining them with separator.&quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">cols</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Number of columns must be list of strings of length &gt;= 2.&quot;</span><span class="p">)</span>
+<span class="sd">    :param fhas: callable, function to be used as `hasattr`</span>
+<span class="sd">    :param fget: callable, function to be used as `getattr`</span>
+<span class="sd">    :param obj: Any, object to check</span>
+<span class="sd">    :param attr: str, attribute to find declared by dot notation accessor</span>
+<span class="sd">    :return: bool, whether the object has the given attribute</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">obj</span><span class="p">:</span>  <span class="c1"># empty list</span>
+            <span class="k">return</span> <span class="kc">False</span>
 
-    <span class="k">def</span> <span class="nf">stringify</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">pd</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">_rhas</span><span class="p">(</span><span class="n">fhas</span><span class="p">,</span> <span class="n">fget</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">safe_join</span><span class="p">(</span><span class="n">str_row</span><span class="p">:</span> <span class="nb">list</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">sep</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
-            <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">str_row</span> <span class="k">if</span> <span class="n">stringify</span><span class="p">(</span><span class="n">col</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
-        <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">left</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
-    <span class="k">return</span> <span class="n">df</span><span class="p">[</span><span class="n">cols</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">r</span><span class="p">:</span> <span class="n">safe_join</span><span class="p">(</span><span class="n">r</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span></div>
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">fhas</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">_rhas</span><span class="p">(</span><span class="n">fhas</span><span class="p">,</span> <span class="n">fget</span><span class="p">,</span> <span class="n">fget</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">left</span><span class="p">),</span> <span class="n">right</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span>
+          <span class="n">obj</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">,</span>
+          <span class="n">attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+          <span class="n">repl_missing</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+          <span class="n">raise_if_missing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Recursively retrieve nested attributes of an object.</span>
+
+<span class="sd">    :param f: callable, function to be used as `getattr`</span>
+<span class="sd">    :param obj: Any, object to check</span>
+<span class="sd">    :param attr: str, attribute to find declared by dot notation accessor</span>
+<span class="sd">    :param repl_missing: bool, whether to raise on missing attribute</span>
+<span class="sd">    :param raise_if_missing:</span>
+<span class="sd">    :return: Any, retrieved attribute</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">set</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="n">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">repl_missing</span><span class="p">,</span> <span class="n">raise_if_missing</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">obj</span>
+        <span class="p">]</span>
+
+    <span class="n">right</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">attrs</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">attrs</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">obj</span>
+    <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">attrs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">left</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">left</span> <span class="o">=</span> <span class="n">attr</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">right</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">raise_if_missing</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">exc</span>
+
+            <span class="k">return</span> <span class="n">repl_missing</span>
+
+    <span class="k">return</span> <span class="n">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">f</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">left</span><span class="p">),</span> <span class="n">right</span><span class="p">,</span> <span class="n">repl_missing</span><span class="p">,</span> <span class="n">raise_if_missing</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="has"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.has">[docs]</a><span class="k">def</span> <span class="nf">has</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Combine both `hasattr` and `in` into universal `has`.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">_in</span><span class="p">(</span><span class="n">_obj</span><span class="p">,</span> <span class="n">_attr</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_attr</span> <span class="ow">in</span> <span class="n">_obj</span>
+        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+            <span class="c1"># object is not iterable</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="nb">any</span><span class="p">([</span><span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">),</span> <span class="n">_in</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">)])</span></div>
+
+
+<div class="viewcode-block" id="get"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.get">[docs]</a><span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span> <span class="o">=</span> <span class="n">DEFAULT</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Combine both `getattr` and `dict.get` into universal `get`.&quot;&quot;&quot;</span>
+    <span class="n">_getattr</span> <span class="o">=</span> <span class="nb">getattr</span> <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="n">DEFAULT</span> <span class="k">else</span> <span class="n">partial</span><span class="p">(</span><span class="nb">getattr</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span>
+    <span class="n">_get</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">get</span> <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="n">DEFAULT</span> <span class="k">else</span> <span class="n">partial</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">get</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">AttributeError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">_get</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">default</span><span class="p">,</span> <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">default</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">DEFAULT</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">default</span>
+
+        <span class="k">raise</span> <span class="n">exc</span></div>
+
+
+<span class="c1"># syntactic sugar to _rhas and _rget which is meant for users</span>
+
+<span class="n">rhasattr</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_rhas</span><span class="p">,</span> <span class="nb">hasattr</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">)</span>
+<span class="n">rhasattr</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">_rhas</span><span class="o">.</span><span class="vm">__doc__</span>
+<span class="n">rgetattr</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_rget</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">)</span>
+<span class="n">rgetattr</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">_rget</span><span class="o">.</span><span class="vm">__doc__</span>
+
+<span class="n">rhas</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_rhas</span><span class="p">,</span> <span class="n">has</span><span class="p">,</span> <span class="n">get</span><span class="p">)</span>
+<span class="n">rhasattr</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">_rhas</span><span class="o">.</span><span class="vm">__doc__</span>
+<span class="n">rget</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_rget</span><span class="p">,</span> <span class="n">get</span><span class="p">)</span>
+<span class="n">rgetattr</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">_rget</span><span class="o">.</span><span class="vm">__doc__</span>
 </pre></div>
 
           </div>
