@@ -17,11 +17,18 @@
     
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
+
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <link rel="shortcut icon" type="image/png" href="../../../_static/favicon.png" />
     <meta name="viewport" content="width=device-width,initial-scale=0.8">
     
     
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
 
   </head><body>
     <div class="related">
@@ -59,6 +66,7 @@
 <span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
 
 <span class="sd">&quot;&quot;&quot;Various utilities for notebooks.&quot;&quot;&quot;</span>
+
 <span class="kn">import</span> <span class="nn">typing</span>
 
 <span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span>
@@ -176,15 +184,13 @@
 <span class="k">def</span> <span class="nf">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span>
           <span class="n">obj</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">,</span>
           <span class="n">attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-          <span class="n">repl_missing</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-          <span class="n">raise_if_missing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">:</span>
+          <span class="n">default</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span> <span class="o">=</span> <span class="n">DEFAULT</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Recursively retrieve nested attributes of an object.</span>
 
 <span class="sd">    :param f: callable, function to be used as `getattr`</span>
 <span class="sd">    :param obj: Any, object to check</span>
 <span class="sd">    :param attr: str, attribute to find declared by dot notation accessor</span>
-<span class="sd">    :param repl_missing: bool, whether to raise on missing attribute</span>
-<span class="sd">    :param raise_if_missing:</span>
+<span class="sd">    :param default: default attribute, similar to getattr&#39;s default</span>
 <span class="sd">    :return: Any, retrieved attribute</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">set</span><span class="p">)):</span>
@@ -192,7 +198,7 @@
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="k">return</span> <span class="p">[</span>
-            <span class="n">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">repl_missing</span><span class="p">,</span> <span class="n">raise_if_missing</span><span class="p">)</span>
+            <span class="n">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">obj</span>
         <span class="p">]</span>
 
@@ -206,17 +212,18 @@
     <span class="k">else</span><span class="p">:</span>
         <span class="n">left</span> <span class="o">=</span> <span class="n">attr</span>
 
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">left</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">DEFAULT</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">default</span>
+
+        <span class="k">raise</span> <span class="n">exc</span>
+
     <span class="k">if</span> <span class="ow">not</span> <span class="n">right</span><span class="p">:</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">f</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
 
-        <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">raise_if_missing</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="n">exc</span>
-
-            <span class="k">return</span> <span class="n">repl_missing</span>
-
-    <span class="k">return</span> <span class="n">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">f</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">left</span><span class="p">),</span> <span class="n">right</span><span class="p">,</span> <span class="n">repl_missing</span><span class="p">,</span> <span class="n">raise_if_missing</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">result</span><span class="p">,</span> <span class="n">right</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="has"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.has">[docs]</a><span class="k">def</span> <span class="nf">has</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">):</span>
@@ -233,7 +240,7 @@
 
 <div class="viewcode-block" id="get"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.get">[docs]</a><span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span> <span class="o">=</span> <span class="n">DEFAULT</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Combine both `getattr` and `dict.get` into universal `get`.&quot;&quot;&quot;</span>
-    <span class="n">_getattr</span> <span class="o">=</span> <span class="nb">getattr</span> <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="n">DEFAULT</span> <span class="k">else</span> <span class="n">partial</span><span class="p">(</span><span class="nb">getattr</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span>
+    <span class="n">_getattr</span> <span class="o">=</span> <span class="nb">getattr</span> <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="n">DEFAULT</span> <span class="k">else</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
     <span class="n">_get</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">get</span> <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="n">DEFAULT</span> <span class="k">else</span> <span class="n">partial</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">get</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span>
 
     <span class="k">try</span><span class="p">:</span>
@@ -241,9 +248,7 @@
 
     <span class="k">except</span> <span class="ne">AttributeError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">_get</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">default</span><span class="p">,</span> <span class="p">)</span>
-        <span class="k">elif</span> <span class="n">default</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">DEFAULT</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">default</span>
+            <span class="k">return</span> <span class="n">_get</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
 
         <span class="k">raise</span> <span class="n">exc</span></div>
 
@@ -295,9 +300,20 @@
       </ul>
     </div>
 
+
     <div class="footer" role="contentinfo">
         &#169; Copyright 2019, Thoth team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.0.0.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.0.1.
     </div>
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
   </body>
 </html>
