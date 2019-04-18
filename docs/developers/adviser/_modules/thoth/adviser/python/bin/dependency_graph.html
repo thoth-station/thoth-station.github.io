@@ -17,11 +17,18 @@
     
     <link rel="index" title="Index" href="../../../../../genindex.html" />
     <link rel="search" title="Search" href="../../../../../search.html" />
+
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
     <link rel="shortcut icon" type="image/png" href="../../../../../_static/favicon.png" />
     <meta name="viewport" content="width=device-width,initial-scale=0.8">
     
     
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
 
   </head><body>
     <div class="related">
@@ -66,11 +73,14 @@
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">ctypes</span>
 <span class="kn">import</span> <span class="nn">signal</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="k">import</span> <span class="n">suppress</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">Counter</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">reduce</span>
 
-<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="k">import</span> <span class="n">init_logging</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">PrematureStreamEndError</span>
-
-<span class="n">init_logging</span><span class="p">()</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">NoDependenciesError</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 <span class="n">_DEFAULT_LIBDEPENDENCY_GRAPH_SO</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
@@ -84,6 +94,15 @@
 
 <div class="viewcode-block" id="DependencyGraph"><a class="viewcode-back" href="../../../../../thoth.adviser.python.bin.html#thoth.adviser.python.bin.dependency_graph.DependencyGraph">[docs]</a><span class="k">class</span> <span class="nc">DependencyGraph</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Adapter for C implementation of dependency graph.&quot;&quot;&quot;</span>
+
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="s2">&quot;_context&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;_direct_dependencies&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;_dependency_types&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;_dependencies_list&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;_read_pipe&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;_producer_pid&quot;</span><span class="p">,</span>
+    <span class="p">]</span>
 
     <span class="c1"># DependencyGraph::DependencyGraph</span>
     <span class="n">_C_CONSTRUCTOR</span> <span class="o">=</span> <span class="n">_LIBDEPENDENCY_GRAPH</span><span class="o">.</span><span class="n">DependencyGraph_new</span>
@@ -124,47 +143,116 @@
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">direct_dependencies</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-        <span class="n">dependencies_list</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]],</span>
-        <span class="n">dependency_types</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">direct_dependencies</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span>
+        <span class="n">paths</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span>
     <span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Construct dependency graph.</span>
 
 <span class="sd">        Create a dependency graph by propagating arguments down to library. The arguments need to be first converted</span>
 <span class="sd">        into C-type specific ones to have correct values in the C/C++ implementation..</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">read_fd</span><span class="p">,</span> <span class="n">write_fd</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">pipe</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">direct_dependencies</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NoDependenciesError</span><span class="p">(</span>
+                <span class="s2">&quot;Cannot run dependency graph if no direct dependencies are specified&quot;</span>
+            <span class="p">)</span>
 
-        <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">pid</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">read_fd</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_stack_producer</span><span class="p">(</span>
-                <span class="n">direct_dependencies</span><span class="p">,</span> <span class="n">dependencies_list</span><span class="p">,</span> <span class="n">dependency_types</span><span class="p">,</span> <span class="n">write_fd</span>
-            <span class="p">)</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                <span class="s2">&quot;Stack producer exited abnormally, this code has to be unreachable&quot;</span>
-            <span class="p">)</span>
-            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">read_pipe</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">read_fd</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span>
-            <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">write_fd</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">producer_pid</span> <span class="o">=</span> <span class="n">pid</span>
+        <span class="c1"># Mapping id to a package tuple to reconstruct back results from C/C++ library.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_context</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_read_pipe</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_producer_pid</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Remove duplicates of direct dependencies, if provided on input.</span>
+        <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">direct_dependencies</span><span class="p">)</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Make sure we assign each package type which was already seen.</span>
+        <span class="n">assigned_dependency_types</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># Mapping from a package tuple to its id to match package tuple with exactly one id.</span>
+        <span class="n">reverse_context</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                <span class="n">package_type</span> <span class="o">=</span> <span class="n">assigned_dependency_types</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">package_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">package_type</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">assigned_dependency_types</span><span class="p">)</span>
+                    <span class="n">assigned_dependency_types</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">package_type</span>
+
+                <span class="n">package_id</span> <span class="o">=</span> <span class="n">reverse_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">package_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">reverse_context</span><span class="p">)</span>
+                    <span class="n">package_id</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">reverse_context</span><span class="p">)</span>
+                    <span class="n">reverse_context</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_id</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_type</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># State this package is dependent on the previous one.</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_id</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+                    <span class="c1"># There is still one more package in path, we state dependency</span>
+                    <span class="c1"># from the current package to the next one in next iteration - see above.</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">package_id</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">direct_dependencies</span><span class="p">:</span>
+            <span class="n">package_type</span> <span class="o">=</span> <span class="n">assigned_dependency_types</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">package_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">package_type</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">assigned_dependency_types</span><span class="p">)</span>
+                <span class="n">assigned_dependency_types</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">package_type</span>
+
+            <span class="n">package_id</span> <span class="o">=</span> <span class="n">reverse_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">package_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># This can happen if a direct dependency has no dependencies.</span>
+                <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">reverse_context</span><span class="p">)</span>
+                <span class="n">package_id</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">reverse_context</span><span class="p">)</span>
+                <span class="n">reverse_context</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_id</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_type</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_SHOW_PACKAGES&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Packages considered in dependency graph traversal:&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="p">):</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;    </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+
+        <span class="c1"># Remove duplicates of paths, but preserve order of these dependencies so</span>
+        <span class="c1"># dependency graph generates based on dependencies stated.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">)</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+        <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Destructor - free up resources.&quot;&quot;&quot;</span>
         <span class="c1"># Kill the child process that produces stacks.</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">os</span><span class="o">.</span><span class="n">kill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">producer_pid</span><span class="p">,</span> <span class="n">signal</span><span class="o">.</span><span class="n">SIGKILL</span><span class="p">)</span>
-        <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
-            <span class="k">pass</span>
+        <span class="k">with</span> <span class="n">suppress</span><span class="p">(</span><span class="ne">AttributeError</span><span class="p">):</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_producer_pid</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">kill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_producer_pid</span><span class="p">,</span> <span class="n">signal</span><span class="o">.</span><span class="n">SIGKILL</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_stack_producer</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">direct_dependencies</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-        <span class="n">dependencies_list</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]],</span>
-        <span class="n">dependency_types</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-        <span class="n">write_fd</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
-    <span class="p">):</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">stacks_estimated</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Estimate number of software stacks we could end up with (the upper bound).&quot;&quot;&quot;</span>
+        <span class="c1"># We could estimate based on traversing the tree, it would give us better, but still rough estimate.</span>
+        <span class="n">counter</span> <span class="o">=</span> <span class="n">Counter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">reduce</span><span class="p">((</span><span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="n">x</span> <span class="o">*</span> <span class="n">y</span><span class="p">),</span> <span class="n">counter</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+
+    <span class="k">def</span> <span class="nf">_reconstruct_stack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stack</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Reconstruct the stack based on results from libdependency graph walks.</span>
+
+<span class="sd">        Convert numeric representation of stacks to package version tuples.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">package_id</span> <span class="ow">in</span> <span class="n">stack</span><span class="p">:</span>
+            <span class="n">package_entry</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="p">[</span><span class="n">package_id</span><span class="p">]</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_entry</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_stack_producer</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">write_fd</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;A producer of stacks.</span>
 
 <span class="sd">        Calls libdependency_graph.so routines to generate all the stacks and quits.</span>
@@ -173,33 +261,35 @@
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
                 <span class="s2">&quot;Starting stack producer from </span><span class="si">%r</span><span class="s2"> library...&quot;</span><span class="p">,</span> <span class="n">_LIBDEPENDENCY_GRAPH_SO</span>
             <span class="p">)</span>
-            <span class="n">size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dependency_types</span><span class="p">)</span>
-            <span class="n">c_dependency_types</span> <span class="o">=</span> <span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">dependency_types</span><span class="p">))(</span>
-                <span class="o">*</span><span class="n">dependency_types</span>
+            <span class="n">size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span><span class="p">)</span>
+            <span class="n">c_dependency_types</span> <span class="o">=</span> <span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span><span class="p">))(</span>
+                <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span>
             <span class="p">)</span>
-            <span class="n">c_direct_dependencies</span> <span class="o">=</span> <span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">direct_dependencies</span><span class="p">))(</span>
-                <span class="o">*</span><span class="n">direct_dependencies</span>
+            <span class="n">c_direct_dependencies</span> <span class="o">=</span> <span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="p">))(</span>
+                <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span>
             <span class="p">)</span>
 
             <span class="c1"># Convert list into ctype representation.</span>
             <span class="n">c_rows</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span> <span class="o">*</span> <span class="mi">2</span>
-            <span class="n">c_matrix</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span><span class="p">)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">dependencies_list</span><span class="p">)</span>
+            <span class="n">c_matrix</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span><span class="p">)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">)</span>
 
             <span class="n">c_dependencies_list</span> <span class="o">=</span> <span class="n">c_matrix</span><span class="p">()</span>
-            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">dependencies_list</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">):</span>
                 <span class="n">c_dependencies_list</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">c_rows</span><span class="p">()</span>
-                <span class="n">c_dependencies_list</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">dependencies_list</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-                <span class="n">c_dependencies_list</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">dependencies_list</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">c_dependencies_list</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">c_dependencies_list</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
 
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Calling dependency graph constructor&quot;</span><span class="p">)</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Dependencies list size: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">dependencies_list</span><span class="p">))</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Number of direct dependencies: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">direct_dependencies</span><span class="p">))</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Dependencies list size: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">))</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Number of direct dependencies: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="p">)</span>
+            <span class="p">)</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Total number of packages considered: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
             <span class="n">dependency_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_C_CONSTRUCTOR</span><span class="p">(</span>
                 <span class="n">c_direct_dependencies</span><span class="p">,</span>
-                <span class="nb">len</span><span class="p">(</span><span class="n">direct_dependencies</span><span class="p">),</span>
+                <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="p">),</span>
                 <span class="n">c_dependencies_list</span><span class="p">,</span>
-                <span class="nb">len</span><span class="p">(</span><span class="n">dependencies_list</span><span class="p">),</span>
+                <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">),</span>
                 <span class="n">c_dependency_types</span><span class="p">,</span>
                 <span class="n">size</span><span class="p">,</span>
                 <span class="n">write_fd</span><span class="p">,</span>
@@ -221,13 +311,34 @@
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Stack producer ended&quot;</span><span class="p">)</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 
-<div class="viewcode-block" id="DependencyGraph.walk"><a class="viewcode-back" href="../../../../../thoth.adviser.python.bin.html#thoth.adviser.python.bin.dependency_graph.DependencyGraph.walk">[docs]</a>    <span class="k">def</span> <span class="nf">walk</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Generator</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="k">def</span> <span class="nf">_create_stack_producer_subprocess</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a stack producer subprocess and instantiate pipe for IPC.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Forking and creating stack producer subprocess&quot;</span><span class="p">)</span>
+        <span class="n">read_fd</span><span class="p">,</span> <span class="n">write_fd</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">pipe</span><span class="p">()</span>
+        <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">pid</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">read_fd</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stack_producer</span><span class="p">(</span><span class="n">write_fd</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Stack producer exited abnormally, this code has to be unreachable&quot;</span>
+            <span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_read_pipe</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">read_fd</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">write_fd</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_producer_pid</span> <span class="o">=</span> <span class="n">pid</span>
+
+<div class="viewcode-block" id="DependencyGraph.walk"><a class="viewcode-back" href="../../../../../thoth.adviser.python.bin.html#thoth.adviser.python.bin.dependency_graph.DependencyGraph.walk">[docs]</a>    <span class="k">def</span> <span class="nf">walk</span><span class="p">(</span>
+        <span class="bp">self</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Generator</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Generate a software stack by traversing the graph.&quot;&quot;&quot;</span>
         <span class="n">stack_dependencies</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_create_stack_producer_subprocess</span><span class="p">()</span>
+
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Reading from pipe, item size: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ITEM_SIZE</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-                <span class="n">item</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">read_pipe</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_ITEM_SIZE</span><span class="p">)</span>
+                <span class="n">item</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_read_pipe</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_ITEM_SIZE</span><span class="p">)</span>
 
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">item</span><span class="p">:</span>
                     <span class="k">raise</span> <span class="n">PrematureStreamEndError</span><span class="p">(</span><span class="s2">&quot;Reached end of stream prematurely&quot;</span><span class="p">)</span>
@@ -236,13 +347,13 @@
 
                 <span class="k">if</span> <span class="n">item</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">STREAM_DELIMITER</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Reached stack delimiter, yielding stack&quot;</span><span class="p">)</span>
-                    <span class="k">yield</span> <span class="n">stack_dependencies</span>
+                    <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reconstruct_stack</span><span class="p">(</span><span class="n">stack_dependencies</span><span class="p">)</span>
                     <span class="n">stack_dependencies</span> <span class="o">=</span> <span class="p">[]</span>
                     <span class="k">continue</span>
 
                 <span class="k">if</span> <span class="n">item</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">STREAM_STOP</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Reached stream stop marker, closing read pipe&quot;</span><span class="p">)</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">read_pipe</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_read_pipe</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
                     <span class="k">return</span>
 
                 <span class="n">stack_dependencies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
@@ -250,20 +361,9 @@
             <span class="c1"># Ensure stack producer gets killed if there is no consumer</span>
             <span class="c1"># e.g. on keyboard interrupt in Jupyter Notebook.</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">os</span><span class="o">.</span><span class="n">kill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">producer_pid</span><span class="p">,</span> <span class="n">signal</span><span class="o">.</span><span class="n">SIGKILL</span><span class="p">)</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">kill</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_producer_pid</span><span class="p">,</span> <span class="n">signal</span><span class="o">.</span><span class="n">SIGKILL</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                 <span class="k">pass</span></div></div>
-
-
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-    <span class="n">f</span> <span class="o">=</span> <span class="n">DependencyGraph</span><span class="p">(</span>
-        <span class="n">direct_dependencies</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span>
-        <span class="n">dependencies_list</span><span class="o">=</span><span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">5</span><span class="p">],</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">6</span><span class="p">],</span> <span class="p">[</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1</span><span class="p">]],</span>
-        <span class="n">dependency_types</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span>
-    <span class="p">)</span>
-
-    <span class="k">for</span> <span class="n">walk_item</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">walk</span><span class="p">():</span>
-        <span class="nb">print</span><span class="p">(</span><span class="n">walk_item</span><span class="p">)</span>
 </pre></div>
 
           </div>
@@ -300,9 +400,20 @@
       </ul>
     </div>
 
+
     <div class="footer" role="contentinfo">
         &#169; Copyright 2019, Thoth team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.0.0.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.0.1.
     </div>
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
   </body>
 </html>

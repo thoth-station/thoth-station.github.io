@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.adviser.python.pipeline.pipeline &#8212; Thoth Adviser NA documentation</title>
+    <link rel="stylesheet" href="../../../../../_static/pydoctheme.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../../" src="../../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../../../../_static/sidebar.js"></script>
+    
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" />
+
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <link rel="shortcut icon" type="image/png" href="../../../../../_static/favicon.png" />
+    <meta name="viewport" content="width=device-width,initial-scale=0.8">
+    
+    
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
+        <li><a href="../../../../../index.html">Thoth Adviser NA documentation</a> &#187;</li>
+          <li><a href="../../../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.adviser.python.pipeline.pipeline</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-adviser</span>
+<span class="c1"># Copyright(C) 2019 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Implementation of stack generation pipeline.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Generator</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="k">import</span> <span class="n">monotonic</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.solver</span> <span class="k">import</span> <span class="n">PythonPackageGraphSolver</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.bin.exceptions</span> <span class="k">import</span> <span class="n">PrematureStreamEndError</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.bin.dependency_graph</span> <span class="k">import</span> <span class="n">DependencyGraph</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Project</span>
+<span class="kn">from</span> <span class="nn">thoth.solver.python.base</span> <span class="k">import</span> <span class="n">SolverException</span>
+<span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
+
+<span class="kn">from</span> <span class="nn">.step</span> <span class="k">import</span> <span class="n">Step</span>
+<span class="kn">from</span> <span class="nn">.step_context</span> <span class="k">import</span> <span class="n">StepContext</span>
+<span class="kn">from</span> <span class="nn">.stride</span> <span class="k">import</span> <span class="n">Stride</span>
+<span class="kn">from</span> <span class="nn">.stride_context</span> <span class="k">import</span> <span class="n">StrideContext</span>
+<span class="kn">from</span> <span class="nn">.stack_candidates</span> <span class="k">import</span> <span class="n">StackCandidates</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">StrideRemoveStack</span>
+<span class="kn">from</span> <span class="nn">.product</span> <span class="k">import</span> <span class="n">PipelineProduct</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Pipeline"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.pipeline.Pipeline">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span>
+<span class="k">class</span> <span class="nc">Pipeline</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;A stack generation pipeline.&quot;&quot;&quot;</span>
+
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">GraphDatabase</span><span class="p">)</span>
+    <span class="n">project</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Project</span><span class="p">)</span>
+    <span class="n">steps</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">type</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
+    <span class="n">strides</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">type</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
+    <span class="n">_solver</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">PythonPackageGraphSolver</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">_stack_info</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PythonPackageGraphSolver</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get solver instance - solver implemented on top of graph database.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span> <span class="o">=</span> <span class="n">PythonPackageGraphSolver</span><span class="p">(</span>
+                <span class="n">graph_db</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span>
+                <span class="n">runtime_environment</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span>
+
+<div class="viewcode-block" id="Pipeline.get_stack_info"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.pipeline.Pipeline.get_stack_info">[docs]</a>    <span class="k">def</span> <span class="nf">get_stack_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get report of a pipeline run.</span>
+
+<span class="sd">        This report includes reports from dependency graph walk.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack_info</span></div>
+
+    <span class="k">def</span> <span class="nf">_prepare_direct_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StepContext</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Resolve all the direct dependencies based on the resolution and data available in the graph.&quot;&quot;&quot;</span>
+        <span class="c1"># It&#39;s important that solver preserves order in which packages were inserted.</span>
+        <span class="c1"># This is also a requirement for running under Python3.6+!!!</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Resolving direct dependencies&quot;</span><span class="p">)</span>
+        <span class="n">step_context</span> <span class="o">=</span> <span class="n">StepContext</span><span class="p">()</span>
+        <span class="n">resolved_direct_dependencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
+            <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">iter_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)),</span>
+            <span class="n">graceful</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">all_versions</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">unresolved</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">package_name</span><span class="p">,</span> <span class="n">package_versions</span> <span class="ow">in</span> <span class="n">resolved_direct_dependencies</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">package_versions</span><span class="p">:</span>
+                <span class="c1"># This means that there were found versions in the graph</span>
+                <span class="c1"># database but none was matching the given version range.</span>
+                <span class="n">unresolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s2">&quot;No versions were found for direct dependency </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_name</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
+                <span class="n">step_context</span><span class="o">.</span><span class="n">add_resolved_direct_dependency</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">unresolved</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SolverException</span><span class="p">(</span>
+                <span class="s2">&quot;Unable to resolve all direct dependencies, no versions were found for packages </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unresolved</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">step_context</span>
+
+    <span class="k">def</span> <span class="nf">_get_python_package_tuples</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">ids_map</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">],</span> <span class="n">transitive_dependencies</span><span class="p">:</span> <span class="n">List</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve tuples representing package name, package version and index url for the given set of ids.&quot;&quot;&quot;</span>
+        <span class="c1"># We need to explicitly iterate over these results as gremlin-python wraps result into Path object</span>
+        <span class="c1"># which does not support advanced indexing like 0::2.</span>
+        <span class="n">seen_ids</span> <span class="o">=</span> <span class="n">ids_map</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+        <span class="n">unseen_ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">transitive_dependencies</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">entry</span><span class="p">),</span> <span class="mi">2</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">entry</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen_ids</span><span class="p">:</span>
+                    <span class="n">unseen_ids</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unseen_ids</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Retrieving package tuples for transitive dependencies (count: </span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="nb">len</span><span class="p">(</span><span class="n">unseen_ids</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="n">package_tuples</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_python_package_tuples</span><span class="p">(</span><span class="n">unseen_ids</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">python_package_id</span><span class="p">,</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">package_tuples</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">ids_map</span><span class="p">[</span><span class="n">python_package_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_tuple</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">entries</span> <span class="ow">in</span> <span class="n">transitive_dependencies</span><span class="p">:</span>
+            <span class="n">new_entries</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">entry</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">entries</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">idx</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># TODO: remove &quot;is_solvable&quot; flag from query</span>
+                    <span class="n">new_entries</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ids_map</span><span class="p">[</span><span class="n">entry</span><span class="p">])</span>
+
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_entries</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_resolve_transitive_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">step_context</span><span class="p">:</span> <span class="n">StepContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Solve all direct dependencies to find all transitive paths (all possible transitive dependencies).&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Resolving transitive dependencies of direct dependencies&quot;</span><span class="p">)</span>
+
+        <span class="n">ids_map</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_direct_dependencies</span><span class="p">():</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Retrieving transitive dependencies for </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">transitive_dependencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">retrieve_transitive_dependencies_python</span><span class="p">(</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">transitive_dependencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_python_package_tuples</span><span class="p">(</span>
+                <span class="n">ids_map</span><span class="p">,</span> <span class="n">transitive_dependencies</span>
+            <span class="p">)</span>
+            <span class="n">step_context</span><span class="o">.</span><span class="n">add_paths</span><span class="p">(</span><span class="n">transitive_dependencies</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_initialize_stepping</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StepContext</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Initialize pipeline - resolve direct dependencies and all the transitive dependencies.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Initializing pipeline&quot;</span><span class="p">)</span>
+        <span class="n">step_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_direct_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_transitive_dependencies</span><span class="p">(</span><span class="n">step_context</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">step_context</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_finalize_stepping</span><span class="p">(</span><span class="n">step_context</span><span class="p">:</span> <span class="n">StepContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependencyGraph</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Finalize pipeline - run dependency graph to resolve fully pinned down stacks.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Finalizing stepping&quot;</span><span class="p">)</span>
+        <span class="n">step_context</span><span class="o">.</span><span class="n">final_sort</span><span class="p">()</span>
+        <span class="n">dependency_graph</span> <span class="o">=</span> <span class="n">DependencyGraph</span><span class="p">(</span>
+            <span class="n">direct_dependencies</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">step_context</span><span class="o">.</span><span class="n">iter_direct_dependencies_tuple</span><span class="p">()),</span>
+            <span class="n">paths</span><span class="o">=</span><span class="n">step_context</span><span class="o">.</span><span class="n">raw_paths</span>
+        <span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Estimated number of stacks: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dependency_graph</span><span class="o">.</span><span class="n">stacks_estimated</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">dependency_graph</span>
+
+    <span class="k">def</span> <span class="nf">_instantiate_strides</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Stride</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Instantiate stride classes with configuration supplied.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Instantiating strides&quot;</span><span class="p">)</span>
+        <span class="n">strides</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">stride_class</span><span class="p">,</span> <span class="n">parameters_dict</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">strides</span><span class="p">:</span>
+            <span class="n">filter_instance</span><span class="p">:</span> <span class="n">Stride</span> <span class="o">=</span> <span class="n">stride_class</span><span class="p">(</span>
+                <span class="n">graph</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">parameters_dict</span><span class="p">:</span>
+                <span class="n">filter_instance</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">(</span><span class="n">parameters_dict</span><span class="p">)</span>
+            <span class="n">strides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filter_instance</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">strides</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_log_pipeline_msg</span><span class="p">(</span><span class="n">count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Starting stack generation pipeline&quot;</span>
+        <span class="k">if</span> <span class="n">count</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">+=</span> <span class="n">f</span><span class="s2">&quot;, pipeline will produce at most </span><span class="si">{count}</span><span class="s2"> stacks&quot;</span>
+        <span class="k">if</span> <span class="n">limit</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">+=</span> <span class="n">f</span><span class="s2">&quot;, limit for number of stacks scored in total is set to </span><span class="si">{limit}</span><span class="s2">&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Pipeline.conduct"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.pipeline.Pipeline.conduct">[docs]</a>    <span class="k">def</span> <span class="nf">conduct</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PipelineProduct</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Chain execution of each step and filter in a pipeline and execute it.&quot;&quot;&quot;</span>
+        <span class="n">start_time</span> <span class="o">=</span> <span class="n">monotonic</span><span class="p">()</span>
+        <span class="n">step_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_initialize_stepping</span><span class="p">()</span>
+        <span class="n">strides</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_instantiate_strides</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">count</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">count</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Number of projects produced by pipeline (count) has to be higher than 0&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">limit</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Number of projects scored by pipeline (limit) has to be higher than 0&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">count</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">count</span> <span class="o">&gt;</span> <span class="n">limit</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Cannot return more stacks (</span><span class="si">%d</span><span class="s2">) than scored, adjusting count to </span><span class="si">%d</span><span class="s2"> based on limit provided&quot;</span><span class="p">,</span>
+                <span class="n">count</span><span class="p">,</span>
+                <span class="n">limit</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">count</span> <span class="o">=</span> <span class="n">limit</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_log_pipeline_msg</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="n">limit</span><span class="p">)</span>
+        <span class="n">step_context</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">start_timer</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">step_class</span><span class="p">,</span> <span class="n">parameters_dict</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">steps</span><span class="p">:</span>
+            <span class="n">step_instance</span><span class="p">:</span> <span class="n">Step</span> <span class="o">=</span> <span class="n">step_class</span><span class="p">(</span><span class="n">graph</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running pipeline step </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">step_instance</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">parameters_dict</span><span class="p">:</span>
+                <span class="n">step_instance</span><span class="o">.</span><span class="n">update_parameters</span><span class="p">(</span><span class="n">parameters_dict</span><span class="p">)</span>
+            <span class="n">step_context</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">reset_stats</span><span class="p">(</span><span class="n">step_instance</span><span class="p">)</span>
+            <span class="n">step_instance</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">step_context</span><span class="p">)</span>
+
+        <span class="n">step_context</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">log_report</span><span class="p">()</span>
+
+        <span class="n">stacks_seen</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">stacks_added</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">stack_candidates</span> <span class="o">=</span> <span class="n">StackCandidates</span><span class="p">(</span>
+            <span class="n">input_project</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="p">,</span>
+            <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
+            <span class="n">direct_dependencies_map</span><span class="o">=</span><span class="n">step_context</span><span class="o">.</span><span class="n">direct_dependencies_map</span><span class="p">,</span>
+            <span class="n">transitive_dependencies_map</span><span class="o">=</span><span class="n">step_context</span><span class="o">.</span><span class="n">transitive_dependencies_map</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">strides</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running strides on stack candidates&quot;</span><span class="p">)</span>
+        <span class="n">dependency_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_finalize_stepping</span><span class="p">(</span><span class="n">step_context</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">stack_candidate</span> <span class="ow">in</span> <span class="n">dependency_graph</span><span class="o">.</span><span class="n">walk</span><span class="p">():</span>
+                <span class="n">stacks_seen</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">stride_context</span> <span class="o">=</span> <span class="n">StrideContext</span><span class="p">(</span><span class="n">stack_candidate</span><span class="p">)</span>
+
+                <span class="n">stride_context</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">start_timer</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">stride_instance</span> <span class="ow">in</span> <span class="n">strides</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running stride </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">stride_instance</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                    <span class="n">stride_context</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">reset_stats</span><span class="p">(</span><span class="n">stride_instance</span><span class="p">)</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">stride_instance</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">stride_context</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="n">StrideRemoveStack</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;Stride </span><span class="si">%r</span><span class="s2"> filtered out stack </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">stride_instance</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                            <span class="n">stack_candidate</span><span class="p">,</span>
+                            <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">),</span>
+                        <span class="p">)</span>
+                        <span class="k">break</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">stack_candidates</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">stride_context</span><span class="p">)</span>
+                    <span class="n">stacks_added</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">stacks_added</span> <span class="o">&gt;=</span> <span class="n">limit</span><span class="p">:</span>
+                        <span class="k">break</span>
+
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">strides</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">stride_context</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">log_report</span><span class="p">()</span>
+        <span class="k">except</span> <span class="n">PrematureStreamEndError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Error while dependency graph walk: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+                <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="s2">&quot;Resolver was closed prematurely because of memory or time-out, consider &quot;</span>
+                                 <span class="s2">&quot;decreasing latest versions considered in software stacks&quot;</span>
+            <span class="p">})</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">strides</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No strides were configured&quot;</span><span class="p">)</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Pipeline produced </span><span class="si">%d</span><span class="s2"> stacks in total in </span><span class="si">%.4f</span><span class="s2"> seconds, </span><span class="si">%d</span><span class="s2"> stacks were discarded by strides&quot;</span><span class="p">,</span>
+                <span class="n">stacks_added</span><span class="p">,</span>
+                <span class="n">monotonic</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">,</span>
+                <span class="n">stacks_seen</span> <span class="o">-</span> <span class="n">stacks_added</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">stack_candidates</span><span class="o">.</span><span class="n">generate_pipeline_products</span><span class="p">()</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+    <a id="sidebar-anchor"></a>
+    
+
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../../search.html" method="get">
+      <input type="text" name="q" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+      </ul>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Thoth team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.0.1.
+    </div>
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
