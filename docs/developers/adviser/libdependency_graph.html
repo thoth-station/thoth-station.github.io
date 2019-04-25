@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>Resolver design document &#8212; Thoth Adviser NA documentation</title>
+    <title>Resolver design document &#8212; Thoth Adviser 0.3.0 documentation</title>
     <link rel="stylesheet" href="_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     
@@ -37,7 +37,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="index.html">Thoth Adviser NA documentation</a> &#187;</li> 
+        <li><a href="index.html">Thoth Adviser 0.3.0 documentation</a> &#187;</li> 
       </ul>
     </div>
     
@@ -51,7 +51,7 @@
   <div class="section" id="resolver-design-document">
 <span id="libdependency-graph"></span><h1>Resolver design document<a class="headerlink" href="#resolver-design-document" title="Permalink to this headline">¶</a></h1>
 <p>This document describes the current and past implementations of Thoth’s
-software stack resolution algorithm which is implemented on top of JanusGraph
+software stack resolution algorithm which is implemented on top of graph
 database. The main reason for creating this resolution algorithm are two
 fundamental requirements from Thoth side:</p>
 <ul class="simple">
@@ -61,7 +61,7 @@ fundamental requirements from Thoth side:</p>
 <div class="section" id="queries-to-the-graph-database">
 <h2>Queries to the graph database<a class="headerlink" href="#queries-to-the-graph-database" title="Permalink to this headline">¶</a></h2>
 <p>Packages and their dependencies were obtained from the graph database
-(JanusGraph). A query to JanusGraph database for transitive dependencies
+(Dgraph). A query to graph database for transitive dependencies
 retrieves a path to each package starting from each direct dependency. Given
 the following dependencies (where A, B, C, D, E, F, G are packages in specific
 versions):</p>
@@ -87,22 +87,17 @@ dependency A returns a list of lists stating which package depends on which
 references back the item which started the cycle).</p>
 <p>The actual query implemented in Thoth does not return values of packages. Based
 on our performance observations, due to serialization, deserialization and
-JanusGraph server-side cache, it is much more efficient to retrieve identifiers
+graph database server-side cache, it is much more efficient to retrieve identifiers
 of these packages and ask for the actual package name, package version and
 source index URL later on in parallel for each item in the dependency chain
 (note that packages in the resulting query occur multiple times based on
 packages which introduced them).</p>
 <p>We are now primarily focused on Python ecosystem, we use pip’s internal
-resolution algorithm to resolve dependencies. JanusGraph allows to submit code
-which should be executed during the traversal in JanusGraph, but this code has
-to be JVM compatible (e.g. Java, Groovy scripts) - because of this reason we
-cannot directly submit pip’s internal resolution algorithm written in Python.
-Moreover, we are interested in resolved stacks, which require maintaining a
-context used during the actual graph traversal.  Python Implementation The very
+resolution algorithm to resolve dependencies.  The very
 first implementation is written in Python and can be found in the Thoth’s
 adviser repository.</p>
 <p>The key idea is in creation in-memory N-ary graph constructed based on queries
-to JanusGraph. This graph is subsequently traversed and the result of each full
+to graph database. This graph is subsequently traversed and the result of each full
 traversal yields a fully pinned down stack.</p>
 <a class="reference external image-reference" href="_static/dependency_graph.png"><img alt="DependencyGraph" src="_images/dependency_graph.png" /></a>
 <p>By traversing the graph and reaching the leaf nodes, we generate software
