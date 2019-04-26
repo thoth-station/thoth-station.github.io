@@ -424,13 +424,6 @@
 
         <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;count&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span></div>
 
-    <span class="k">def</span> <span class="nf">_get_stack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">packages</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">tuple</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get all stacks that include the given set of packages.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">packages</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot query for a stack with no packages.&quot;</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
-
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">_construct_filter_eq_from_dict</span><span class="p">(</span><span class="n">dict_</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Construct a filter query from a dict matching all the properties.&quot;&quot;&quot;</span>
@@ -463,8 +456,8 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">packages</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No packages provided for the query&quot;</span><span class="p">)</span>
 
-        <span class="c1"># Create a list so we can index packages in log messages.</span>
-        <span class="n">packages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">packages</span><span class="p">)</span>
+        <span class="c1"># Create a list so we can index packages in log messages, also normalize names according to PEP.</span>
+        <span class="n">packages</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">pkg</span><span class="p">)</span> <span class="k">for</span> <span class="n">pkg</span> <span class="ow">in</span> <span class="n">packages</span><span class="p">)</span>
         <span class="n">queries</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">packages</span><span class="p">):</span>
             <span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span><span class="p">,</span> <span class="n">index_url</span> <span class="o">=</span> <span class="n">package_tuple</span>
@@ -891,6 +884,7 @@
 <span class="sd">        dependencies as most of the time is otherwise spent in serialization</span>
 <span class="sd">        and deserialization of query results.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
         <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
         <span class="k">if</span> <span class="n">os_name</span><span class="p">:</span>
             <span class="n">query</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39; AND eq(os_name, &quot;</span><span class="si">{os_name}</span><span class="s1">&quot;)&#39;</span>
@@ -1105,6 +1099,7 @@
 
 <div class="viewcode-block" id="GraphDatabase.get_python_cve_records"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.get_python_cve_records">[docs]</a>    <span class="k">def</span> <span class="nf">get_python_cve_records</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Get known vulnerabilities for the given package-version.&quot;&quot;&quot;</span>
+        <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
         <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;{</span>
 <span class="s2">            f(func: has(</span><span class="si">%s</span><span class="s2">)) @filter(eq(ecosystem, &quot;python&quot;) &quot;&quot;&quot;</span> \
         <span class="sd">&quot;&quot;&quot;AND eq(package_name, &quot;%s&quot;) AND eq(package_version, &quot;%s&quot;)) {</span>
@@ -1303,7 +1298,7 @@
         <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">pipfile_locked</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="n">python_package_version</span> <span class="o">=</span> <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
                 <span class="n">ecosystem</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">,</span>
-                <span class="n">package_name</span><span class="o">=</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">package_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
                 <span class="n">package_version</span><span class="o">=</span><span class="n">package</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
                 <span class="n">index_url</span><span class="o">=</span><span class="n">package</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span> <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">index</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">extras</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
@@ -1337,7 +1332,7 @@
         <span class="k">for</span> <span class="n">requirement</span> <span class="ow">in</span> <span class="n">pipfile</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="n">python_package_requirement</span> <span class="o">=</span> <span class="n">PythonPackageRequirement</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
                 <span class="n">ecosystem</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">,</span>
-                <span class="n">package_name</span><span class="o">=</span><span class="n">requirement</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">package_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">requirement</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
                 <span class="n">version_range</span><span class="o">=</span><span class="n">requirement</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
                 <span class="n">index_url</span><span class="o">=</span><span class="n">requirement</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span> <span class="k">if</span> <span class="n">requirement</span><span class="o">.</span><span class="n">index</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">markers</span><span class="o">=</span><span class="n">requirement</span><span class="o">.</span><span class="n">markers</span><span class="p">,</span>
@@ -1506,6 +1501,7 @@
         <span class="n">cve</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">CVE</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Store information about a CVE in the graph database for the given Python package.&quot;&quot;&quot;</span>
+        <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
         <span class="n">python_index</span> <span class="o">=</span> <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">query_one</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">,</span> <span class="n">url</span><span class="o">=</span><span class="n">index_url</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">python_index</span><span class="p">:</span>
             <span class="k">raise</span> <span class="n">PythonIndexNotRegistered</span><span class="p">(</span>
@@ -1628,7 +1624,7 @@
 
             <span class="n">python_package_version</span> <span class="o">=</span> <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
                 <span class="n">ecosystem</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">,</span>
-                <span class="n">package_name</span><span class="o">=</span><span class="n">python_package_info</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                <span class="n">package_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">python_package_info</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]),</span>
                 <span class="n">package_version</span><span class="o">=</span><span class="n">python_package_info</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;version&quot;</span><span class="p">],</span>
                 <span class="n">index_url</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
                 <span class="n">extras</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
