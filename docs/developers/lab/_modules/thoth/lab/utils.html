@@ -75,11 +75,13 @@
 <span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="k">import</span> <span class="n">urlparse</span>
 
 <span class="kn">import</span> <span class="nn">importlib</span>
+<span class="kn">import</span> <span class="nn">requests</span>
 <span class="kn">import</span> <span class="nn">urllib3</span>
 
-<span class="kn">import</span> <span class="nn">requests</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
 
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="n">DEFAULT</span> <span class="o">=</span> <span class="nb">object</span><span class="p">()</span>
 
@@ -155,6 +157,68 @@
         <span class="n">importable</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">import_successful</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;package&#39;</span><span class="p">:</span> <span class="n">packages</span><span class="p">,</span> <span class="s1">&#39;version&#39;</span><span class="p">:</span> <span class="n">versions</span><span class="p">,</span> <span class="s1">&#39;importable&#39;</span><span class="p">:</span> <span class="n">importable</span><span class="p">})</span></div>
+
+
+<div class="viewcode-block" id="scale_colour_continuous"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.scale_colour_continuous">[docs]</a><span class="k">def</span> <span class="nf">scale_colour_continuous</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">,</span>
+                            <span class="n">colour_palette</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                            <span class="n">n_colours</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+                            <span class="n">norm</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Scale given arrays into colour array by specific palette.</span>
+
+<span class="sd">    The default number of colours is 10, which translates to</span>
+<span class="sd">    dividing an array on a scale from 0 to 1 into 0.1 colour bins.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
+    <span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="k">import</span> <span class="n">ListedColormap</span>
+
+<span class="c1">#     colour_palette = colour_palette or sns.diverging_palette(</span>
+<span class="c1">#         10, 130, 80, 50, 25, n=n_colours, as_cmap=True)</span>
+    <span class="c1"># better have the yellow in the middle</span>
+    <span class="n">colour_palette</span> <span class="o">=</span> <span class="n">colour_palette</span> <span class="ow">or</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span><span class="s1">&#39;RdYlGn&#39;</span><span class="p">,</span> <span class="n">n_colors</span><span class="o">=</span><span class="n">n_colours</span><span class="p">)</span>
+    <span class="n">colour_map</span> <span class="o">=</span> <span class="n">ListedColormap</span><span class="p">(</span><span class="n">colour_palette</span><span class="o">.</span><span class="n">as_hex</span><span class="p">())</span>
+
+    <span class="n">array_normalized</span> <span class="o">=</span> <span class="n">arr</span>
+    <span class="k">if</span> <span class="n">norm</span><span class="p">:</span>
+        <span class="n">array</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">arr</span><span class="p">)</span>
+        <span class="n">array_dim</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">array</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">array_dim</span> <span class="o">==</span> <span class="mi">1</span>
+
+        <span class="n">array_normalized</span> <span class="o">=</span> <span class="p">(</span><span class="n">array</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">array</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">array</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">array</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">colour_map</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">array_normalized</span><span class="p">])</span><span class="o">.</span><span class="n">as_hex</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="highlight"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.highlight">[docs]</a><span class="k">def</span> <span class="nf">highlight</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">content</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">column_class</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">colours</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Highlight rows of `content` column of a given DataFrame.</span>
+
+<span class="sd">    Highlight can be based on `column_class` or custom `colours` provided.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">IPython.core.display</span> <span class="k">import</span> <span class="n">HTML</span>
+
+    <span class="n">html</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">colours</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">colours</span> <span class="o">=</span> <span class="n">colours</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">colours</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="n">df</span><span class="p">[</span><span class="n">colours</span><span class="p">]</span>
+
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">colours</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">colours</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">line_template</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        &lt;span&gt;&lt;pre style=&quot;background-color: </span><span class="si">{col}</span><span class="s2">;&quot; class=&quot;</span><span class="si">{cls}</span><span class="s2">&quot;&gt;</span><span class="si">{idx: &lt;3}</span><span class="s2"> | </span><span class="si">{content}</span><span class="s2">&lt;/pre&gt;&lt;/span&gt;</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">line</span> <span class="o">=</span> <span class="n">line_template</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">col</span><span class="o">=</span><span class="n">colours</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">colours</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="bp">cls</span><span class="o">=</span><span class="n">row</span><span class="p">[</span><span class="n">column_class</span><span class="p">]</span>  <span class="k">if</span> <span class="n">column_class</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="n">idx</span><span class="o">=</span><span class="n">idx</span><span class="p">,</span>
+            <span class="n">content</span><span class="o">=</span><span class="n">row</span><span class="p">[</span><span class="n">content</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="n">html</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">HTML</span><span class="p">(</span><span class="s1">&#39;&lt;br&gt;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">html</span><span class="p">))</span></div>
 
 
 <span class="k">def</span> <span class="nf">_rhas</span><span class="p">(</span><span class="n">fhas</span><span class="p">,</span> <span class="n">fget</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">,</span> <span class="n">attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
