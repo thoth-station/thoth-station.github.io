@@ -68,6 +68,7 @@
 <span class="sd">&quot;&quot;&quot;Implementation of statistics for a stack generation pipeline and every pipeline step.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">.stats_base</span> <span class="k">import</span> <span class="n">StatsBase</span>
@@ -79,14 +80,28 @@
 <span class="k">class</span> <span class="nc">StepStats</span><span class="p">(</span><span class="n">StatsBase</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Statistics accumulated for steps in pipeline.&quot;&quot;&quot;</span>
 
+    <span class="n">_packages_removed_count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>
+
 <div class="viewcode-block" id="StepStats.log_report"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_stats.StepStats.log_report">[docs]</a>    <span class="k">def</span> <span class="nf">log_report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Log report for a pipeline step.&quot;&quot;&quot;</span>
         <span class="n">total</span> <span class="o">=</span> <span class="mf">0.0</span>
         <span class="k">for</span> <span class="n">step_name</span><span class="p">,</span> <span class="n">step_duration</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_units_run</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;    Step </span><span class="si">%r</span><span class="s2"> took </span><span class="si">%.5f</span><span class="s2"> seconds&quot;</span><span class="p">,</span> <span class="n">step_name</span><span class="p">,</span> <span class="n">step_duration</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_packages_removed_count</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">step_name</span><span class="p">,</span> <span class="nb">set</span><span class="p">()))</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;     -&gt; number of packages removed from dependency graph: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_packages_removed_count</span><span class="p">[</span><span class="n">step_name</span><span class="p">])</span>
+                <span class="p">)</span>
             <span class="n">total</span> <span class="o">+=</span> <span class="n">step_duration</span>
 
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Steps took </span><span class="si">%.5f</span><span class="s2"> seconds in total&quot;</span><span class="p">,</span> <span class="n">total</span><span class="p">)</span></div></div>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Steps took </span><span class="si">%.5f</span><span class="s2"> seconds in total&quot;</span><span class="p">,</span> <span class="n">total</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="StepStats.mark_removed_package_tuple"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_stats.StepStats.mark_removed_package_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">mark_removed_package_tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]):</span>
+        <span class="sd">&quot;&quot;&quot;Keep track of packages removed in a step run for statistics.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_current_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_packages_removed_count</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_packages_removed_count</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_current_name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_packages_removed_count</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_current_name</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span></div></div>
 </pre></div>
 
           </div>

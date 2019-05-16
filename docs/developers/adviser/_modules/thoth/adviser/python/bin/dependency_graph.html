@@ -79,9 +79,6 @@
 <span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">Counter</span>
 <span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">reduce</span>
 
-<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">PrematureStreamEndError</span>
-<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">NoDependenciesError</span>
-
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 <span class="n">_DEFAULT_LIBDEPENDENCY_GRAPH_SO</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
     <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)),</span> <span class="s2">&quot;libdependency_graph.so&quot;</span>
@@ -90,6 +87,29 @@
     <span class="s2">&quot;LIBDEPENDENCY_GRAPH_SO_PATH&quot;</span><span class="p">,</span> <span class="n">_DEFAULT_LIBDEPENDENCY_GRAPH_SO</span>
 <span class="p">)</span>
 <span class="n">_LIBDEPENDENCY_GRAPH</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">cdll</span><span class="o">.</span><span class="n">LoadLibrary</span><span class="p">(</span><span class="n">_LIBDEPENDENCY_GRAPH_SO</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="DependencyGraphException"><a class="viewcode-back" href="../../../../../thoth.adviser.python.bin.html#thoth.adviser.python.bin.dependency_graph.DependencyGraphException">[docs]</a><span class="k">class</span> <span class="nc">DependencyGraphException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A base class for dependency graph exception hierarchy.&quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="PrematureStreamEndError"><a class="viewcode-back" href="../../../../../thoth.adviser.python.bin.html#thoth.adviser.python.bin.dependency_graph.PrematureStreamEndError">[docs]</a><span class="k">class</span> <span class="nc">PrematureStreamEndError</span><span class="p">(</span><span class="n">DependencyGraphException</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;An exception raised if the stack stream was closed prematurely.</span>
+
+<span class="sd">    This can happen for example due to OOM, which can kill stack producer. In that case we would like to</span>
+<span class="sd">    report to user what we have computed so far.</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="NoDependenciesError"><a class="viewcode-back" href="../../../../../thoth.adviser.python.bin.html#thoth.adviser.python.bin.dependency_graph.NoDependenciesError">[docs]</a><span class="k">class</span> <span class="nc">NoDependenciesError</span><span class="p">(</span><span class="n">DependencyGraphException</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;An exception raised if no direct dependencies were provided to dependency graph.&quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="DependenciesCountOverflow"><a class="viewcode-back" href="../../../../../thoth.adviser.python.bin.html#thoth.adviser.python.bin.dependency_graph.DependenciesCountOverflow">[docs]</a><span class="k">class</span> <span class="nc">DependenciesCountOverflow</span><span class="p">(</span><span class="n">DependencyGraphException</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;An exception raised if number of dependencies cannot be processed due to overflow.</span>
+
+<span class="sd">    Based on internal representation of packages (fixed size unsigned integers).</span>
+<span class="sd">    &quot;&quot;&quot;</span></div>
 
 
 <div class="viewcode-block" id="DependencyGraph"><a class="viewcode-back" href="../../../../../thoth.adviser.python.bin.html#thoth.adviser.python.bin.dependency_graph.DependencyGraph">[docs]</a><span class="k">class</span> <span class="nc">DependencyGraph</span><span class="p">:</span>
@@ -133,13 +153,16 @@
 
     <span class="c1"># Marker used to signalize delimit stacks in stack stream (one stack delimited by this marker).</span>
     <span class="n">_C_GET_STREAM_DELIMITER</span> <span class="o">=</span> <span class="n">_LIBDEPENDENCY_GRAPH</span><span class="o">.</span><span class="n">get_stream_delimiter</span>
-    <span class="n">_C_GET_STREAM_DELIMITER</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span>
+    <span class="n">_C_GET_STREAM_DELIMITER</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint16</span>
     <span class="n">STREAM_DELIMITER</span> <span class="o">=</span> <span class="n">_C_GET_STREAM_DELIMITER</span><span class="p">()</span>
 
     <span class="c1"># Marker used to signalize end of the stack stream (one stack delimited by this marker).</span>
     <span class="n">_C_GET_STREAM_STOP</span> <span class="o">=</span> <span class="n">_LIBDEPENDENCY_GRAPH</span><span class="o">.</span><span class="n">get_stream_stop</span>
-    <span class="n">_C_GET_STREAM_STOP</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span>
+    <span class="n">_C_GET_STREAM_STOP</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint16</span>
     <span class="n">STREAM_STOP</span> <span class="o">=</span> <span class="n">_C_GET_STREAM_STOP</span><span class="p">()</span>
+
+    <span class="c1"># Given the fact we have uint16_t for representing a package and 2 markers - stream stop and delimiter marker.</span>
+    <span class="n">MAX_DEPENDENCIES_COUNT</span> <span class="o">=</span> <span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">16</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span>
 
     <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -220,6 +243,12 @@
             <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="p">):</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;    </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
 
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_context</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">MAX_DEPENDENCIES_COUNT</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">DependenciesCountOverflow</span><span class="p">(</span>
+                <span class="n">f</span><span class="s2">&quot;Number of dependencies overflowed dependency graph implementation, number &quot;</span>
+                <span class="n">f</span><span class="s2">&quot;of dependencies: {len(self._context)}, limit is </span><span class="si">{self.MAX_DEPENDENCIES_COUNT}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
         <span class="c1"># Remove duplicates of paths, but preserve order of these dependencies so</span>
         <span class="c1"># dependency graph generates based on dependencies stated.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
@@ -262,16 +291,16 @@
                 <span class="s2">&quot;Starting stack producer from </span><span class="si">%r</span><span class="s2"> library...&quot;</span><span class="p">,</span> <span class="n">_LIBDEPENDENCY_GRAPH_SO</span>
             <span class="p">)</span>
             <span class="n">size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span><span class="p">)</span>
-            <span class="n">c_dependency_types</span> <span class="o">=</span> <span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span><span class="p">))(</span>
+            <span class="n">c_dependency_types</span> <span class="o">=</span> <span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint16</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span><span class="p">))(</span>
                 <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependency_types</span>
             <span class="p">)</span>
-            <span class="n">c_direct_dependencies</span> <span class="o">=</span> <span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="p">))(</span>
+            <span class="n">c_direct_dependencies</span> <span class="o">=</span> <span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint16</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="p">))(</span>
                 <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span>
             <span class="p">)</span>
 
             <span class="c1"># Convert list into ctype representation.</span>
-            <span class="n">c_rows</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span> <span class="o">*</span> <span class="mi">2</span>
-            <span class="n">c_matrix</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint</span><span class="p">)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">)</span>
+            <span class="n">c_rows</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint16</span> <span class="o">*</span> <span class="mi">2</span>
+            <span class="n">c_matrix</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">ctypes</span><span class="o">.</span><span class="n">c_uint16</span><span class="p">)</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">)</span>
 
             <span class="n">c_dependencies_list</span> <span class="o">=</span> <span class="n">c_matrix</span><span class="p">()</span>
             <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dependencies_list</span><span class="p">):</span>
