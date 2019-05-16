@@ -648,7 +648,8 @@
         <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">]:</span>
             <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span>
-                <span class="n">f</span><span class="s2">&quot;Package </span><span class="si">{package_name}</span><span class="s2"> in version </span><span class="si">{package_version}</span><span class="s2"> from index </span><span class="si">{index_url}</span><span class="s2"> not found&quot;</span>
+                <span class="n">f</span><span class="s2">&quot;Package </span><span class="si">{package_name!r}</span><span class="s2"> in version </span><span class="si">{package_version!r}</span><span class="s2"> from index </span><span class="si">{index_url!r}</span><span class="s2"> not found for &quot;</span>
+                <span class="n">f</span><span class="s2">&quot;operating system &#39;</span><span class="si">{os_name}</span><span class="s2">:</span><span class="si">{os_version}</span><span class="s2">&#39;, python version: </span><span class="si">{python_version!r}</span><span class="s2">&quot;</span>
             <span class="p">)</span>
 
         <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;e&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">])</span></div>
@@ -998,6 +999,9 @@
 <span class="s2">            q(func: has(</span><span class="si">%s</span><span class="s2">)) @filter(eq(package_name, &quot;</span><span class="si">%s</span><span class="s2">&quot;) &quot;&quot;&quot;</span> \
         <span class="sd">&quot;&quot;&quot;AND eq(package_version, &quot;%s&quot;) AND eq(index_url, &quot;%s&quot;)%s) @recurse(depth: %d, loop: false) {</span>
 <span class="sd">                uid</span>
+<span class="sd">                package_name</span>
+<span class="sd">                package_version</span>
+<span class="sd">                index_url</span>
 <span class="sd">                depends_on</span>
 <span class="sd">            }</span>
 <span class="sd">        }</span>
@@ -1019,17 +1023,15 @@
         <span class="c1">#</span>
         <span class="c1"># Post-process if we need perform more search in-depth not to reach serialization issues.</span>
         <span class="c1">#</span>
-        <span class="c1"># TODO: the manual traversal for transitive dependencies does not include check for cyclic deps</span>
-        <span class="c1">#</span>
 
         <span class="c1"># Adjust to add additional filter for uid based queries.</span>
         <span class="k">if</span> <span class="n">query_filter</span><span class="p">:</span>
             <span class="n">query_filter</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot; @filter(</span><span class="si">{query_filter}</span><span class="s2">)&quot;</span>
 
-        <span class="n">stack</span> <span class="o">=</span> <span class="n">deque</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">query_result</span><span class="p">)</span>
+        <span class="n">stack</span> <span class="o">=</span> <span class="n">deque</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="nb">set</span><span class="p">())</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">query_result</span><span class="p">)</span>
         <span class="k">while</span> <span class="n">stack</span><span class="p">:</span>
-            <span class="n">depth</span><span class="p">,</span> <span class="n">item</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
-            <span class="k">if</span> <span class="n">depth</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_TRANSITIVE_QUERY_DEPTH</span><span class="p">:</span>
+            <span class="n">depth</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">packages_seen</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">depth</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">_TRANSITIVE_QUERY_DEPTH</span> <span class="ow">and</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;uid&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">packages_seen</span><span class="p">:</span>
                 <span class="k">assert</span> <span class="s2">&quot;depends_on&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">item</span>
                 <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">                    {</span>
@@ -1044,14 +1046,16 @@
                     <span class="bp">self</span><span class="o">.</span><span class="n">_TRANSITIVE_QUERY_DEPTH</span><span class="p">,</span>
                 <span class="p">)</span>
                 <span class="n">subquery_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+                <span class="k">assert</span> <span class="n">subquery_result</span><span class="p">[</span><span class="s2">&quot;q&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;uid&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;uid&quot;</span><span class="p">]</span>
                 <span class="c1"># We always have one element in the query result - the uid itself.</span>
                 <span class="k">if</span> <span class="s2">&quot;depends_on&quot;</span> <span class="ow">in</span> <span class="n">subquery_result</span><span class="p">[</span><span class="s2">&quot;q&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]:</span>
                     <span class="n">item</span><span class="p">[</span><span class="s2">&quot;depends_on&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">subquery_result</span><span class="p">[</span><span class="s2">&quot;q&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;depends_on&quot;</span><span class="p">]</span>
-                    <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">subquery_result</span><span class="p">))</span>
+                    <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="n">subquery_result</span><span class="p">,</span> <span class="n">packages_seen</span> <span class="o">|</span> <span class="p">{</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;uid&quot;</span><span class="p">]}))</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">depth</span> <span class="o">+=</span> <span class="mi">1</span>
                 <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;depends_on&quot;</span><span class="p">,</span> <span class="p">[]):</span>
-                    <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">depth</span><span class="p">,</span> <span class="n">entry</span><span class="p">))</span>
+                    <span class="n">new_packages_seen</span> <span class="o">=</span> <span class="n">packages_seen</span> <span class="o">|</span> <span class="p">{</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;uid&quot;</span><span class="p">]}</span>
+                    <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">depth</span><span class="p">,</span> <span class="n">entry</span><span class="p">,</span> <span class="n">new_packages_seen</span><span class="p">))</span>
 
         <span class="n">stack</span> <span class="o">=</span> <span class="n">deque</span><span class="p">((</span><span class="n">qr</span><span class="p">,</span> <span class="p">[])</span> <span class="k">for</span> <span class="n">qr</span> <span class="ow">in</span> <span class="n">query_result</span><span class="p">)</span>
         <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
@@ -2182,7 +2186,7 @@
 
         <span class="c1"># Output stack.</span>
         <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">result</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;report&quot;</span><span class="p">]):</span>
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Omitting stack as no output Pipfile.lock was provided&quot;</span><span class="p">)</span>
                 <span class="k">continue</span>
 
@@ -2206,18 +2210,18 @@
                         <span class="p">)</span>
                     <span class="n">overall_score</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;overall_score&quot;</span><span class="p">]</span>
 
-                <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requirements_locked&quot;</span><span class="p">):</span>
-                    <span class="n">advised_software_stack</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_advised_software_stack_pipfile</span><span class="p">(</span>
-                        <span class="n">adviser_document_id</span><span class="p">,</span>
-                        <span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requirements_locked&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[],</span>
-                        <span class="n">advised_stack_index</span><span class="o">=</span><span class="n">idx</span><span class="p">,</span>
-                        <span class="n">performance_score</span><span class="o">=</span><span class="n">performance_score</span><span class="p">,</span>
-                        <span class="n">overall_score</span><span class="o">=</span><span class="n">overall_score</span><span class="p">,</span>
-                        <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
-                    <span class="p">)</span>
-                    <span class="n">Advised</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">adviser_run</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">advised_software_stack</span><span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">client</span>
-                    <span class="p">)</span></div>
+            <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">and</span> <span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requirements_locked&quot;</span><span class="p">):</span>
+                <span class="n">advised_software_stack</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_advised_software_stack_pipfile</span><span class="p">(</span>
+                    <span class="n">adviser_document_id</span><span class="p">,</span>
+                    <span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;requirements_locked&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[],</span>
+                    <span class="n">advised_stack_index</span><span class="o">=</span><span class="n">idx</span><span class="p">,</span>
+                    <span class="n">performance_score</span><span class="o">=</span><span class="n">performance_score</span><span class="p">,</span>
+                    <span class="n">overall_score</span><span class="o">=</span><span class="n">overall_score</span><span class="p">,</span>
+                    <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">Advised</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">adviser_run</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">advised_software_stack</span><span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">client</span>
+                <span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.sync_provenance_checker_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.sync_provenance_checker_result">[docs]</a>    <span class="nd">@enable_vertex_cache</span>
     <span class="k">def</span> <span class="nf">sync_provenance_checker_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>

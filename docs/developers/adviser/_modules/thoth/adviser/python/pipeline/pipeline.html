@@ -80,8 +80,8 @@
 <span class="kn">import</span> <span class="nn">attr</span>
 
 <span class="kn">from</span> <span class="nn">thoth.adviser.python.solver</span> <span class="k">import</span> <span class="n">PythonPackageGraphSolver</span>
-<span class="kn">from</span> <span class="nn">thoth.adviser.python.bin.exceptions</span> <span class="k">import</span> <span class="n">PrematureStreamEndError</span>
-<span class="kn">from</span> <span class="nn">thoth.adviser.python.bin.dependency_graph</span> <span class="k">import</span> <span class="n">DependencyGraph</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.bin</span> <span class="k">import</span> <span class="n">PrematureStreamEndError</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.bin</span> <span class="k">import</span> <span class="n">DependencyGraph</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Project</span>
 <span class="kn">from</span> <span class="nn">thoth.solver.python.base</span> <span class="k">import</span> <span class="n">SolverException</span>
 <span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
@@ -109,6 +109,8 @@
     <span class="n">_solver</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">PythonPackageGraphSolver</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
     <span class="n">_stack_info</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
 
+    <span class="n">_LIVENESS_PROBE_KILL_FILE</span> <span class="o">=</span> <span class="s2">&quot;/tmp/thoth_adviser_cpu_timeout&quot;</span>
+
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PythonPackageGraphSolver</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get solver instance - solver implemented on top of graph database.&quot;&quot;&quot;</span>
@@ -126,6 +128,14 @@
 <span class="sd">        This report includes reports from dependency graph walk.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack_info</span></div>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_get_premature_stream_log_msg</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_LIVENESS_PROBE_KILL_FILE</span><span class="p">):</span>
+            <span class="k">return</span> <span class="s2">&quot;Stack producer was killed as allocated CPU time was exceeded, consider &quot;</span> \
+                   <span class="s2">&quot;decreasing limit for latest versions&quot;</span>
+
+        <span class="k">return</span> <span class="s2">&quot;Exceeded memory, consider decreasing latest versions considered to score more stacks&quot;</span>
 
     <span class="k">def</span> <span class="nf">_prepare_direct_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StepContext</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Resolve all the direct dependencies based on the resolution and data available in the graph.&quot;&quot;&quot;</span>
@@ -327,12 +337,13 @@
                 <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">strides</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
                     <span class="n">stride_context</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">log_report</span><span class="p">()</span>
         <span class="k">except</span> <span class="n">PrematureStreamEndError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Error while dependency graph walk: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Stack stream closed prematurely: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+            <span class="n">reported_message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_premature_stream_log_msg</span><span class="p">()</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">reported_message</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                 <span class="p">{</span>
                     <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="s2">&quot;Resolver was closed prematurely because of memory or time-out, consider &quot;</span>
-                    <span class="s2">&quot;decreasing latest versions considered in software stacks&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="n">reported_message</span>
                 <span class="p">}</span>
             <span class="p">)</span>
         <span class="k">finally</span><span class="p">:</span>
