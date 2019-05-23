@@ -129,10 +129,24 @@
         <span class="n">index_url</span><span class="p">,</span>
     <span class="p">)</span>
 
-    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-        <span class="n">subgraph_check_api</span><span class="p">,</span>
-        <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_name</span><span class="p">,</span> <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="p">,</span> <span class="s2">&quot;index_url&quot;</span><span class="p">:</span> <span class="n">index_url</span><span class="p">},</span>
-    <span class="p">)</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="n">subgraph_check_api</span><span class="p">,</span>
+            <span class="n">params</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_name</span><span class="p">,</span> <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="p">,</span> <span class="s2">&quot;index_url&quot;</span><span class="p">:</span> <span class="n">index_url</span><span class="p">},</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">208</span><span class="p">):</span>
+            <span class="k">break</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Invalid response from subgraph check API </span><span class="si">%r</span><span class="s2">, retrying (status code: </span><span class="si">%d</span><span class="s2">): </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">subgraph_check_api</span><span class="p">,</span>
+            <span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="p">,</span>
+            <span class="n">response</span><span class="o">.</span><span class="n">text</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="n">http</span><span class="o">.</span><span class="n">HTTPStatus</span><span class="o">.</span><span class="n">OK</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">True</span>
@@ -140,7 +154,6 @@
         <span class="c1"># FIXME This is probably not the correct HTTP status code to be used here, but which one should be used?</span>
         <span class="k">return</span> <span class="kc">False</span>
 
-    <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
         <span class="s2">&quot;Unreachable code - subgraph check API responded with unknown HTTP status &quot;</span>
         <span class="s2">&quot;code </span><span class="si">%s</span><span class="s2"> for package </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> from index </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
