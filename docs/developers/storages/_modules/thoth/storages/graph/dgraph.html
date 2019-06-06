@@ -469,28 +469,59 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">[]</span></div>
 
-<div class="viewcode-block" id="GraphDatabase.python_package_version_exists"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.python_package_version_exists">[docs]</a>    <span class="k">def</span> <span class="nf">python_package_version_exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">index_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Check if the given Python package version exists in the graph database.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="GraphDatabase.python_package_version_exists"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.python_package_version_exists">[docs]</a>    <span class="k">def</span> <span class="nf">python_package_version_exists</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+            <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+            <span class="n">index_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if the given Python package version exists in the graph database.</span>
+
+<span class="sd">        If optional solver_name parameter is set, the call answers if the given package was solved by</span>
+<span class="sd">        the given solver. Otherwise, any solver run is taken into account.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
 
         <span class="n">q</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
         <span class="k">if</span> <span class="n">index_url</span><span class="p">:</span>
             <span class="n">q</span> <span class="o">=</span> <span class="n">q</span> <span class="o">+</span> <span class="s1">&#39; AND eq(index_url, &quot;</span><span class="si">%s</span><span class="s1">&quot;)&#39;</span> <span class="o">%</span> <span class="n">index_url</span>
 
-        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;{</span>
-<span class="s2">            f(func: has(</span><span class="si">%s</span><span class="s2">)) @filter(eq(package_name, &quot;</span><span class="si">%s</span><span class="s2">&quot;) AND eq(package_version, &quot;</span><span class="si">%s</span><span class="s2">&quot;) AND eq(ecosystem, python)</span><span class="si">%s</span><span class="s2">) {</span>
-<span class="s2">                count(uid)</span>
+        <span class="k">if</span> <span class="n">solver_name</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            {</span>
+<span class="s2">                f(func: has(</span><span class="si">%s</span><span class="s2">)) @filter(eq(solver_name, &quot;</span><span class="si">%s</span><span class="s2">&quot;)) @cascade @normalize {</span>
+<span class="s2">                    solved @filter(eq(package_name, &quot;</span><span class="si">%s</span><span class="s2">&quot;) AND eq(package_version, &quot;</span><span class="si">%s</span><span class="s2">&quot;) AND eq(ecosystem, python)</span><span class="si">%s</span><span class="s2">) {</span>
+<span class="s2">                        count: count(~solved)</span>
+<span class="s2">                    }</span>
+<span class="s2">                }</span>
 <span class="s2">            }</span>
-<span class="s2">        }</span>
-<span class="s2">        &quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span>
-            <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">get_label</span><span class="p">(),</span>
-            <span class="n">package_name</span><span class="p">,</span>
-            <span class="n">package_version</span><span class="p">,</span>
-            <span class="n">q</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+<span class="s2">            &quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">EcosystemSolverRun</span><span class="o">.</span><span class="n">get_label</span><span class="p">(),</span>
+                <span class="n">solver_name</span><span class="p">,</span>
+                <span class="n">package_name</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="p">,</span>
+                <span class="n">q</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;{</span>
+<span class="s2">                f(func: has(</span><span class="si">%s</span><span class="s2">)) @filter(eq(package_name, &quot;</span><span class="si">%s</span><span class="s2">&quot;) AND eq(package_version, &quot;</span><span class="si">%s</span><span class="s2">&quot;)</span>
+<span class="s2">                AND eq(ecosystem, python)</span><span class="si">%s</span><span class="s2">) {</span>
+<span class="s2">                    count(uid)</span>
+<span class="s2">                }</span>
+<span class="s2">            }</span>
+<span class="s2">            &quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">get_label</span><span class="p">(),</span>
+                <span class="n">package_name</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="p">,</span>
+                <span class="n">q</span><span class="p">,</span>
+            <span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;count&quot;</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span></div>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;count&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.python_package_exists"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.python_package_exists">[docs]</a>    <span class="k">def</span> <span class="nf">python_package_exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Check if the given Python package exists regardless of version.&quot;&quot;&quot;</span>
@@ -553,7 +584,7 @@
             <span class="n">run_software_env_filter</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
             <span class="k">if</span> <span class="n">run_software_environment</span><span class="p">:</span>
                 <span class="n">run_software_env_filter</span> <span class="o">=</span> <span class="s2">&quot;~inspection_software_environment_input @filter(&quot;</span>
-                <span class="n">run_software_env_filter</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_filter_eq_from_dict</span><span class="p">(</span><span class="n">software_environment</span><span class="p">)</span>
+                <span class="n">run_software_env_filter</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_filter_eq_from_dict</span><span class="p">(</span><span class="n">run_software_environment</span><span class="p">)</span>
                 <span class="n">run_software_env_filter</span> <span class="o">+=</span> <span class="s2">&quot;) { uid }&quot;</span>
 
             <span class="n">hw_filter</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
@@ -2351,7 +2382,7 @@
         <span class="n">run_software_environment</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
 
         <span class="n">DependencyMonkeyRunSoftwareEnvironmentInput</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
-            <span class="n">source</span><span class="o">=</span><span class="n">software_environment</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">dependency_monkey_run</span>
+            <span class="n">source</span><span class="o">=</span><span class="n">run_software_environment</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">dependency_monkey_run</span>
         <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
 
         <span class="n">UsedIn</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">hardware_information</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">dependency_monkey_run</span><span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
