@@ -67,12 +67,14 @@
 
 <span class="sd">&quot;&quot;&quot;Various utilities for notebooks.&quot;&quot;&quot;</span>
 
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">re</span>
 <span class="kn">import</span> <span class="nn">typing</span>
-
-<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span>
 
 <span class="kn">from</span> <span class="nn">pkgutil</span> <span class="k">import</span> <span class="n">walk_packages</span>
 <span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="k">import</span> <span class="n">urlparse</span>
+
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">namedtuple</span>
 
 <span class="kn">import</span> <span class="nn">importlib</span>
 <span class="kn">import</span> <span class="nn">requests</span>
@@ -80,8 +82,6 @@
 
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
-
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="n">DEFAULT</span> <span class="o">=</span> <span class="nb">object</span><span class="p">()</span>
 
@@ -100,19 +100,20 @@
     <span class="c1"># Get actual Thoth user API location based on redirect headers.</span>
     <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;https://url.corp.redhat.com/</span><span class="si">{name}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="n">verify</span><span class="p">,</span> <span class="n">allow_redirects</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
-    <span class="n">location</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s1">&#39;Location&#39;</span><span class="p">]</span>
+    <span class="n">location</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">headers</span><span class="p">[</span><span class="s2">&quot;Location&quot;</span><span class="p">]</span>
 
     <span class="k">if</span> <span class="n">only_netloc</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">location</span><span class="p">)</span><span class="o">.</span><span class="n">netloc</span>
 
-    <span class="k">if</span> <span class="n">location</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">location</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">):</span>
         <span class="n">location</span> <span class="o">=</span> <span class="n">location</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 
     <span class="k">return</span> <span class="n">location</span></div>
 
 
-<div class="viewcode-block" id="display_page"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.display_page">[docs]</a><span class="k">def</span> <span class="nf">display_page</span><span class="p">(</span><span class="n">location</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">verify</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-                 <span class="n">no_obtain_location</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">980</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">900</span><span class="p">):</span>
+<div class="viewcode-block" id="display_page"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.display_page">[docs]</a><span class="k">def</span> <span class="nf">display_page</span><span class="p">(</span>
+    <span class="n">location</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">verify</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">no_obtain_location</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">width</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">980</span><span class="p">,</span> <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">900</span>
+<span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Display the given page in notebook as iframe.&quot;&quot;&quot;</span>
     <span class="kn">from</span> <span class="nn">IPython.display</span> <span class="k">import</span> <span class="n">IFrame</span>
 
@@ -127,7 +128,7 @@
     <span class="kn">import</span> <span class="nn">thoth</span>
 
     <span class="k">def</span> <span class="nf">on_import_error</span><span class="p">(</span><span class="n">package_name</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">thoth_packages</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">package_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;thoth.&#39;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">thoth_packages</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">package_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;thoth.&quot;</span><span class="p">):</span>
             <span class="k">return</span>
 
         <span class="n">packages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
@@ -141,7 +142,7 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">pkg</span><span class="o">.</span><span class="n">ispkg</span><span class="p">:</span>
             <span class="k">continue</span>
 
-        <span class="n">name</span> <span class="o">=</span> <span class="n">f</span><span class="s1">&#39;thoth.</span><span class="si">{pkg.name}</span><span class="s1">&#39;</span> <span class="k">if</span> <span class="n">thoth_packages</span> <span class="k">else</span> <span class="n">pkg</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;thoth.</span><span class="si">{pkg.name}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">thoth_packages</span> <span class="k">else</span> <span class="n">pkg</span><span class="o">.</span><span class="n">name</span>
         <span class="n">import_successful</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="n">version</span> <span class="o">=</span> <span class="kc">None</span>
 
@@ -149,20 +150,17 @@
             <span class="n">module</span> <span class="o">=</span> <span class="n">importlib</span><span class="o">.</span><span class="n">import_module</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
             <span class="n">import_successful</span> <span class="o">=</span> <span class="kc">True</span>
             <span class="n">version</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">__version__</span>
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
             <span class="k">pass</span>
 
         <span class="n">packages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
         <span class="n">versions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>
         <span class="n">importable</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">import_successful</span><span class="p">)</span>
 
-    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;package&#39;</span><span class="p">:</span> <span class="n">packages</span><span class="p">,</span> <span class="s1">&#39;version&#39;</span><span class="p">:</span> <span class="n">versions</span><span class="p">,</span> <span class="s1">&#39;importable&#39;</span><span class="p">:</span> <span class="n">importable</span><span class="p">})</span></div>
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;package&quot;</span><span class="p">:</span> <span class="n">packages</span><span class="p">,</span> <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">versions</span><span class="p">,</span> <span class="s2">&quot;importable&quot;</span><span class="p">:</span> <span class="n">importable</span><span class="p">})</span></div>
 
 
-<div class="viewcode-block" id="scale_colour_continuous"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.scale_colour_continuous">[docs]</a><span class="k">def</span> <span class="nf">scale_colour_continuous</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">,</span>
-                            <span class="n">colour_palette</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-                            <span class="n">n_colours</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
-                            <span class="n">norm</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<div class="viewcode-block" id="scale_colour_continuous"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.scale_colour_continuous">[docs]</a><span class="k">def</span> <span class="nf">scale_colour_continuous</span><span class="p">(</span><span class="n">arr</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Iterable</span><span class="p">,</span> <span class="n">colour_palette</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">n_colours</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span> <span class="n">norm</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Scale given arrays into colour array by specific palette.</span>
 
 <span class="sd">    The default number of colours is 10, which translates to</span>
@@ -171,10 +169,10 @@
     <span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
     <span class="kn">from</span> <span class="nn">matplotlib.colors</span> <span class="k">import</span> <span class="n">ListedColormap</span>
 
-<span class="c1">#     colour_palette = colour_palette or sns.diverging_palette(</span>
-<span class="c1">#         10, 130, 80, 50, 25, n=n_colours, as_cmap=True)</span>
+    <span class="c1">#     colour_palette = colour_palette or sns.diverging_palette(</span>
+    <span class="c1">#         10, 130, 80, 50, 25, n=n_colours, as_cmap=True)</span>
     <span class="c1"># better have the yellow in the middle</span>
-    <span class="n">colour_palette</span> <span class="o">=</span> <span class="n">colour_palette</span> <span class="ow">or</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span><span class="s1">&#39;RdYlGn&#39;</span><span class="p">,</span> <span class="n">n_colors</span><span class="o">=</span><span class="n">n_colours</span><span class="p">)</span>
+    <span class="n">colour_palette</span> <span class="o">=</span> <span class="n">colour_palette</span> <span class="ow">or</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span><span class="s2">&quot;RdYlGn&quot;</span><span class="p">,</span> <span class="n">n_colors</span><span class="o">=</span><span class="n">n_colours</span><span class="p">)</span>
     <span class="n">colour_map</span> <span class="o">=</span> <span class="n">ListedColormap</span><span class="p">(</span><span class="n">colour_palette</span><span class="o">.</span><span class="n">as_hex</span><span class="p">())</span>
 
     <span class="n">array_normalized</span> <span class="o">=</span> <span class="n">arr</span>
@@ -185,11 +183,10 @@
 
         <span class="n">array_normalized</span> <span class="o">=</span> <span class="p">(</span><span class="n">array</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">array</span><span class="p">))</span> <span class="o">/</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">array</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="n">array</span><span class="p">))</span>
 
-    <span class="k">return</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">(</span>
-        <span class="p">[</span><span class="n">colour_map</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">array_normalized</span><span class="p">])</span><span class="o">.</span><span class="n">as_hex</span><span class="p">()</span></div>
+    <span class="k">return</span> <span class="n">sns</span><span class="o">.</span><span class="n">color_palette</span><span class="p">([</span><span class="n">colour_map</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">array_normalized</span><span class="p">])</span><span class="o">.</span><span class="n">as_hex</span><span class="p">()</span></div>
 
 
-<div class="viewcode-block" id="highlight"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.highlight">[docs]</a><span class="k">def</span> <span class="nf">highlight</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">content</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">column_class</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">colours</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="highlight"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.highlight">[docs]</a><span class="k">def</span> <span class="nf">highlight</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">content</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">column_class</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">colours</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Highlight rows of `content` column of a given DataFrame.</span>
 
 <span class="sd">    Highlight can be based on `column_class` or custom `colours` provided.</span>
@@ -211,14 +208,14 @@
     <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
         <span class="n">line</span> <span class="o">=</span> <span class="n">line_template</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
             <span class="n">col</span><span class="o">=</span><span class="n">colours</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">colours</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
-            <span class="bp">cls</span><span class="o">=</span><span class="n">row</span><span class="p">[</span><span class="n">column_class</span><span class="p">]</span>  <span class="k">if</span> <span class="n">column_class</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="bp">cls</span><span class="o">=</span><span class="n">row</span><span class="p">[</span><span class="n">column_class</span><span class="p">]</span> <span class="k">if</span> <span class="n">column_class</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
             <span class="n">idx</span><span class="o">=</span><span class="n">idx</span><span class="p">,</span>
-            <span class="n">content</span><span class="o">=</span><span class="n">row</span><span class="p">[</span><span class="n">content</span><span class="p">]</span>
+            <span class="n">content</span><span class="o">=</span><span class="n">row</span><span class="p">[</span><span class="n">content</span><span class="p">],</span>
         <span class="p">)</span>
 
         <span class="n">html</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
 
-    <span class="k">return</span> <span class="n">HTML</span><span class="p">(</span><span class="s1">&#39;&lt;br&gt;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">html</span><span class="p">))</span></div>
+    <span class="k">return</span> <span class="n">HTML</span><span class="p">(</span><span class="s2">&quot;&lt;br&gt;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">html</span><span class="p">))</span></div>
 
 
 <span class="k">def</span> <span class="nf">_rhas</span><span class="p">(</span><span class="n">fhas</span><span class="p">,</span> <span class="n">fget</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">,</span> <span class="n">attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
@@ -237,7 +234,7 @@
         <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">_rhas</span><span class="p">(</span><span class="n">fhas</span><span class="p">,</span> <span class="n">fget</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">)</span>
 
     <span class="k">try</span><span class="p">:</span>
-        <span class="n">left</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">left</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">fhas</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
@@ -245,10 +242,7 @@
     <span class="k">return</span> <span class="n">_rhas</span><span class="p">(</span><span class="n">fhas</span><span class="p">,</span> <span class="n">fget</span><span class="p">,</span> <span class="n">fget</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">left</span><span class="p">),</span> <span class="n">right</span><span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span>
-          <span class="n">obj</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">,</span>
-          <span class="n">attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-          <span class="n">default</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span> <span class="o">=</span> <span class="n">DEFAULT</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">:</span>
+<span class="k">def</span> <span class="nf">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">,</span> <span class="n">attr</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span> <span class="o">=</span> <span class="n">DEFAULT</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Recursively retrieve nested attributes of an object.</span>
 
 <span class="sd">    :param f: callable, function to be used as `getattr`</span>
@@ -261,18 +255,15 @@
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
 
-        <span class="k">return</span> <span class="p">[</span>
-            <span class="n">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">obj</span>
-        <span class="p">]</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">_rget</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">]</span>
 
-    <span class="n">right</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
-    <span class="n">attrs</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">right</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">attrs</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">attrs</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">obj</span>
     <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">attrs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
-        <span class="n">left</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">left</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">left</span> <span class="o">=</span> <span class="n">attr</span>
 
@@ -305,7 +296,7 @@
 <div class="viewcode-block" id="get"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.get">[docs]</a><span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span> <span class="o">=</span> <span class="n">DEFAULT</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Combine both `getattr` and `dict.get` into universal `get`.&quot;&quot;&quot;</span>
     <span class="n">_getattr</span> <span class="o">=</span> <span class="nb">getattr</span> <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="n">DEFAULT</span> <span class="k">else</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">default</span><span class="p">)</span>
-    <span class="n">_get</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">get</span> <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="n">DEFAULT</span> <span class="k">else</span> <span class="n">partial</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">get</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span>
+    <span class="n">_get</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">get</span> <span class="k">if</span> <span class="n">default</span> <span class="ow">is</span> <span class="n">DEFAULT</span> <span class="k">else</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">get</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">)</span>
 
     <span class="k">try</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">_getattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">attr</span><span class="p">)</span>
@@ -319,15 +310,168 @@
 
 <span class="c1"># syntactic sugar to _rhas and _rget which is meant for users</span>
 
-<span class="n">rhasattr</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_rhas</span><span class="p">,</span> <span class="nb">hasattr</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">)</span>
+<span class="n">rhasattr</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">_rhas</span><span class="p">,</span> <span class="nb">hasattr</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">)</span>
 <span class="n">rhasattr</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">_rhas</span><span class="o">.</span><span class="vm">__doc__</span>
-<span class="n">rgetattr</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_rget</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">)</span>
+<span class="n">rgetattr</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">_rget</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">)</span>
 <span class="n">rgetattr</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">_rget</span><span class="o">.</span><span class="vm">__doc__</span>
 
-<span class="n">rhas</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_rhas</span><span class="p">,</span> <span class="n">has</span><span class="p">,</span> <span class="n">get</span><span class="p">)</span>
+<span class="n">rhas</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">_rhas</span><span class="p">,</span> <span class="n">has</span><span class="p">,</span> <span class="n">get</span><span class="p">)</span>
 <span class="n">rhasattr</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">_rhas</span><span class="o">.</span><span class="vm">__doc__</span>
-<span class="n">rget</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">_rget</span><span class="p">,</span> <span class="n">get</span><span class="p">)</span>
+<span class="n">rget</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">_rget</span><span class="p">,</span> <span class="n">get</span><span class="p">)</span>
 <span class="n">rgetattr</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">_rget</span><span class="o">.</span><span class="vm">__doc__</span>
+
+
+<div class="viewcode-block" id="resolve_query"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.resolve_query">[docs]</a><span class="k">def</span> <span class="nf">resolve_query</span><span class="p">(</span>
+    <span class="n">query</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">resolvers</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">engine</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">parser</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;pandas&quot;</span>
+<span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Resolve query in the given context.&quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">pandas.core.computation.expr</span> <span class="k">import</span> <span class="n">Expr</span>
+    <span class="kn">from</span> <span class="nn">pandas.core.computation.eval</span> <span class="k">import</span> <span class="n">_ensure_scope</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">query</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">context</span>
+
+    <span class="n">q</span> <span class="o">=</span> <span class="n">query</span>
+    <span class="n">q</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\[\(&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">q</span><span class="p">)</span>
+    <span class="n">q</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\b(\d)+\b&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">q</span><span class="p">)</span>
+    <span class="n">q</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[+\-\*:!&lt;&gt;=~.|&amp;%]&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="n">q</span><span class="p">)</span>
+
+    <span class="c1"># get our (possibly passed-in) scope</span>
+    <span class="n">resolvers</span> <span class="o">=</span> <span class="n">resolvers</span> <span class="ow">or</span> <span class="p">()</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">context</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+        <span class="n">index_resolvers</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">_get_index_resolvers</span><span class="p">()</span>
+        <span class="n">resolvers</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">resolvers</span><span class="p">)</span> <span class="o">+</span> <span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">context</span><span class="o">.</span><span class="n">iteritems</span><span class="p">()),</span> <span class="n">index_resolvers</span><span class="p">)</span>
+
+    <span class="n">repl</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">resolver</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">resolvers</span><span class="p">):</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="n">resolver</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">q</span><span class="o">.</span><span class="n">split</span><span class="p">()):</span>
+            <span class="n">matches</span> <span class="o">=</span> <span class="p">[(</span><span class="n">op</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">keys</span> <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">k</span><span class="p">)]</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">matches</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">op</span><span class="p">,</span> <span class="n">key</span> <span class="o">=</span> <span class="n">matches</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">repl</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">idx</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">resolver</span><span class="p">[</span><span class="n">key</span><span class="p">]))</span>
+
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">matches</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="c1"># sort by length of the operand</span>
+                <span class="n">ambiguous</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">for</span> <span class="n">op</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">matches</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">op</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">k</span><span class="p">):</span>
+                        <span class="n">ambiguous</span> <span class="o">=</span> <span class="kc">False</span>
+                        <span class="n">repl</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">idx</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">resolver</span><span class="p">[</span><span class="n">k</span><span class="p">]))</span>
+
+                <span class="k">if</span> <span class="n">ambiguous</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Ambiguous query operand provided: `</span><span class="si">{op}</span><span class="s2">`&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">repl</span><span class="p">:</span>
+        <span class="n">resolvers</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="n">op</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span>
+
+    <span class="n">env</span> <span class="o">=</span> <span class="n">_ensure_scope</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">resolvers</span><span class="o">=</span><span class="n">resolvers</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">context</span><span class="p">)</span>
+    <span class="n">expr</span> <span class="o">=</span> <span class="n">Expr</span><span class="p">(</span><span class="n">query</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="n">engine</span><span class="p">,</span> <span class="n">parser</span><span class="o">=</span><span class="n">parser</span><span class="p">,</span> <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_resolve_expr</span><span class="p">(</span><span class="n">expr</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="n">terms</span> <span class="o">=</span> <span class="n">expr</span><span class="o">.</span><span class="n">terms</span>
+
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">terms</span><span class="p">,</span> <span class="s2">&quot;operands&quot;</span><span class="p">):</span>  <span class="c1"># BinOp</span>
+            <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">terms</span><span class="o">.</span><span class="n">operands</span><span class="p">:</span>
+                <span class="c1"># complex query</span>
+                <span class="k">if</span> <span class="n">op</span><span class="o">.</span><span class="n">is_scalar</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">yield from</span> <span class="n">_resolve_expr</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">operands</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                    <span class="k">yield</span> <span class="nb">str</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">terms</span><span class="p">)</span>
+
+    <span class="n">operands</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">_resolve_expr</span><span class="p">(</span><span class="n">expr</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">operands</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">env</span><span class="o">.</span><span class="n">resolvers</span><span class="p">[</span><span class="n">op</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+    <span class="k">return</span> <span class="n">context</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">query</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_column_group"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.get_column_group">[docs]</a><span class="k">def</span> <span class="nf">get_column_group</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">columns</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span> <span class="n">pd</span><span class="o">.</span><span class="n">Index</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Group columns of the DataFrame into a single column group.&quot;&quot;&quot;</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="n">columns</span> <span class="ow">or</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span>
+
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">):</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">label</span><span class="p">:</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">]</span>
+
+        <span class="n">common_words</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">functools</span><span class="o">.</span><span class="n">reduce</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">intersect1d</span><span class="p">,</span> <span class="n">cols</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">common_words</span><span class="p">:</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="s2">&quot;_&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">w</span> <span class="k">for</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">w</span> <span class="ow">in</span> <span class="n">common_words</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">label</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">label</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">columns</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">columns</span><span class="p">))</span>
+
+    <span class="n">Group</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">&quot;Group&quot;</span><span class="p">,</span> <span class="n">columns</span><span class="p">)</span>
+
+    <span class="n">groups</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="p">[</span><span class="n">columns</span><span class="p">]</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="n">groups</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Group</span><span class="p">(</span><span class="o">*</span><span class="n">row</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">groups</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">label</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_index_group"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.get_index_group">[docs]</a><span class="k">def</span> <span class="nf">get_index_group</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">names</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Group multiple index levels into single index group.&quot;&quot;&quot;</span>
+    <span class="n">names</span> <span class="o">=</span> <span class="n">names</span> <span class="ow">or</span> <span class="nb">list</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+
+    <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">names</span><span class="p">):</span>
+        <span class="n">names</span> <span class="o">=</span> <span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">names</span><span class="p">]</span>
+
+    <span class="n">index</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">to_frame</span><span class="p">(</span><span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">group</span> <span class="o">=</span> <span class="n">get_column_group</span><span class="p">(</span><span class="n">index</span><span class="p">[</span><span class="n">names</span><span class="p">])</span>
+
+    <span class="n">index</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="n">names</span><span class="p">)</span>
+    <span class="n">group_indices</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">group</span><span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">index</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+
+    <span class="n">group_index</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="o">.</span><span class="n">from_tuples</span><span class="p">(</span><span class="n">group_indices</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="p">[</span><span class="n">group</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="o">*</span><span class="n">index</span><span class="o">.</span><span class="n">columns</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">group_index</span></div>
+
+
+<div class="viewcode-block" id="group_columns"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.group_columns">[docs]</a><span class="k">def</span> <span class="nf">group_columns</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>
+    <span class="n">columns</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span> <span class="n">pd</span><span class="o">.</span><span class="n">Index</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">inplace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Group columns of the DataFrame into a single column group and set it to the DataFrame.&quot;&quot;&quot;</span>
+    <span class="n">group</span> <span class="o">=</span> <span class="n">get_column_group</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">columns</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">inplace</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">df</span><span class="p">[</span><span class="n">group</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">group</span>
+
+    <span class="k">return</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="group_index"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.utils.group_index">[docs]</a><span class="k">def</span> <span class="nf">group_index</span><span class="p">(</span>
+    <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">names</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">inplace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Group multiple index levels into single index group and set it as index to the DataFrame.&quot;&quot;&quot;</span>
+    <span class="n">group_index</span> <span class="o">=</span> <span class="n">get_index_group</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">names</span><span class="o">=</span><span class="n">names</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="n">group_index</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="n">inplace</span><span class="p">)</span></div>
 </pre></div>
 
           </div>
@@ -367,7 +511,7 @@
 
     <div class="footer" role="contentinfo">
         &#169; Copyright 2019, Thoth team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.0.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.1.
     </div>
 <script type="text/javascript">
   (function() {

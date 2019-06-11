@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.lab.inspection &#8212; Thoth lab 0.0.3 documentation</title>
+    <link rel="stylesheet" href="../../../_static/pydoctheme.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../../_static/sidebar.js"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <link rel="shortcut icon" type="image/png" href="../../../_static/favicon.png" />
+    <meta name="viewport" content="width=device-width,initial-scale=0.8">
+    
+    
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
+        <li><a href="../../../index.html">Thoth lab 0.0.3 documentation</a> &#187;</li>
+          <li><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.lab.inspection</h1><div class="highlight"><pre>
+<span></span><span class="c1"># thoth-lab</span>
+<span class="c1"># Copyright(C) 2018, 2019 Marek Cermak</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Inspection results processing ana analysis.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="kn">import</span> <span class="nn">textwrap</span>
+<span class="kn">import</span> <span class="nn">typing</span>
+
+<span class="kn">import</span> <span class="nn">cufflinks</span> <span class="k">as</span> <span class="nn">cf</span>
+<span class="kn">import</span> <span class="nn">plotly</span>
+<span class="kn">import</span> <span class="nn">plotly.offline</span> <span class="k">as</span> <span class="nn">py</span>
+
+<span class="kn">from</span> <span class="nn">pandas_profiling</span> <span class="k">import</span> <span class="n">ProfileReport</span> <span class="k">as</span> <span class="n">profile</span>
+<span class="kn">from</span> <span class="nn">pandas.io.json</span> <span class="k">import</span> <span class="n">json_normalize</span>
+
+<span class="kn">from</span> <span class="nn">prettyprinter</span> <span class="k">import</span> <span class="n">pformat</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Iterable</span>
+
+<span class="kn">from</span> <span class="nn">plotly</span> <span class="k">import</span> <span class="n">graph_objs</span> <span class="k">as</span> <span class="n">go</span>
+<span class="kn">from</span> <span class="nn">plotly</span> <span class="k">import</span> <span class="n">figure_factory</span> <span class="k">as</span> <span class="n">ff</span>
+<span class="kn">from</span> <span class="nn">plotly</span> <span class="k">import</span> <span class="n">tools</span>
+
+<span class="kn">from</span> <span class="nn">thoth.lab.utils</span> <span class="k">import</span> <span class="n">group_index</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;thoth.lab.inspection&quot;</span><span class="p">)</span>
+
+<span class="c1"># cufflinks should be in offline mode</span>
+<span class="n">cf</span><span class="o">.</span><span class="n">go_offline</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="extract_structure_json"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.extract_structure_json">[docs]</a><span class="k">def</span> <span class="nf">extract_structure_json</span><span class="p">(</span><span class="n">input_json</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">upper_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">level</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">json_structure</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convert a json file structure into a list with rows showing tree depths, keys and values.&quot;&quot;&quot;</span>
+    <span class="n">level</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">input_json</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">input_json</span><span class="p">[</span><span class="n">key</span><span class="p">])</span> <span class="ow">is</span> <span class="nb">dict</span><span class="p">:</span>
+            <span class="n">json_structure</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">level</span><span class="p">,</span> <span class="n">upper_key</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">input_json</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()]])</span>
+
+            <span class="n">extract_structure_json</span><span class="p">(</span><span class="n">input_json</span><span class="p">[</span><span class="n">key</span><span class="p">],</span> <span class="n">f</span><span class="s2">&quot;</span><span class="si">{upper_key}</span><span class="s2">__</span><span class="si">{key}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">json_structure</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">json_structure</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">level</span><span class="p">,</span> <span class="n">upper_key</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">input_json</span><span class="p">[</span><span class="n">key</span><span class="p">]])</span>
+
+    <span class="k">return</span> <span class="n">json_structure</span></div>
+
+
+<div class="viewcode-block" id="extract_keys_from_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.extract_keys_from_dataframe">[docs]</a><span class="k">def</span> <span class="nf">extract_keys_from_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Filter the specific dataframe created for a certain key, combination of keys or for a tree depth.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">available_keys</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;Current_key&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">available_combined_keys</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;Upper_keys&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">available_keys</span><span class="p">:</span>
+            <span class="n">ndf</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;Current_key&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;^</span><span class="si">{key}</span><span class="s2">$&quot;</span><span class="p">,</span> <span class="n">regex</span><span class="o">=</span><span class="kc">True</span><span class="p">)]</span>
+
+        <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">available_combined_keys</span><span class="p">:</span>
+            <span class="n">ndf</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;Upper_keys&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;</span><span class="si">{key}</span><span class="s2">$&quot;</span><span class="p">,</span> <span class="n">regex</span><span class="o">=</span><span class="kc">True</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;The key is not in the json&quot;</span><span class="p">)</span>
+            <span class="n">ndf</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="n">f</span><span class="s2">&quot;The available keys are (WARNING: Some of the keys have no leafs):</span><span class="si">{available_keys}</span><span class="s2"> &quot;</span><span class="p">,</span>
+                    <span class="n">f</span><span class="s2">&quot;The available combined keys are: </span><span class="si">{available_combined_keys}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="p">]</span>
+            <span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">type</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="n">max_depth</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="s2">&quot;Tree_depth&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="o">&lt;=</span> <span class="n">max_depth</span><span class="p">:</span>
+            <span class="n">ndf</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;Tree_depth&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">key</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ndf</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;The maximum tree depth available is: </span><span class="si">{max_depth}</span><span class="s2">&quot;</span>
+    <span class="k">return</span> <span class="n">ndf</span></div>
+
+
+<div class="viewcode-block" id="process_inspection_results"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.process_inspection_results">[docs]</a><span class="k">def</span> <span class="nf">process_inspection_results</span><span class="p">(</span>
+    <span class="n">inspection_results</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span>
+    <span class="n">exclude</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">set</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">apply</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">drop</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Process inspection result into pd.DataFrame.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">inspection_results</span><span class="p">:</span>
+        <span class="k">return</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Empty iterable provided.&quot;</span><span class="p">)</span>
+
+    <span class="n">datetime_spec</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;created|started_at|finished_at&quot;</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_datetime</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">apply</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">apply</span> <span class="o">=</span> <span class="p">[</span><span class="n">datetime_spec</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">apply</span> <span class="o">=</span> <span class="p">[</span><span class="o">*</span><span class="n">apply</span><span class="p">,</span> <span class="n">datetime_spec</span><span class="p">]</span>
+
+    <span class="n">exclude</span> <span class="o">=</span> <span class="n">exclude</span> <span class="ow">or</span> <span class="p">[]</span>
+    <span class="n">apply</span> <span class="o">=</span> <span class="n">apply</span> <span class="ow">or</span> <span class="p">()</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">json_normalize</span><span class="p">(</span><span class="n">inspection_results</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;__&quot;</span><span class="p">)</span>  <span class="c1"># each row resembles InspectionResult</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">df</span>
+
+    <span class="k">for</span> <span class="n">regex</span><span class="p">,</span> <span class="n">func</span> <span class="ow">in</span> <span class="n">apply</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="n">regex</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+
+    <span class="n">keys</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">inspection_results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">exclude</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">exclude</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="n">k</span><span class="p">)</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="n">profile</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
+
+        <span class="n">rejected</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">p</span><span class="o">.</span><span class="n">description_set</span><span class="p">[</span><span class="s2">&quot;variables&quot;</span><span class="p">]</span>
+            <span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">&quot;distinct_count &lt;= 1 &amp; type != &#39;UNSUPPORTED&#39;&quot;</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="s2">&quot;^((?!version).)*$&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="p">)</span>  <span class="c1"># explicitly include versions</span>
+
+        <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Rejected columns: &quot;</span><span class="p">,</span> <span class="n">rejected</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">drop</span><span class="p">:</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">rejected</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">eval</span><span class="p">(</span>
+        <span class="s2">&quot;status__job__duration   = status__job__finished_at   - status__job__started_at&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;python&quot;</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="s2">&quot;status__build__duration = status__build__finished_at - status__build__started_at&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="create_duration_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.create_duration_dataframe">[docs]</a><span class="k">def</span> <span class="nf">create_duration_dataframe</span><span class="p">(</span><span class="n">inspection_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Compute statistics and duration DataFrame.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">inspection_df</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Empty DataFrame provided&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">inspection_df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">&quot;build_log&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+        <span class="k">pass</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">inspection_df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">like</span><span class="o">=</span><span class="s2">&quot;duration&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="k">lambda</span> <span class="n">s</span><span class="p">:</span> <span class="n">s</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;status__&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;__&quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">))</span>
+        <span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="k">lambda</span> <span class="n">ts</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_timedelta</span><span class="p">(</span><span class="n">ts</span><span class="p">)</span><span class="o">.</span><span class="n">dt</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">())</span>
+    <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">compute_duration_stats</span><span class="p">(</span><span class="n">group</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">group</span><span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="s2">&quot;job_duration_mean      = job_duration.mean()&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="s2">&quot;job_duration_upper_bound    = job_duration + job_duration.std()&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="s2">&quot;job_duration_lower_bound    = job_duration - job_duration.std()&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="s2">&quot;build_duration_mean         = build_duration.mean()&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="s2">&quot;build_duration_upper_bound  = build_duration + build_duration.std()&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="s2">&quot;build_duration_lower_bound  = build_duration - build_duration.std()&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">inspection_df</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="p">):</span>
+        <span class="n">n_levels</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">inspection_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">levels</span><span class="p">)</span>
+
+        <span class="c1"># compute duration stats for each group separately</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_levels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)),</span> <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">compute_duration_stats</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">compute_duration_stats</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">data</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="create_duration_box"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.create_duration_box">[docs]</a><span class="k">def</span> <span class="nf">create_duration_box</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">columns</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create duration Box plot.&quot;&quot;&quot;</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="n">columns</span> <span class="k">if</span> <span class="n">columns</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">data</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="s2">&quot;duration$&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span>
+
+    <span class="n">figure</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">columns</span><span class="p">]</span><span class="o">.</span><span class="n">iplot</span><span class="p">(</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;box&quot;</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="s2">&quot;InspectionRun duration&quot;</span><span class="p">),</span> <span class="n">yTitle</span><span class="o">=</span><span class="s2">&quot;duration [s]&quot;</span><span class="p">,</span> <span class="n">asFigure</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">figure</span></div>
+
+
+<div class="viewcode-block" id="create_duration_scatter"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.create_duration_scatter">[docs]</a><span class="k">def</span> <span class="nf">create_duration_scatter</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">columns</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create duration Scatter plot.&quot;&quot;&quot;</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="n">columns</span> <span class="k">if</span> <span class="n">columns</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">data</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="s2">&quot;duration$&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span>
+
+    <span class="n">figure</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">columns</span><span class="p">]</span><span class="o">.</span><span class="n">iplot</span><span class="p">(</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;scatter&quot;</span><span class="p">,</span>
+        <span class="n">title</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="s2">&quot;InspectionRun duration&quot;</span><span class="p">),</span>
+        <span class="n">yTitle</span><span class="o">=</span><span class="s2">&quot;duration [s]&quot;</span><span class="p">,</span>
+        <span class="n">xTitle</span><span class="o">=</span><span class="s2">&quot;inspection ID&quot;</span><span class="p">,</span>
+        <span class="n">asFigure</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">figure</span></div>
+
+
+<div class="viewcode-block" id="create_duration_scatter_with_bounds"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.create_duration_scatter_with_bounds">[docs]</a><span class="k">def</span> <span class="nf">create_duration_scatter_with_bounds</span><span class="p">(</span>
+    <span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">index</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">Index</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">RangeIndex</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create duration Scatter plot with upper and lower bounds.&quot;&quot;&quot;</span>
+    <span class="n">df_duration</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">data</span><span class="p">[[</span><span class="n">col</span><span class="p">]]</span>
+        <span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;upper_bound = </span><span class="si">{col}</span><span class="s2"> + </span><span class="si">{col}</span><span class="s2">.std()&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">eval</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;lower_bound = </span><span class="si">{col}</span><span class="s2"> - </span><span class="si">{col}</span><span class="s2">.std()&quot;</span><span class="p">,</span> <span class="n">engine</span><span class="o">=</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">index</span> <span class="o">=</span> <span class="n">index</span> <span class="k">if</span> <span class="n">index</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">df_duration</span><span class="o">.</span><span class="n">index</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="p">):</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">levels</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">levels</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+
+    <span class="n">upper_bound</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Upper Bound&quot;</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">index</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">df_duration</span><span class="o">.</span><span class="n">upper_bound</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;lightgray&quot;</span><span class="p">),</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">width</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span>
+        <span class="n">fillcolor</span><span class="o">=</span><span class="s2">&quot;rgba(68, 68, 68, 0.3)&quot;</span><span class="p">,</span>
+        <span class="n">fill</span><span class="o">=</span><span class="s2">&quot;tonexty&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">trace</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Duration&quot;</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">index</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">df_duration</span><span class="p">[</span><span class="n">col</span><span class="p">],</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;rgb(31, 119, 180)&quot;</span><span class="p">),</span>
+        <span class="n">fillcolor</span><span class="o">=</span><span class="s2">&quot;rgba(68, 68, 68, 0.3)&quot;</span><span class="p">,</span>
+        <span class="n">fill</span><span class="o">=</span><span class="s2">&quot;tonexty&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">lower_bound</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;Lower Bound&quot;</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="n">index</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="n">df_duration</span><span class="o">.</span><span class="n">lower_bound</span><span class="p">,</span>
+        <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">color</span><span class="o">=</span><span class="s2">&quot;lightgray&quot;</span><span class="p">),</span>
+        <span class="n">line</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">width</span><span class="o">=</span><span class="mi">0</span><span class="p">),</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;lines&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="n">lower_bound</span><span class="p">,</span> <span class="n">trace</span><span class="p">,</span> <span class="n">upper_bound</span><span class="p">]</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">df_duration</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+    <span class="n">layout</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Layout</span><span class="p">(</span>
+        <span class="n">yaxis</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;duration [s]&quot;</span><span class="p">),</span>
+        <span class="n">xaxis</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;inspection ID&quot;</span><span class="p">),</span>
+        <span class="n">shapes</span><span class="o">=</span><span class="p">[</span>
+            <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;line&quot;</span><span class="p">,</span> <span class="s2">&quot;x0&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;x1&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">index</span><span class="p">),</span> <span class="s2">&quot;y0&quot;</span><span class="p">:</span> <span class="n">m</span><span class="p">,</span> <span class="s2">&quot;y1&quot;</span><span class="p">:</span> <span class="n">m</span><span class="p">,</span> <span class="s2">&quot;line&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;color&quot;</span><span class="p">:</span> <span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="s2">&quot;dash&quot;</span><span class="p">:</span> <span class="s2">&quot;longdash&quot;</span><span class="p">}}</span>
+        <span class="p">],</span>
+        <span class="n">title</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="s2">&quot;InspectionRun duration&quot;</span><span class="p">),</span>
+        <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">fig</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Figure</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">layout</span><span class="o">=</span><span class="n">layout</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">fig</span></div>
+
+
+<div class="viewcode-block" id="create_duration_histogram"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.create_duration_histogram">[docs]</a><span class="k">def</span> <span class="nf">create_duration_histogram</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">columns</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">bins</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Create duration Histogram plot.&quot;&quot;&quot;</span>
+    <span class="n">columns</span> <span class="o">=</span> <span class="n">columns</span> <span class="k">if</span> <span class="n">columns</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">data</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">regex</span><span class="o">=</span><span class="s2">&quot;duration$&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">columns</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">bins</span><span class="p">:</span>
+        <span class="n">bins</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">histograms</span><span class="o">.</span><span class="n">_hist_bin_auto</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">])</span>
+
+    <span class="n">figure</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="n">columns</span><span class="p">]</span><span class="o">.</span><span class="n">iplot</span><span class="p">(</span>
+        <span class="n">title</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="s2">&quot;InspectionRun distribution&quot;</span><span class="p">),</span>
+        <span class="n">yTitle</span><span class="o">=</span><span class="s2">&quot;count&quot;</span><span class="p">,</span>
+        <span class="n">xTitle</span><span class="o">=</span><span class="s2">&quot;durations [ms]&quot;</span><span class="p">,</span>
+        <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;hist&quot;</span><span class="p">,</span>
+        <span class="n">bins</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">bins</span><span class="p">)),</span>
+        <span class="n">asFigure</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">figure</span></div>
+
+
+<div class="viewcode-block" id="query_inspection_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.query_inspection_dataframe">[docs]</a><span class="k">def</span> <span class="nf">query_inspection_dataframe</span><span class="p">(</span><span class="n">inspection_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Wrapper around _.query method which always include `duration` columns in filter expression.&quot;&quot;&quot;</span>
+    <span class="n">like</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;like&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">regex</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;regex&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">like</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">inspection_df</span><span class="o">.</span><span class="n">_</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">like</span><span class="o">=</span><span class="n">like</span><span class="p">,</span> <span class="n">regex</span><span class="o">=</span><span class="n">regex</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="s2">&quot;duration&quot;</span><span class="p">)):</span>
+            <span class="c1"># duration columns must be present</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">inspection_df</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">like</span><span class="o">=</span><span class="s2">&quot;duration&quot;</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">df</span>
+
+    <span class="k">elif</span> <span class="n">regex</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">regex</span> <span class="o">+=</span> <span class="s2">&quot;|(.*duration)&quot;</span>
+
+    <span class="k">return</span> <span class="n">inspection_df</span><span class="o">.</span><span class="n">_</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">like</span><span class="o">=</span><span class="n">like</span><span class="p">,</span> <span class="n">regex</span><span class="o">=</span><span class="n">regex</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="make_subplots"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.make_subplots">[docs]</a><span class="k">def</span> <span class="nf">make_subplots</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">columns</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">kind</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;box&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Make subplots and arrange them in an optimized grid layout.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">kind</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;box&quot;</span><span class="p">,</span> <span class="s2">&quot;histogram&quot;</span><span class="p">,</span> <span class="s2">&quot;scatter&quot;</span><span class="p">,</span> <span class="s2">&quot;scatter_with_bounds&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Can NOT handle plot of kind: </span><span class="si">{kind}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+    <span class="n">index</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">droplevel</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Can only handle hierarchical index of depth &lt;= 2, got {len(index.names)}. Grouping index.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">make_subplots</span><span class="p">(</span><span class="n">group_index</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">nlevels</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)),</span> <span class="n">columns</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="n">kind</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">grid</span> <span class="o">=</span> <span class="n">ff</span><span class="o">.</span><span class="n">create_facet_grid</span><span class="p">(</span>
+        <span class="n">data</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(),</span>
+        <span class="n">facet_row</span><span class="o">=</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">index</span><span class="o">.</span><span class="n">nlevels</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">facet_col</span><span class="o">=</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">trace_type</span><span class="o">=</span><span class="s2">&quot;box&quot;</span><span class="p">,</span>  <span class="c1"># box does not need data specification</span>
+        <span class="n">ggplot2</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">shape</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">shape</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">_grid_ref</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">sub_plots</span> <span class="o">=</span> <span class="n">tools</span><span class="o">.</span><span class="n">make_subplots</span><span class="p">(</span>
+        <span class="n">rows</span><span class="o">=</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+        <span class="n">cols</span><span class="o">=</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">shared_yaxes</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;shared_yaxes&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">),</span>
+        <span class="n">shared_xaxes</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;shared_xaxes&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+        <span class="n">print_grid</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;print_grid&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="p">):</span>
+        <span class="n">index_grid</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">index</span><span class="o">.</span><span class="n">labels</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">index_grid</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">transpose</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">tile</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])])</span>
+        <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">grp</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">nlevels</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">()):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">columns</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">&quot;scatter_with_bounds&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">columns</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;`scatter_with_bounds` requires `col` argument, not provided.&quot;</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">columns</span><span class="p">,</span> <span class="o">=</span> <span class="n">columns</span>
+            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;`scatter_with_bounds` does not allow for multiple columns.&quot;</span><span class="p">)</span>
+
+        <span class="n">fig</span> <span class="o">=</span> <span class="nb">eval</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;create_duration_</span><span class="si">{kind}</span><span class="s2">(grp, columns, **kwargs)&quot;</span><span class="p">)</span>
+
+        <span class="n">col</span><span class="p">,</span> <span class="n">row</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="nb">next</span><span class="p">(</span><span class="n">index_grid</span><span class="p">))</span>  <span class="c1"># col-first plotting</span>
+        <span class="k">for</span> <span class="n">trace</span> <span class="ow">in</span> <span class="n">fig</span><span class="o">.</span><span class="n">data</span><span class="p">:</span>
+            <span class="n">sub_plots</span><span class="o">.</span><span class="n">append_trace</span><span class="p">(</span><span class="n">trace</span><span class="p">,</span> <span class="n">row</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">col</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">layout</span> <span class="o">=</span> <span class="n">sub_plots</span><span class="o">.</span><span class="n">layout</span>
+    <span class="n">layout</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+        <span class="n">title</span><span class="o">=</span><span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;title&quot;</span><span class="p">,</span> <span class="n">fig</span><span class="o">.</span><span class="n">layout</span><span class="o">.</span><span class="n">title</span><span class="p">),</span>
+        <span class="n">shapes</span><span class="o">=</span><span class="n">grid</span><span class="o">.</span><span class="n">layout</span><span class="o">.</span><span class="n">shapes</span><span class="p">,</span>
+        <span class="n">annotations</span><span class="o">=</span><span class="n">grid</span><span class="o">.</span><span class="n">layout</span><span class="o">.</span><span class="n">annotations</span><span class="p">,</span>
+        <span class="n">showlegend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">x_dom_vals</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">layout</span><span class="o">.</span><span class="n">to_plotly_json</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="k">if</span> <span class="s2">&quot;xaxis&quot;</span> <span class="ow">in</span> <span class="n">k</span><span class="p">]</span>
+    <span class="n">y_dom_vals</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">layout</span><span class="o">.</span><span class="n">to_plotly_json</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="k">if</span> <span class="s2">&quot;yaxis&quot;</span> <span class="ow">in</span> <span class="n">k</span><span class="p">]</span>
+
+    <span class="n">layout_shapes</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">layout</span><span class="o">.</span><span class="n">to_plotly_json</span><span class="p">()[</span><span class="s2">&quot;shapes&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">sort_values</span><span class="p">([</span><span class="s2">&quot;x0&quot;</span><span class="p">,</span> <span class="s2">&quot;y0&quot;</span><span class="p">])</span>
+
+    <span class="n">h_shapes</span> <span class="o">=</span> <span class="n">layout_shapes</span><span class="p">[</span><span class="o">~</span><span class="n">layout_shapes</span><span class="o">.</span><span class="n">x0</span><span class="o">.</span><span class="n">duplicated</span><span class="p">(</span><span class="n">keep</span><span class="o">=</span><span class="kc">False</span><span class="p">)]</span>
+    <span class="n">v_shapes</span> <span class="o">=</span> <span class="n">layout_shapes</span><span class="p">[</span><span class="o">~</span><span class="n">layout_shapes</span><span class="o">.</span><span class="n">y0</span><span class="o">.</span><span class="n">duplicated</span><span class="p">(</span><span class="n">keep</span><span class="o">=</span><span class="kc">False</span><span class="p">)]</span>
+
+    <span class="c1"># handle single-columns</span>
+    <span class="n">h_shapes</span> <span class="o">=</span> <span class="n">h_shapes</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">&quot;y1 - y0 != 1&quot;</span><span class="p">)</span>
+    <span class="n">v_shapes</span> <span class="o">=</span> <span class="n">v_shapes</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s2">&quot;x1 - x0 != 1&quot;</span><span class="p">)</span>
+
+    <span class="c1"># update axis domains and layout</span>
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">x_axis</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">x_dom_vals</span><span class="p">):</span>
+        <span class="n">x0</span><span class="p">,</span> <span class="n">x1</span> <span class="o">=</span> <span class="n">h_shapes</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span> <span class="o">%</span> <span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]][[</span><span class="s2">&quot;x0&quot;</span><span class="p">,</span> <span class="s2">&quot;x1&quot;</span><span class="p">]]</span>
+
+        <span class="n">layout</span><span class="p">[</span><span class="n">x_axis</span><span class="p">]</span><span class="o">.</span><span class="n">domain</span> <span class="o">=</span> <span class="p">(</span><span class="n">x0</span> <span class="o">+</span> <span class="mf">0.03</span><span class="p">,</span> <span class="n">x1</span> <span class="o">-</span> <span class="mf">0.03</span><span class="p">)</span>
+        <span class="n">layout</span><span class="p">[</span><span class="n">x_axis</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">showticklabels</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">zeroline</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">y_axis</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">y_dom_vals</span><span class="p">):</span>
+        <span class="n">y0</span><span class="p">,</span> <span class="n">y1</span> <span class="o">=</span> <span class="n">v_shapes</span><span class="o">.</span><span class="n">iloc</span><span class="p">[</span><span class="n">idx</span> <span class="o">%</span> <span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]][[</span><span class="s2">&quot;y0&quot;</span><span class="p">,</span> <span class="s2">&quot;y1&quot;</span><span class="p">]]</span>
+
+        <span class="n">layout</span><span class="p">[</span><span class="n">y_axis</span><span class="p">]</span><span class="o">.</span><span class="n">domain</span> <span class="o">=</span> <span class="p">(</span><span class="n">y0</span> <span class="o">+</span> <span class="mf">0.03</span><span class="p">,</span> <span class="n">y1</span> <span class="o">-</span> <span class="mf">0.03</span><span class="p">)</span>
+        <span class="n">layout</span><span class="p">[</span><span class="n">y_axis</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">zeroline</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="c1"># correct annotation to match the relevant group and width</span>
+    <span class="n">annot_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">layout</span><span class="o">.</span><span class="n">to_plotly_json</span><span class="p">()[</span><span class="s2">&quot;annotations&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">sort_values</span><span class="p">([</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">])</span>
+    <span class="n">annot_df</span> <span class="o">=</span> <span class="n">annot_df</span><span class="p">[</span><span class="n">annot_df</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">len</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">aw</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span>  <span class="c1"># annotation width magic</span>
+        <span class="nb">int</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">60</span> <span class="o">/</span> <span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span> <span class="mi">6</span><span class="p">)),</span> <span class="nb">int</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">30</span> <span class="o">/</span> <span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span> <span class="mi">6</span><span class="p">))</span>
+    <span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">annot_idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">annot_df</span><span class="o">.</span><span class="n">index</span><span class="p">):</span>
+        <span class="n">annot</span> <span class="o">=</span> <span class="n">layout</span><span class="o">.</span><span class="n">annotations</span><span class="p">[</span><span class="n">annot_idx</span><span class="p">]</span>
+
+        <span class="n">index_label</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">annot</span><span class="p">[</span><span class="s2">&quot;text&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">MultiIndex</span><span class="p">):</span>
+            <span class="n">index_axis</span> <span class="o">=</span> <span class="n">i</span> <span class="o">&gt;=</span> <span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">pass</span>  <span class="c1"># no worries, the order and label are aight</span>
+            <span class="k">elif</span> <span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">index_label</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">levels</span><span class="p">[</span><span class="n">index_axis</span><span class="p">][</span><span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">index_label</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">levels</span><span class="p">[</span><span class="n">index_axis</span><span class="p">][</span><span class="n">i</span> <span class="o">%</span> <span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
+
+        <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">index_label</span><span class="p">)</span>
+
+        <span class="n">annot</span><span class="p">[</span><span class="s2">&quot;text&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^(.{</span><span class="si">%d</span><span class="s2">}).*(.{</span><span class="si">%d</span><span class="s2">})$&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">aw</span><span class="p">,</span> <span class="n">aw</span><span class="p">),</span> <span class="s2">&quot;\g&lt;1&gt;...\g&lt;2&gt;&quot;</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span>
+        <span class="n">annot</span><span class="p">[</span><span class="s2">&quot;hovertext&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;&lt;br&gt;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pformat</span><span class="p">(</span><span class="n">index_label</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">))</span>
+
+    <span class="c1"># add axis titles as plot annotations</span>
+    <span class="n">layout</span><span class="o">.</span><span class="n">annotations</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="o">*</span><span class="n">layout</span><span class="o">.</span><span class="n">annotations</span><span class="p">,</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span>
+            <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.05</span><span class="p">,</span>
+            <span class="s2">&quot;xref&quot;</span><span class="p">:</span> <span class="s2">&quot;paper&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;yref&quot;</span><span class="p">:</span> <span class="s2">&quot;paper&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="n">fig</span><span class="o">.</span><span class="n">layout</span><span class="o">.</span><span class="n">xaxis</span><span class="p">[</span><span class="s2">&quot;title&quot;</span><span class="p">][</span><span class="s2">&quot;text&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;showarrow&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="p">{</span>
+            <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.05</span><span class="p">,</span>
+            <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span>
+            <span class="s2">&quot;xref&quot;</span><span class="p">:</span> <span class="s2">&quot;paper&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;yref&quot;</span><span class="p">:</span> <span class="s2">&quot;paper&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;text&quot;</span><span class="p">:</span> <span class="n">fig</span><span class="o">.</span><span class="n">layout</span><span class="o">.</span><span class="n">yaxis</span><span class="p">[</span><span class="s2">&quot;title&quot;</span><span class="p">][</span><span class="s2">&quot;text&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;textangle&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mi">90</span><span class="p">,</span>
+            <span class="s2">&quot;showarrow&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">)</span>
+
+    <span class="c1"># custom user layout updates</span>
+    <span class="n">user_layout</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;layout&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">user_layout</span><span class="p">:</span>
+        <span class="n">layout</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">user_layout</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">sub_plots</span></div>
+
+
+<div class="viewcode-block" id="show_categories"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.inspection.show_categories">[docs]</a><span class="k">def</span> <span class="nf">show_categories</span><span class="p">(</span><span class="n">inspection_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;List categories in the given DataFrame.&quot;&quot;&quot;</span>
+    <span class="n">index</span> <span class="o">=</span> <span class="n">inspection_df</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">droplevel</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">unique</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">values</span><span class="p">):</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Category </span><span class="si">{}</span><span class="s2">/</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">index</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">ind</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">index</span><span class="o">.</span><span class="n">names</span><span class="p">,</span> <span class="n">idx</span><span class="p">):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;</span><span class="si">{name}</span><span class="s2"> :&quot;</span><span class="p">,</span> <span class="n">ind</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;</span><span class="si">{index.names[0]}</span><span class="s2"> :&quot;</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
+
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">inspection_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Number of rows (jobs) is:&quot;</span><span class="p">,</span> <span class="n">frame</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+    <a id="sidebar-anchor"></a>
+    
+
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+      </ul>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Thoth team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.1.
+    </div>
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
