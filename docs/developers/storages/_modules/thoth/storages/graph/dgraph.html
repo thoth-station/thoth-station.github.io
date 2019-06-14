@@ -760,6 +760,23 @@
 
         <span class="k">return</span> <span class="p">[</span><span class="nb">tuple</span><span class="p">(</span><span class="n">python_package</span><span class="o">.</span><span class="n">values</span><span class="p">())</span> <span class="k">for</span> <span class="n">python_package</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">]]</span></div>
 
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_postprocess_retrieve_packages</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Post-process retrieve packages query.&quot;&quot;&quot;</span>
+        <span class="n">pp_result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">pp_result</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]:</span>
+                    <span class="k">pass</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">+</span> <span class="p">[</span>
+                        <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]</span>
+                    <span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
+
+        <span class="k">return</span> <span class="n">pp_result</span>
+
 <div class="viewcode-block" id="GraphDatabase.retrieve_unsolved_pypi_packages"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.retrieve_unsolved_pypi_packages">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_unsolved_pypi_packages</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve a dictionary mapping package names to versions that dependencies were not yet resolved.</span>
 
@@ -768,7 +785,7 @@
         <span class="n">solver_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_python_solver_name</span><span class="p">(</span><span class="n">solver_name</span><span class="p">)</span>
         <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;{</span>
 <span class="s2">           f(func: has(</span><span class="si">%s</span><span class="s2">))  @filter(eq(os_name, &quot;</span><span class="si">%s</span><span class="s2">&quot;) AND eq(os_version, &quot;</span><span class="si">%s</span><span class="s2">&quot;) &quot;&quot;&quot;</span> \
-           <span class="sd">&quot;&quot;&quot;AND eq(python_version, &quot;%s&quot;) AND NOT has(~%s)) {</span>
+        <span class="sd">&quot;&quot;&quot;AND eq(python_version, &quot;%s&quot;) AND NOT has(~%s)) {</span>
 <span class="sd">                   package_name:package_name</span>
 <span class="sd">                   package_version:package_version</span>
 <span class="sd">                }</span>
@@ -780,15 +797,8 @@
             <span class="n">Solved</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span>
         <span class="p">)</span>
         <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
-        <span class="c1"># Post-Process result</span>
-        <span class="n">pp_result</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">]:</span>
-            <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">pp_result</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">+</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
 
-        <span class="k">return</span> <span class="n">pp_result</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_postprocess_retrieve_packages</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.retrieve_solved_pypi_packages"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.retrieve_solved_pypi_packages">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_solved_pypi_packages</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve a dictionary mapping package names to versions for dependencies that were already solved.&quot;&quot;&quot;</span>
@@ -804,15 +814,8 @@
             <span class="n">Solved</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span>
         <span class="p">)</span>
         <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
-        <span class="c1"># Post-Process result</span>
-        <span class="n">pp_result</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">]:</span>
-            <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">pp_result</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">+</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
 
-        <span class="k">return</span> <span class="n">pp_result</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_postprocess_retrieve_packages</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.retrieve_unsolvable_pypi_packages"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.retrieve_unsolvable_pypi_packages">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_unsolvable_pypi_packages</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve a dictionary mapping package names to versions of packages that were marked as unsolvable.&quot;&quot;&quot;</span>
@@ -828,16 +831,43 @@
             <span class="n">Solved</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span>
         <span class="p">)</span>
         <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
-        <span class="c1"># Post-Process result</span>
-        <span class="n">pp_result</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">]:</span>
 
-            <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">pp_result</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">+</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_postprocess_retrieve_packages</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
 
-        <span class="k">return</span> <span class="n">pp_result</span></div>
+<div class="viewcode-block" id="GraphDatabase.retrieve_unsolvable_python_packages_per_run_software_environment"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.retrieve_unsolvable_python_packages_per_run_software_environment">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_unsolvable_python_packages_per_run_software_environment</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve a dictionary mapping package names to versions of packages that were marked as unsolvable.</span>
+
+<span class="sd">        The result is given for a specific run software environment (OS + python version)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">solver_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_python_solver_name</span><span class="p">(</span><span class="n">solver_name</span><span class="p">)</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;{</span>
+<span class="s2">           f(func: has(</span><span class="si">%s</span><span class="s2">)) @filter(eq(os_name, &quot;</span><span class="si">%s</span><span class="s2">&quot;) AND eq(os_version, &quot;</span><span class="si">%s</span><span class="s2">&quot;) &quot;&quot;&quot;</span> \
+        <span class="sd">&quot;&quot;&quot;AND eq(python_version, &quot;%s&quot;) AND eq(solver_error, true) AND eq(solver_error_unsolvable, true) AND has(~%s)) {</span>
+<span class="sd">                   package_name:package_name</span>
+<span class="sd">                   package_version:package_version</span>
+<span class="sd">                }</span>
+<span class="sd">            }&quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">get_label</span><span class="p">(),</span>
+            <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;os_name&quot;</span><span class="p">],</span>
+            <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;os_version&quot;</span><span class="p">],</span>
+            <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">],</span>
+            <span class="n">Solved</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_postprocess_retrieve_packages</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.retrieve_document_list_of_unsolvable_pypi_packages"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.retrieve_document_list_of_unsolvable_pypi_packages">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_document_list_of_unsolvable_pypi_packages</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve a dictionary mapping package names to versions of packages that were marked as unsolvable.&quot;&quot;&quot;</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;{</span>
+<span class="s2">            f(func: has(</span><span class="si">%s</span><span class="s2">)) {</span>
+<span class="s2">                solver_document_id:solver_document_id</span>
+<span class="s2">                }</span>
+<span class="s2">            }&quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span>
+            <span class="n">Solved</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">document_id</span><span class="p">[</span><span class="s2">&quot;solver_document_id&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">]]</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.retrieve_unparseable_pypi_packages"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.retrieve_unparseable_pypi_packages">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_unparseable_pypi_packages</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve a dictionary mapping package names to versions of packages that couldn&#39;t be parsed by solver.&quot;&quot;&quot;</span>
@@ -853,16 +883,8 @@
             <span class="n">Solved</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span>
         <span class="p">)</span>
         <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
-        <span class="c1"># Post-Process result</span>
-        <span class="n">pp_result</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">]:</span>
 
-            <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">pp_result</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">+</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
-
-        <span class="k">return</span> <span class="n">pp_result</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_postprocess_retrieve_packages</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.get_all_python_packages_count"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.get_all_python_packages_count">[docs]</a>    <span class="k">def</span> <span class="nf">get_all_python_packages_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">without_error</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve number of Python packages stored in the graph database.&quot;&quot;&quot;</span>
@@ -977,16 +999,8 @@
             <span class="n">DependsOn</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span>
         <span class="p">)</span>
         <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
-        <span class="c1"># Post-Process result</span>
-        <span class="n">pp_result</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">]:</span>
 
-            <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="ow">in</span> <span class="n">pp_result</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">+</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">pp_result</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]]</span>
-
-        <span class="k">return</span> <span class="n">pp_result</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_postprocess_retrieve_packages</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.get_python_package_tuple"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.get_python_package_tuple">[docs]</a>    <span class="k">async</span> <span class="k">def</span> <span class="nf">get_python_package_tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">python_package_node_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Get Python&#39;s package name, package version, package index tuple for the given package id.&quot;&quot;&quot;</span>
@@ -1767,20 +1781,36 @@
             <span class="k">if</span> <span class="ow">not</span> <span class="n">overall_score</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No overall score found when syncing inspection document </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">inspection_document_id</span><span class="p">)</span>
 
-            <span class="c1"># We support only matmul here, we should re-think and re-design how we handle performance indicators here.</span>
-            <span class="n">performance_indicator_matmul</span> <span class="o">=</span> <span class="n">PiMatmul</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
-                <span class="n">origin</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;specification&quot;</span><span class="p">][</span><span class="s2">&quot;script&quot;</span><span class="p">],</span>
-                <span class="n">reference</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;script_sha256&quot;</span><span class="p">],</span>
-                <span class="n">matrix_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># TODO assign matrix size once we allow parameters on Amun.</span>
-                <span class="n">overall_score</span><span class="o">=</span><span class="n">overall_score</span><span class="p">,</span>
-            <span class="p">)</span>
-            <span class="n">performance_indicator_matmul</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
+            <span class="c1"># PERFORMANCE INDICATORS</span>
+            <span class="c1"># We uniquely identify the performance indicators considering:</span>
+            <span class="c1"># - {ML_FRAMEWORK}</span>
+            <span class="c1"># - {ML_PRIMITIVE} or {DATASET}-{ALGORITHM}.</span>
 
-            <span class="n">ObservedPerformance</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
-                <span class="n">source</span><span class="o">=</span><span class="n">inspection_run</span><span class="p">,</span>
-                <span class="n">target</span><span class="o">=</span><span class="n">performance_indicator_matmul</span><span class="p">,</span>
-                <span class="n">performance_indicator_index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>  <span class="c1"># We can now run only one performance indicator per inspection request.</span>
-            <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span></div>
+            <span class="c1"># MATMUL</span>
+            <span class="k">if</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;matmul&quot;</span><span class="p">:</span>
+                <span class="n">performance_indicator_matmul</span> <span class="o">=</span> <span class="n">PiMatmul</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
+                    <span class="n">pi_name</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">),</span>
+                    <span class="n">ml_framework</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;framework&quot;</span><span class="p">),</span>
+                    <span class="n">origin</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;specification&quot;</span><span class="p">][</span><span class="s2">&quot;script&quot;</span><span class="p">],</span>
+                    <span class="n">reference</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;script_sha256&quot;</span><span class="p">],</span>
+                    <span class="n">matrix_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># TODO assign matrix size once we allow parameters on Amun.</span>
+                    <span class="n">overall_score</span><span class="o">=</span><span class="n">overall_score</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">performance_indicator_matmul</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
+
+                <span class="n">ObservedPerformance</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
+                    <span class="n">source</span><span class="o">=</span><span class="n">inspection_run</span><span class="p">,</span>
+                    <span class="n">target</span><span class="o">=</span><span class="n">performance_indicator_matmul</span><span class="p">,</span>
+                    <span class="n">performance_indicator_index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>  <span class="c1"># We can now run only one pi per inspection request.</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">PythonIndexNotRegistered</span><span class="p">(</span>
+                    <span class="s2">&quot;We don&#39;t have support for syncing this PI called </span><span class="si">{}</span><span class="s2"> with origin </span><span class="si">{}</span><span class="s2"> and reference </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                        <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">),</span>
+                        <span class="n">document</span><span class="p">[</span><span class="s2">&quot;specification&quot;</span><span class="p">][</span><span class="s2">&quot;script&quot;</span><span class="p">],</span>
+                        <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;script_sha256&quot;</span><span class="p">],</span>
+                    <span class="p">)</span>
+                <span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.create_python_cve_record"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.create_python_cve_record">[docs]</a>    <span class="k">def</span> <span class="nf">create_python_cve_record</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
