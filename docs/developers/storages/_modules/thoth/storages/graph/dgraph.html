@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.graph.dgraph &#8212; Thoth Storages 0.14.2 documentation</title>
+    <title>thoth.storages.graph.dgraph &#8212; Thoth Storages 0.14.3 documentation</title>
     <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../../index.html">Thoth Storages 0.14.2 documentation</a> &#187;</li>
+        <li><a href="../../../../index.html">Thoth Storages 0.14.3 documentation</a> &#187;</li>
           <li><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -799,10 +799,23 @@
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_postprocess_retrieve_packages</span><span class="p">(</span><span class="n">result</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="GraphDatabase.retrieve_solved_python_packages"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.retrieve_solved_python_packages">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_solved_python_packages</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Retrieve a dictionary mapping package names to versions for dependencies that were already solved.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="GraphDatabase.retrieve_solved_python_packages"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.retrieve_solved_python_packages">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_solved_python_packages</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span> <span class="n">start_offset</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve a dictionary mapping package names to versions for dependencies that were already solved.</span>
+
+<span class="sd">        Using count and start_offset is possible to change pagination.</span>
+<span class="sd">        Using solver_name argument the query narrows down to packages that were resolved by the given solver.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">solver_name</span><span class="p">:</span>
+            <span class="n">solver_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_python_solver_name</span><span class="p">(</span><span class="n">solver_name</span><span class="p">)</span>
+            <span class="n">q</span> <span class="o">+=</span> <span class="s2">&quot;@filter(&quot;</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="n">q</span> <span class="o">+</span> <span class="s1">&#39;eq(os_name, &quot;</span><span class="si">%s</span><span class="s1">&quot;)&#39;</span> <span class="o">%</span> <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;os_name&quot;</span><span class="p">]</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="n">q</span> <span class="o">+</span> <span class="s1">&#39; AND eq(os_version, &quot;</span><span class="si">%s</span><span class="s1">&quot;)&#39;</span> <span class="o">%</span> <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;os_version&quot;</span><span class="p">]</span>
+            <span class="n">q</span> <span class="o">=</span> <span class="n">q</span> <span class="o">+</span> <span class="s1">&#39; AND eq(python_version, &quot;</span><span class="si">%s</span><span class="s1">&quot;)&#39;</span> <span class="o">%</span> <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">]</span>
+            <span class="n">q</span> <span class="o">+=</span> <span class="s2">&quot;)&quot;</span>
+
         <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;{</span>
-<span class="s2">           f(func: has(</span><span class="si">%s</span><span class="s2">)) @normalize {</span>
+<span class="s2">           f(func: has(</span><span class="si">%s</span><span class="s2">), first: </span><span class="si">%d</span><span class="s2">, offset: </span><span class="si">%d</span><span class="s2">) </span><span class="si">%s</span><span class="s2"> @normalize {</span>
 <span class="s2">               </span><span class="si">%s</span><span class="s2"> {</span>
 <span class="s2">                   package_name:package_name</span>
 <span class="s2">                   package_version:package_version</span>
@@ -810,6 +823,9 @@
 <span class="s2">                }</span>
 <span class="s2">            }&quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span>
             <span class="n">Solved</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span>
+            <span class="n">count</span><span class="p">,</span>
+            <span class="n">start_offset</span><span class="p">,</span>
+            <span class="n">q</span><span class="p">,</span>
             <span class="n">Solved</span><span class="o">.</span><span class="n">get_name</span><span class="p">(),</span>
         <span class="p">)</span>
         <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
