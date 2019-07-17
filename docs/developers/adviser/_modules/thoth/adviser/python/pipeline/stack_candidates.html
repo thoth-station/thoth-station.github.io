@@ -68,7 +68,8 @@
 <span class="sd">&quot;&quot;&quot;Wrapper for transparent manipulation with stack candidates.&quot;&quot;&quot;</span>
 
 
-<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
@@ -84,6 +85,9 @@
 
 <span class="kn">from</span> <span class="nn">.stride_context</span> <span class="k">import</span> <span class="n">StrideContext</span>
 <span class="kn">from</span> <span class="nn">.product</span> <span class="k">import</span> <span class="n">PipelineProduct</span>
+
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="StackCandidates"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stack_candidates.StackCandidates">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -108,7 +112,7 @@
         <span class="c1"># first inserted if score matches. This requires insertion first and generation later on (do not mix</span>
         <span class="c1"># calls) - this is preserved in our case.</span>
         <span class="n">heap_item</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="p">(</span><span class="o">-</span><span class="n">stride_context</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stack_candidates</span><span class="p">)),</span>
+            <span class="p">(</span><span class="n">stride_context</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stack_candidates</span><span class="p">)),</span>
             <span class="n">stride_context</span><span class="o">.</span><span class="n">justification</span><span class="p">,</span>
             <span class="n">stride_context</span><span class="o">.</span><span class="n">stack_candidate</span><span class="p">,</span>
         <span class="p">)</span>
@@ -121,13 +125,9 @@
 <div class="viewcode-block" id="StackCandidates.get_package_version_tuple"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stack_candidates.StackCandidates.get_package_version_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">get_package_version_tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackageVersion</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get package version from the dependencies map based on tuple provided.&quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transitive_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]][</span>
-                <span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
-            <span class="p">]</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">transitive_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span>
         <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">direct_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]][</span>
-                <span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
-            <span class="p">]</span></div>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">direct_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span></div>
 
 <div class="viewcode-block" id="StackCandidates.generate_pipeline_products"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stack_candidates.StackCandidates.generate_pipeline_products">[docs]</a>    <span class="k">def</span> <span class="nf">generate_pipeline_products</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PipelineProduct</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Generate projects in stack candidates.</span>
@@ -137,18 +137,27 @@
         <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack_candidates</span><span class="p">:</span>
             <span class="n">heap_item</span> <span class="o">=</span> <span class="n">heappop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stack_candidates</span><span class="p">)</span>
             <span class="n">sort_key</span><span class="p">,</span> <span class="n">justification</span><span class="p">,</span> <span class="n">stack_candidate</span> <span class="o">=</span> <span class="n">heap_item</span>
-            <span class="n">score</span> <span class="o">=</span> <span class="o">-</span><span class="n">sort_key</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">score</span> <span class="o">=</span> <span class="n">sort_key</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
             <span class="n">package_versions_locked</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">get_package_version_tuple</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
                 <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">stack_candidate</span>
             <span class="p">]</span>
+
+            <span class="c1"># Print out packages if user requested so.</span>
+            <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_SHOW_PACKAGES&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)):</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Packages forming found stack (score: </span><span class="si">%f</span><span class="s2">):&quot;</span><span class="p">,</span> <span class="n">score</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">stack_candidate</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;    </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+
             <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">(</span>
                 <span class="n">packages</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">input_project</span><span class="o">.</span><span class="n">iter_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
                 <span class="n">packages_locked</span><span class="o">=</span><span class="n">package_versions_locked</span><span class="p">,</span>
                 <span class="n">meta</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">input_project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="p">,</span>
             <span class="p">)</span>
 
-            <span class="k">yield</span> <span class="n">PipelineProduct</span><span class="p">(</span><span class="n">project</span><span class="o">=</span><span class="n">project</span><span class="p">,</span> <span class="n">score</span><span class="o">=</span><span class="n">score</span><span class="p">,</span> <span class="n">justification</span><span class="o">=</span><span class="n">justification</span><span class="p">)</span></div></div>
+            <span class="k">yield</span> <span class="n">PipelineProduct</span><span class="p">(</span>
+                <span class="n">project</span><span class="o">=</span><span class="n">project</span><span class="p">,</span> <span class="n">score</span><span class="o">=</span><span class="n">score</span><span class="p">,</span> <span class="n">justification</span><span class="o">=</span><span class="n">justification</span>
+            <span class="p">)</span></div></div>
 </pre></div>
 
           </div>
