@@ -68,20 +68,23 @@
 <span class="sd">&quot;&quot;&quot;Implementation of stack generation pipeline.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">gc</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">itertools</span> <span class="k">import</span> <span class="n">chain</span>
+<span class="kn">import</span> <span class="nn">operator</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">time</span> <span class="k">import</span> <span class="n">monotonic</span>
 <span class="kn">import</span> <span class="nn">pickle</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.dependency_graph</span> <span class="k">import</span> <span class="n">DependencyGraphWalker</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.dependency_graph</span> <span class="k">import</span> <span class="n">PrematureStreamEndError</span>
 <span class="kn">from</span> <span class="nn">thoth.adviser.python.solver</span> <span class="k">import</span> <span class="n">PythonPackageGraphSolver</span>
-<span class="kn">from</span> <span class="nn">thoth.adviser.python.bin</span> <span class="k">import</span> <span class="n">PrematureStreamEndError</span>
-<span class="kn">from</span> <span class="nn">thoth.adviser.python.bin</span> <span class="k">import</span> <span class="n">DependencyGraph</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">PackageVersion</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Project</span>
 <span class="kn">from</span> <span class="nn">thoth.solver.python.base</span> <span class="k">import</span> <span class="n">SolverException</span>
 <span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
@@ -129,20 +132,35 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stack_info</span></div>
 
+<div class="viewcode-block" id="Pipeline.get_configuration"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.pipeline.Pipeline.get_configuration">[docs]</a>    <span class="k">def</span> <span class="nf">get_configuration</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get a serialized configuration of this pipeline.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;steps&quot;</span><span class="p">:</span> <span class="p">[{</span>
+                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">step_entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                <span class="s2">&quot;configuration&quot;</span><span class="p">:</span> <span class="n">step_entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">compute_expanded_parameters</span><span class="p">(</span><span class="n">step_entry</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+            <span class="p">}</span> <span class="k">for</span> <span class="n">step_entry</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">steps</span><span class="p">],</span>
+            <span class="s2">&quot;strides&quot;</span><span class="p">:</span> <span class="p">[{</span>
+                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">stride_entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                <span class="s2">&quot;configuration&quot;</span><span class="p">:</span> <span class="n">stride_entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">compute_expanded_parameters</span><span class="p">(</span><span class="n">stride_entry</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+            <span class="p">}</span> <span class="k">for</span> <span class="n">stride_entry</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">strides</span><span class="p">],</span>
+        <span class="p">}</span></div>
+
     <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">_get_premature_stream_log_msg</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_LIVENESS_PROBE_KILL_FILE</span><span class="p">):</span>
-            <span class="k">return</span> <span class="s2">&quot;Stack producer was killed as allocated CPU time was exceeded, consider &quot;</span> \
-                   <span class="s2">&quot;decreasing limit for latest versions&quot;</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="s2">&quot;Stack producer was killed as allocated CPU time was exceeded, consider &quot;</span>
+                <span class="s2">&quot;decreasing limit for latest versions&quot;</span>
+            <span class="p">)</span>
 
         <span class="k">return</span> <span class="s2">&quot;Exceeded memory, consider decreasing latest versions considered to score more stacks&quot;</span>
 
-    <span class="k">def</span> <span class="nf">_prepare_direct_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StepContext</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">_prepare_direct_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Resolve all the direct dependencies based on the resolution and data available in the graph.&quot;&quot;&quot;</span>
         <span class="c1"># It&#39;s important that solver preserves order in which packages were inserted.</span>
         <span class="c1"># This is also a requirement for running under Python3.6+!!!</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Resolving direct dependencies&quot;</span><span class="p">)</span>
-        <span class="n">step_context</span> <span class="o">=</span> <span class="n">StepContext</span><span class="p">()</span>
+        <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">resolved_direct_dependencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
             <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">iter_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)),</span>
             <span class="n">graceful</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
@@ -160,8 +178,7 @@
                 <span class="p">)</span>
                 <span class="k">continue</span>
 
-            <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
-                <span class="n">step_context</span><span class="o">.</span><span class="n">add_resolved_direct_dependency</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
+            <span class="n">direct_dependencies</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">package_versions</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">unresolved</span><span class="p">:</span>
             <span class="k">raise</span> <span class="n">SolverException</span><span class="p">(</span>
@@ -169,51 +186,67 @@
                 <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unresolved</span><span class="p">),</span>
             <span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">step_context</span>
+        <span class="k">return</span> <span class="n">direct_dependencies</span>
 
-    <span class="k">def</span> <span class="nf">_resolve_transitive_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">step_context</span><span class="p">:</span> <span class="n">StepContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">_resolve_transitive_dependencies</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">direct_dependencies</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StepContext</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Solve all direct dependencies to find all transitive paths (all possible transitive dependencies).&quot;&quot;&quot;</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Retrieving transitive dependencies of direct dependencies&quot;</span><span class="p">)</span>
         <span class="n">direct_dependencies_tuples</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
-            <span class="p">(</span><span class="n">pv</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">pv</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span> <span class="n">pv</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
-            <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_direct_dependencies</span><span class="p">()</span>
+            <span class="p">(</span><span class="n">pv</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">pv</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span> <span class="n">pv</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">)</span> <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="n">direct_dependencies</span>
         <span class="p">)</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
             <span class="s2">&quot;Direct dependencies considered: </span><span class="si">%r</span><span class="s2"> (count: </span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
             <span class="n">direct_dependencies_tuples</span><span class="p">,</span>
-            <span class="nb">len</span><span class="p">(</span><span class="n">direct_dependencies_tuples</span><span class="p">)</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">direct_dependencies_tuples</span><span class="p">),</span>
         <span class="p">)</span>
-        <span class="n">transitive_dependencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">retrieve_transitive_dependencies_python_multi</span><span class="p">(</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">retrieve_transitive_dependencies_python_multi</span><span class="p">(</span>
             <span class="n">direct_dependencies_tuples</span>
         <span class="p">)</span>
-        <span class="n">transitive_dependencies</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">transitive_dependencies</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">paths</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
 
         <span class="k">if</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span> <span class="o">==</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
             <span class="n">total</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-            <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">transitive_dependencies</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
                 <span class="n">total</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Total number of packages including transitive: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">total</span><span class="p">))</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Total number of packages including transitive: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">total</span><span class="p">)</span>
+            <span class="p">)</span>
 
-        <span class="n">step_context</span><span class="o">.</span><span class="n">add_paths</span><span class="p">(</span><span class="n">transitive_dependencies</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">StepContext</span><span class="o">.</span><span class="n">from_paths</span><span class="p">(</span><span class="n">direct_dependencies</span><span class="p">,</span> <span class="n">paths</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_initialize_stepping</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StepContext</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Initialize pipeline - resolve direct dependencies and all the transitive dependencies.&quot;&quot;&quot;</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Initializing pipeline&quot;</span><span class="p">)</span>
-        <span class="n">step_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_direct_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_transitive_dependencies</span><span class="p">(</span><span class="n">step_context</span><span class="p">)</span>
+        <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_direct_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">step_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_transitive_dependencies</span><span class="p">(</span><span class="n">direct_dependencies</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">step_context</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_finalize_stepping</span><span class="p">(</span><span class="n">step_context</span><span class="p">:</span> <span class="n">StepContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependencyGraph</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">_finalize_stepping</span><span class="p">(</span><span class="n">step_context</span><span class="p">:</span> <span class="n">StepContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependencyGraphWalker</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Finalize pipeline - run dependency graph to resolve fully pinned down stacks.&quot;&quot;&quot;</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Finalizing stepping&quot;</span><span class="p">)</span>
-        <span class="n">step_context</span><span class="o">.</span><span class="n">final_sort</span><span class="p">()</span>
-        <span class="n">dependency_graph</span> <span class="o">=</span> <span class="n">DependencyGraph</span><span class="p">(</span>
-            <span class="n">direct_dependencies</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">step_context</span><span class="o">.</span><span class="n">iter_direct_dependencies_tuple</span><span class="p">()),</span>
-            <span class="n">paths</span><span class="o">=</span><span class="n">step_context</span><span class="o">.</span><span class="n">raw_paths</span><span class="p">,</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Finalizing stepping...&quot;</span><span class="p">)</span>
+        <span class="n">scored_package_tuple_pairs</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">step_context</span><span class="o">.</span><span class="n">dependency_graph_adaptation</span><span class="o">.</span><span class="n">to_scored_package_tuple_pairs</span><span class="p">()</span>
         <span class="p">)</span>
+        <span class="c1"># It&#39;s important to have this sort stable so that we reflect relative ordering of paths</span>
+        <span class="c1"># based on for example semver sort which have same score.</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">scored_package_tuple_pairs</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+        <span class="c1"># We don&#39;t need actual score of paths and remove paths which are direct dependencies.</span>
+        <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="nb">set</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span> <span class="k">if</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span> <span class="k">if</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="n">dependency_graph</span> <span class="o">=</span> <span class="n">DependencyGraphWalker</span><span class="p">(</span>
+            <span class="n">direct_dependencies</span><span class="o">=</span><span class="n">direct_dependencies</span><span class="p">,</span> <span class="n">paths</span><span class="o">=</span><span class="n">paths</span>
+        <span class="p">)</span>
+
+        <span class="n">estimated</span> <span class="o">=</span> <span class="n">dependency_graph</span><span class="o">.</span><span class="n">stacks_estimated</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="s2">&quot;Estimated number of stacks: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dependency_graph</span><span class="o">.</span><span class="n">stacks_estimated</span>
+            <span class="s2">&quot;Estimated number of stacks: </span><span class="si">%.2E</span><span class="s2"> (precise number: </span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
+            <span class="n">estimated</span><span class="p">,</span>
+            <span class="n">estimated</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">dependency_graph</span>
 
@@ -247,14 +280,25 @@
         <span class="n">start_time</span> <span class="o">=</span> <span class="n">monotonic</span><span class="p">()</span>
 
         <span class="c1"># Load file-dump if configured so.</span>
-        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">)):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Loading filedump </span><span class="si">%r</span><span class="s2"> as per user request&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">)</span>
+        <span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Loading filedump </span><span class="si">%r</span><span class="s2"> as per user request&quot;</span><span class="p">,</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">],</span>
+            <span class="p">)</span>
             <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">),</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_dump</span><span class="p">:</span>
                 <span class="n">step_context</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file_dump</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">step_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_initialize_stepping</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">):</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Storing filedump </span><span class="si">%r</span><span class="s2"> as per user request&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">])</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Storing filedump </span><span class="si">%r</span><span class="s2"> as per user request&quot;</span><span class="p">,</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
+                <span class="kn">import</span> <span class="nn">sys</span>
+
+                <span class="n">sys</span><span class="o">.</span><span class="n">setrecursionlimit</span><span class="p">(</span><span class="mi">5000</span><span class="p">)</span>
                 <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FILEDUMP&quot;</span><span class="p">),</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file_dump</span><span class="p">:</span>
                     <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">step_context</span><span class="p">,</span> <span class="n">file_dump</span><span class="p">)</span>
 
@@ -278,6 +322,11 @@
             <span class="p">)</span>
             <span class="n">count</span> <span class="o">=</span> <span class="n">limit</span>
 
+        <span class="c1"># Explicitly call garbage collector to be more efficient with memory before actually running the pipeline.</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Explicitly calling garbage collector before pipeline&quot;</span><span class="p">)</span>
+        <span class="n">gc</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Preparing pipeline steps&quot;</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_log_pipeline_msg</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="n">limit</span><span class="p">)</span>
         <span class="n">step_context</span><span class="o">.</span><span class="n">stats</span><span class="o">.</span><span class="n">start_timer</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">step_class</span><span class="p">,</span> <span class="n">parameters_dict</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">steps</span><span class="p">:</span>
@@ -294,11 +343,17 @@
 
         <span class="n">stacks_seen</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="n">stacks_added</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">direct_dependencies_map</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">():</span> <span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_direct_dependencies</span><span class="p">()</span>
+        <span class="p">}</span>
+        <span class="n">transitive_dependencies_map</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">():</span> <span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_transitive_dependencies</span><span class="p">()</span>
+        <span class="p">}</span>
         <span class="n">stack_candidates</span> <span class="o">=</span> <span class="n">StackCandidates</span><span class="p">(</span>
             <span class="n">input_project</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="p">,</span>
             <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
-            <span class="n">direct_dependencies_map</span><span class="o">=</span><span class="n">step_context</span><span class="o">.</span><span class="n">direct_dependencies_map</span><span class="p">,</span>
-            <span class="n">transitive_dependencies_map</span><span class="o">=</span><span class="n">step_context</span><span class="o">.</span><span class="n">transitive_dependencies_map</span><span class="p">,</span>
+            <span class="n">direct_dependencies_map</span><span class="o">=</span><span class="n">direct_dependencies_map</span><span class="p">,</span>
+            <span class="n">transitive_dependencies_map</span><span class="o">=</span><span class="n">transitive_dependencies_map</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">strides</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running strides on stack candidates&quot;</span><span class="p">)</span>
@@ -341,10 +396,7 @@
             <span class="n">reported_message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_premature_stream_log_msg</span><span class="p">()</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">reported_message</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-                <span class="p">{</span>
-                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="n">reported_message</span>
-                <span class="p">}</span>
+                <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span> <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="n">reported_message</span><span class="p">}</span>
             <span class="p">)</span>
         <span class="k">finally</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">strides</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>

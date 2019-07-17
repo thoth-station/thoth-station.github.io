@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.adviser.python.dependency_graph.adaptation.graph &#8212; Thoth Adviser 0.4.0 documentation</title>
+    <link rel="stylesheet" href="../../../../../../_static/pydoctheme.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../../../" src="../../../../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../../../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../../../../../_static/sidebar.js"></script>
+    
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <link rel="shortcut icon" type="image/png" href="../../../../../../_static/favicon.png" />
+    <meta name="viewport" content="width=device-width,initial-scale=0.8">
+    
+    
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
+        <li><a href="../../../../../../index.html">Thoth Adviser 0.4.0 documentation</a> &#187;</li>
+          <li><a href="../../../../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.adviser.python.dependency_graph.adaptation.graph</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-adviser</span>
+<span class="c1"># Copyright(C) 2019 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Adaptation of dependency graph based on scoring and package removals.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Set</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Generator</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Callable</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="k">import</span> <span class="n">chain</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">cmp_to_key</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">deque</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">OrderedDict</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="k">import</span> <span class="n">contextmanager</span>
+
+<span class="kn">from</span> <span class="nn">.elements</span> <span class="k">import</span> <span class="n">Edge</span>
+<span class="kn">from</span> <span class="nn">.elements</span> <span class="k">import</span> <span class="n">Node</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">CannotRemovePackage</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">PackageNotFound</span>
+<span class="kn">from</span> <span class="nn">.transaction</span> <span class="k">import</span> <span class="n">DependencyGraphTransaction</span>
+
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="DependencyGraph"><a class="viewcode-back" href="../../../../../../thoth.adviser.python.dependency_graph.adaptation.html#thoth.adviser.python.dependency_graph.adaptation.graph.DependencyGraph">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">DependencyGraph</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;A constructed dependency graph based on paths.&quot;&quot;&quot;</span>
+
+    <span class="n">packages_map</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">Node</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">edges_map</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">Edge</span><span class="p">],</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="n">OrderedDict</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">direct_dependencies_map</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">Node</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">packages_score</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">float</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="DependencyGraph.from_paths"><a class="viewcode-back" href="../../../../../../thoth.adviser.python.dependency_graph.adaptation.html#thoth.adviser.python.dependency_graph.adaptation.graph.DependencyGraph.from_paths">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_paths</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]])</span> <span class="o">-&gt;</span> <span class="s2">&quot;DependencyGraph&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Construct dependency graph from paths.&quot;&quot;&quot;</span>
+        <span class="n">packages_map</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">edges_map</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">direct_dependency_map</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Empty path supplied&quot;</span><span class="p">)</span>
+
+            <span class="n">direct_dependency</span> <span class="o">=</span> <span class="n">packages_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">direct_dependency</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">direct_dependency</span> <span class="o">=</span> <span class="n">Node</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                <span class="n">packages_map</span><span class="p">[</span><span class="n">direct_dependency</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">direct_dependency</span>
+
+            <span class="k">if</span> <span class="n">direct_dependency</span><span class="o">.</span><span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">direct_dependency_map</span><span class="p">:</span>
+                <span class="n">direct_dependency_map</span><span class="p">[</span>
+                    <span class="n">direct_dependency</span><span class="o">.</span><span class="n">package_tuple</span>
+                <span class="p">]</span> <span class="o">=</span> <span class="n">direct_dependency</span>
+
+            <span class="n">previous</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+                <span class="n">package_node</span> <span class="o">=</span> <span class="n">packages_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">package_node</span><span class="p">:</span>
+                    <span class="n">package_node</span> <span class="o">=</span> <span class="n">Node</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+                    <span class="n">packages_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_node</span>
+
+                <span class="n">previous_package_tuple</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">previous</span><span class="o">.</span><span class="n">package_tuple</span> <span class="k">if</span> <span class="n">previous</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">)</span>
+                <span class="n">previous_package_name</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">previous_package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">previous_package_tuple</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="p">)</span>
+
+                <span class="n">edge</span> <span class="o">=</span> <span class="n">edges_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="p">(</span><span class="n">previous_package_tuple</span><span class="p">,</span> <span class="n">package_node</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">)</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">edge</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">edge</span> <span class="o">=</span> <span class="n">Edge</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">previous</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">package_node</span><span class="p">)</span>
+                    <span class="n">edges_map</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">get_edge_key</span><span class="p">()]</span> <span class="o">=</span> <span class="n">edge</span>
+
+                <span class="k">if</span> <span class="n">previous</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">package_node</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">previous</span><span class="o">.</span><span class="n">outgoing_edges</span><span class="p">:</span>
+                        <span class="n">previous</span><span class="o">.</span><span class="n">outgoing_edges</span><span class="p">[</span><span class="n">package_node</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+                    <span class="k">if</span> <span class="p">(</span>
+                        <span class="n">package_node</span><span class="o">.</span><span class="n">package_tuple</span>
+                        <span class="ow">not</span> <span class="ow">in</span> <span class="n">previous</span><span class="o">.</span><span class="n">outgoing_edges</span><span class="p">[</span><span class="n">package_node</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+                    <span class="p">):</span>
+                        <span class="n">previous</span><span class="o">.</span><span class="n">outgoing_edges</span><span class="p">[</span><span class="n">package_node</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span>
+                            <span class="n">package_node</span><span class="o">.</span><span class="n">package_tuple</span>
+                        <span class="p">]</span> <span class="o">=</span> <span class="n">edge</span>
+
+                <span class="k">if</span> <span class="n">previous_package_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">package_node</span><span class="o">.</span><span class="n">incoming_edges</span><span class="p">:</span>
+                    <span class="n">package_node</span><span class="o">.</span><span class="n">incoming_edges</span><span class="p">[</span><span class="n">previous_package_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="n">edge</span><span class="o">.</span><span class="n">get_edge_key</span><span class="p">()</span>
+                    <span class="ow">not</span> <span class="ow">in</span> <span class="n">package_node</span><span class="o">.</span><span class="n">incoming_edges</span><span class="p">[</span><span class="n">previous_package_name</span><span class="p">]</span>
+                <span class="p">):</span>
+                    <span class="n">package_node</span><span class="o">.</span><span class="n">incoming_edges</span><span class="p">[</span><span class="n">previous_package_name</span><span class="p">][</span>
+                        <span class="n">previous_package_tuple</span>
+                    <span class="p">]</span> <span class="o">=</span> <span class="n">edge</span>
+
+                <span class="n">previous</span> <span class="o">=</span> <span class="n">package_node</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">packages_map</span><span class="o">=</span><span class="n">packages_map</span><span class="p">,</span>
+            <span class="n">edges_map</span><span class="o">=</span><span class="n">edges_map</span><span class="p">,</span>
+            <span class="n">direct_dependencies_map</span><span class="o">=</span><span class="n">direct_dependency_map</span><span class="p">,</span>
+            <span class="n">packages_score</span><span class="o">=</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">packages_map</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="mf">0.0</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="DependencyGraph.score_package_tuple"><a class="viewcode-back" href="../../../../../../thoth.adviser.python.dependency_graph.adaptation.html#thoth.adviser.python.dependency_graph.adaptation.graph.DependencyGraph.score_package_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">score_package_tuple</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">score_adjustment</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Adjust score of a package tuple in dependency graph to modify its precedence.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">packages_map</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">PackageNotFound</span><span class="p">(</span>
+                <span class="n">f</span><span class="s2">&quot;No record for package </span><span class="si">{package_tuple}</span><span class="s2"> found in dependency graph&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">edges_dict</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">packages_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span><span class="o">.</span><span class="n">incoming_edges</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+        <span class="p">):</span>
+            <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">edges_dict</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">edge</span><span class="o">.</span><span class="n">score</span> <span class="o">+=</span> <span class="n">score_adjustment</span></div>
+
+<div class="viewcode-block" id="DependencyGraph.to_scored_package_tuple_pairs"><a class="viewcode-back" href="../../../../../../thoth.adviser.python.dependency_graph.adaptation.html#thoth.adviser.python.dependency_graph.adaptation.graph.DependencyGraph.to_scored_package_tuple_pairs">[docs]</a>    <span class="k">def</span> <span class="nf">to_scored_package_tuple_pairs</span><span class="p">(</span>
+        <span class="bp">self</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span>
+        <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">],</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]</span>
+    <span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Construct pairs respecting package dependencies with corresponding score of these dependencies.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">edges_map</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">source_package_tuple</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="o">.</span><span class="n">package_tuple</span> <span class="k">if</span> <span class="n">edge</span><span class="o">.</span><span class="n">source</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="p">)</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">edge</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="p">(</span><span class="n">source_package_tuple</span><span class="p">,</span> <span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">))</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="DependencyGraph.remove_package_tuples"><a class="viewcode-back" href="../../../../../../thoth.adviser.python.dependency_graph.adaptation.html#thoth.adviser.python.dependency_graph.adaptation.graph.DependencyGraph.remove_package_tuples">[docs]</a>    <span class="nd">@contextmanager</span>
+    <span class="k">def</span> <span class="nf">remove_package_tuples</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">package_tuples</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependencyGraphTransaction</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Remove a package from dependency graph, ensure the given package can be removed.</span>
+
+<span class="sd">        This methods acts as a transaction - if any package from package tuples cannot be</span>
+<span class="sd">        removed, it raises an exception and leaves the dependency graph untouched.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">stack</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">package_tuples</span><span class="p">:</span>
+            <span class="n">package_node</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">packages_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">package_node</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">PackageNotFound</span><span class="p">(</span>
+                    <span class="n">f</span><span class="s2">&quot;No record for package </span><span class="si">{package_tuple}</span><span class="s2"> found in dependency graph&quot;</span>
+                <span class="p">)</span>
+
+            <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">package_node</span><span class="p">,</span> <span class="n">package_node</span><span class="p">))</span>
+
+        <span class="n">all_to_remove_edges</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">all_to_remove_nodes</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">while</span> <span class="n">stack</span><span class="p">:</span>
+            <span class="n">to_remove_node</span><span class="p">,</span> <span class="n">requested_remove_node</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">to_remove_node</span><span class="o">.</span><span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">all_to_remove_nodes</span><span class="p">:</span>
+                <span class="c1"># Break cyclic dependencies.</span>
+                <span class="k">continue</span>
+
+            <span class="n">all_to_remove_nodes</span><span class="p">[</span><span class="n">to_remove_node</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">to_remove_node</span>
+
+            <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">to_remove_node</span><span class="o">.</span><span class="n">all_incoming_edges</span><span class="p">:</span>
+                <span class="n">all_to_remove_edges</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">get_edge_key</span><span class="p">()]</span> <span class="o">=</span> <span class="n">edge</span>
+
+            <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">to_remove_node</span><span class="o">.</span><span class="n">all_outgoing_edges</span><span class="p">:</span>
+                <span class="n">all_to_remove_edges</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">get_edge_key</span><span class="p">()]</span> <span class="o">=</span> <span class="n">edge</span>
+
+            <span class="c1"># Now check each parent has an alternative for the given package.</span>
+            <span class="n">direct_dependency_node</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">direct_dependencies_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="n">to_remove_node</span><span class="o">.</span><span class="n">package_tuple</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">direct_dependency_node</span><span class="p">:</span>
+                <span class="c1"># It&#39;s a direct dependency. Removing a direct dependency which has no</span>
+                <span class="c1"># alternative causes invalidation of dependency graph for the given set of requirements.</span>
+                <span class="k">for</span> <span class="n">direct_dependency_tuple</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">direct_dependencies_map</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+                <span class="p">)</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">all_to_remove_nodes</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+                    <span class="k">if</span> <span class="n">direct_dependency_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">to_remove_node</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+                        <span class="c1"># We have an alternative package - it&#39;s OK to remove the given package.</span>
+                        <span class="k">break</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">CannotRemovePackage</span><span class="p">(</span>
+                        <span class="n">f</span><span class="s2">&quot;Cannot remove package </span><span class="si">{requested_remove_node.package_tuple}</span><span class="s2">, removing this package &quot;</span>
+                        <span class="n">f</span><span class="s2">&quot;would cause invalidity in dependency graph as all direct dependencies of &quot;</span>
+                        <span class="n">f</span><span class="s2">&quot;type </span><span class="si">{to_remove_node.package_tuple[0]!r}</span><span class="s2"> would be removed&quot;</span>
+                    <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">to_remove_node</span><span class="o">.</span><span class="n">all_incoming_edges</span><span class="p">:</span>
+                    <span class="n">edges_considered</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
+                        <span class="n">e</span><span class="o">.</span><span class="n">get_edge_key</span><span class="p">()</span>
+                        <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="o">.</span><span class="n">outgoing_edges</span><span class="p">[</span>
+                            <span class="n">to_remove_node</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+                    <span class="p">)</span>
+
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">edges_considered</span> <span class="o">-</span> <span class="nb">set</span><span class="p">(</span><span class="n">all_to_remove_edges</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+                        <span class="c1"># We don&#39;t have any alternative for the removed package.</span>
+                        <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="p">,</span> <span class="n">requested_remove_node</span><span class="p">))</span>
+
+        <span class="c1"># Discard nodes and edges as one would traverse down the graph that are not</span>
+        <span class="c1"># reachable anymore based on computed removals.</span>
+        <span class="n">change</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">while</span> <span class="n">change</span><span class="p">:</span>
+            <span class="n">change</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">all_to_remove_package_tuples</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">all_to_remove_nodes</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+
+            <span class="k">for</span> <span class="n">package_node</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">packages_map</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">package_node</span><span class="o">.</span><span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">all_to_remove_nodes</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">all_dependencies</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">package_node</span><span class="o">.</span><span class="n">all_dependency_package_tuples</span><span class="p">)</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="n">all_dependencies</span>
+                    <span class="ow">and</span> <span class="ow">not</span> <span class="n">all_dependencies</span> <span class="o">-</span> <span class="n">all_to_remove_package_tuples</span>
+                <span class="p">):</span>
+                    <span class="n">all_to_remove_nodes</span><span class="p">[</span><span class="n">package_node</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_node</span>
+
+                    <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">package_node</span><span class="o">.</span><span class="n">all_outgoing_edges</span><span class="p">:</span>
+                        <span class="n">all_to_remove_edges</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">get_edge_key</span><span class="p">()]</span> <span class="o">=</span> <span class="n">edge</span>
+
+                    <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">package_node</span><span class="o">.</span><span class="n">all_incoming_edges</span><span class="p">:</span>
+                        <span class="n">all_to_remove_edges</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">get_edge_key</span><span class="p">()]</span> <span class="o">=</span> <span class="n">edge</span>
+
+                    <span class="n">change</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">break</span>
+
+                <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">package_node</span><span class="o">.</span><span class="n">all_outgoing_edges</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">all_to_remove_edges</span><span class="p">:</span>
+                        <span class="n">all_to_remove_edges</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">edge</span><span class="o">.</span><span class="n">get_edge_key</span><span class="p">()]</span> <span class="o">=</span> <span class="n">edge</span>
+
+            <span class="k">del</span> <span class="n">all_to_remove_package_tuples</span>
+
+        <span class="k">yield</span> <span class="n">DependencyGraphTransaction</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="n">to_remove_nodes</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">all_to_remove_nodes</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span>
+            <span class="n">to_remove_edges</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">all_to_remove_edges</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="DependencyGraph.perform_transaction"><a class="viewcode-back" href="../../../../../../thoth.adviser.python.dependency_graph.adaptation.html#thoth.adviser.python.dependency_graph.adaptation.graph.DependencyGraph.perform_transaction">[docs]</a>    <span class="k">def</span> <span class="nf">perform_transaction</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">to_remove_nodes</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Node</span><span class="p">],</span> <span class="n">to_remove_edges</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Edge</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Perform the actual transaction.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">node</span><span class="o">.</span><span class="n">package_tuple</span> <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">to_remove_nodes</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">packages_map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">packages_score</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">direct_dependencies_map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">edge_key</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">get_edge_key</span><span class="p">()</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">to_remove_edges</span><span class="p">):</span>
+            <span class="n">edge</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">edges_map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">edge_key</span><span class="p">)</span>
+
+            <span class="c1"># Unregister from source and target.</span>
+            <span class="k">if</span> <span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="p">:</span>
+                <span class="n">source_name</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">source_tuple</span> <span class="o">=</span> <span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="o">.</span><span class="n">package_tuple</span>
+
+                <span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="o">.</span><span class="n">outgoing_edges</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="o">.</span><span class="n">outgoing_edges</span><span class="p">[</span><span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]:</span>
+                    <span class="n">edge</span><span class="o">.</span><span class="n">source</span><span class="o">.</span><span class="n">outgoing_edges</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">source_name</span><span class="p">,</span> <span class="n">source_tuple</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+            <span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">incoming_edges</span><span class="p">[</span><span class="n">source_name</span><span class="p">]</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">source_tuple</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">incoming_edges</span><span class="p">[</span><span class="n">source_name</span><span class="p">]:</span>
+                <span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">incoming_edges</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">source_name</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="DependencyGraph.iter_transitive_dependencies_tuple"><a class="viewcode-back" href="../../../../../../thoth.adviser.python.dependency_graph.adaptation.html#thoth.adviser.python.dependency_graph.adaptation.graph.DependencyGraph.iter_transitive_dependencies_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">iter_transitive_dependencies_tuple</span><span class="p">(</span>
+        <span class="bp">self</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get all transitive dependencies found in dependency graph.&quot;&quot;&quot;</span>
+        <span class="c1"># Iterate over all edges and find those who have no starting node - these are packages</span>
+        <span class="c1"># which came are present due to its dependency.</span>
+        <span class="n">package_tuples_seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="c1"># Create list so that we can adjust dependency graph</span>
+        <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edges_map</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">edge</span><span class="o">.</span><span class="n">source</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+                <span class="ow">and</span> <span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">package_tuples_seen</span>
+            <span class="p">):</span>
+                <span class="n">package_tuples_seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">package_tuple</span><span class="p">)</span>
+                <span class="k">yield</span> <span class="n">edge</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">package_tuple</span></div>
+
+<div class="viewcode-block" id="DependencyGraph.iter_direct_dependencies_tuple"><a class="viewcode-back" href="../../../../../../thoth.adviser.python.dependency_graph.adaptation.html#thoth.adviser.python.dependency_graph.adaptation.graph.DependencyGraph.iter_direct_dependencies_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">iter_direct_dependencies_tuple</span><span class="p">(</span>
+        <span class="bp">self</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Iterate over all direct dependencies.&quot;&quot;&quot;</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">direct_dependencies_map</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="DependencyGraph.sort_paths"><a class="viewcode-back" href="../../../../../../thoth.adviser.python.dependency_graph.adaptation.html#thoth.adviser.python.dependency_graph.adaptation.graph.DependencyGraph.sort_paths">[docs]</a>    <span class="k">def</span> <span class="nf">sort_paths</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">comparision_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="nb">int</span><span class="p">],</span>
+        <span class="n">reverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Sort paths in the dependency graph.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">edges_map</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span>
+            <span class="p">(</span><span class="n">e</span><span class="o">.</span><span class="n">get_edge_key</span><span class="p">(),</span> <span class="n">e</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">edges_map</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+                <span class="n">key</span><span class="o">=</span><span class="n">cmp_to_key</span><span class="p">(</span><span class="n">comparision_func</span><span class="p">),</span>
+                <span class="n">reverse</span><span class="o">=</span><span class="n">reverse</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+    <a id="sidebar-anchor"></a>
+    
+
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+      </ul>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Thoth team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.1.2.
+    </div>
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>

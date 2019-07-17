@@ -67,516 +67,147 @@
 
 <span class="sd">&quot;&quot;&quot;An object wrapping stack candidates used to generate stacks from in pipeline.&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Generator</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Callable</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Generator</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Set</span>
-<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">cmp_to_key</span>
-<span class="kn">from</span> <span class="nn">contextlib</span> <span class="k">import</span> <span class="n">ContextDecorator</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Callable</span>
 <span class="kn">from</span> <span class="nn">itertools</span> <span class="k">import</span> <span class="n">chain</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">deque</span>
-<span class="kn">import</span> <span class="nn">copy</span>
-
-<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">PackageVersion</span>
-<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Source</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">PackageVersion</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Source</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.dependency_graph</span> <span class="k">import</span> <span class="n">DependencyGraphAdaptation</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.dependency_graph</span> <span class="k">import</span> <span class="n">DependencyGraphTransaction</span>
+
 <span class="kn">from</span> <span class="nn">.step_stats</span> <span class="k">import</span> <span class="n">StepStats</span>
 <span class="kn">from</span> <span class="nn">.context_base</span> <span class="k">import</span> <span class="n">ContextBase</span>
-<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">CannotRemovePackage</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
-
-
-<span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">_StepChangeContext</span><span class="p">(</span><span class="n">ContextDecorator</span><span class="p">):</span>
-
-    <span class="n">step_context</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">&quot;StepContext&quot;</span><span class="p">)</span>
-    <span class="n">graceful</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-    <span class="n">_to_remove_tuples</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">set</span><span class="p">)</span>
-    <span class="p">)</span>
-    <span class="n">_to_remove_tuples_list</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
-    <span class="p">)</span>
-
-    <span class="k">def</span> <span class="nf">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Enter context and keep track of changes being made to stacks.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span>
-
-    <span class="k">def</span> <span class="nf">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">exc</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Remove paths or tuples which were requested to be removed.&quot;&quot;&quot;</span>
-        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_remove_tuples_list</span><span class="p">:</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">path</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_context</span><span class="o">.</span><span class="n">raw_paths</span><span class="p">)</span>
-                <span class="ow">and</span> <span class="n">package_tuple</span>
-                <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_context</span><span class="o">.</span><span class="n">iter_direct_dependencies_tuple</span><span class="p">()</span>
-            <span class="p">):</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="s2">&quot;No need to remove package </span><span class="si">%r</span><span class="s2">, it was already removed&quot;</span><span class="p">,</span>
-                    <span class="n">package_tuple</span><span class="p">,</span>
-                <span class="p">)</span>
-                <span class="k">continue</span>
-
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Removing </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">step_context</span><span class="o">.</span><span class="n">remove_package_tuple</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
-            <span class="k">except</span> <span class="n">CannotRemovePackage</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Failed to remove package </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">graceful</span><span class="p">:</span>
-                    <span class="k">raise</span>
-
-    <span class="k">def</span> <span class="nf">remove_package_tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Mark the given package tuple for removal.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_remove_tuples</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_to_remove_tuples</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_to_remove_tuples_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="StepContext"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">StepContext</span><span class="p">(</span><span class="n">ContextBase</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;A wrapper representing stack stack candidates.&quot;&quot;&quot;</span>
 
-    <span class="n">_paths</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
-    <span class="p">)</span>
+    <span class="n">packages</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">PackageVersion</span><span class="p">])</span>
+    <span class="n">dependency_graph_adaptation</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">DependencyGraphAdaptation</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
     <span class="n">_stats</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">StepStats</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="n">StepStats</span><span class="p">))</span>
-    <span class="n">_direct_dependencies</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
-    <span class="p">)</span>
-    <span class="n">_direct_dependencies_score</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">float</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
-    <span class="p">)</span>
-    <span class="n">_direct_dependencies_map</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PackageVersion</span><span class="p">]]],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">)</span>
-    <span class="p">)</span>
-    <span class="n">_transitive_dependencies_map</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Set</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PackageVersion</span><span class="p">]]]],</span>
-        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span>
-    <span class="p">)</span>
-    <span class="c1"># Associate map, queries to this map answer a question:</span>
-    <span class="c1">#   What are dependencies of a package?</span>
-    <span class="c1"># e.g. flask 0.12.1 from pypi depends on werkzeug 0.13 from pypi, the corresponding entry would be:</span>
-    <span class="c1">#  {</span>
-    <span class="c1">#    (&quot;flask&quot;, &quot;0.12.1&quot;, &quot;https://pypi.org/simple&quot;): {</span>
-    <span class="c1">#        &quot;werkzeug&quot;: {(&quot;werkzeug&quot;, &quot;0.13&quot;, &quot;https://pypi.org/simple&quot;)}  # A set of dependencies.</span>
-    <span class="c1">#    }</span>
-    <span class="c1">#  }</span>
-    <span class="c1"># The name is used to optimize listing of dependencies of a same name to check for wrong dependency removals.</span>
-    <span class="n">_associate_dependency_map</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span>
-        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span>
-    <span class="p">)</span>
-    <span class="c1"># Associate map, queries to this map answer a question:</span>
-    <span class="c1">#  What are dependent packages to a package?</span>
-    <span class="c1"># e.g. flask 0.12.1 from pypi depends on werkzeug 0.13 from pypi, the corresponding entry would be:</span>
-    <span class="c1">#  {</span>
-    <span class="c1">#    (&quot;werkzeug&quot;, &quot;0.13&quot;, &quot;https://pypi.org/simple&quot;): {</span>
-    <span class="c1">#        (&quot;flask&quot;, &quot;0.12.1&quot;, &quot;https://pypi.org/simple&quot;)   # An item in a set.</span>
-    <span class="c1">#    }</span>
-    <span class="c1">#  }</span>
-    <span class="n">_associate_dependent_map</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span>
-        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span>
-    <span class="p">)</span>
-    <span class="c1"># To reduce number of same indexes tracked - these indexes are checked when</span>
-    <span class="c1"># there is created a new PackageVersion from a tuple.</span>
-    <span class="n">_indexes_used</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Source</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>
 
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">direct_dependencies_map</span><span class="p">(</span>
-        <span class="bp">self</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PackageVersion</span><span class="p">]]]:</span>
-        <span class="sd">&quot;&quot;&quot;Get direct dependencies map.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_map</span>
+<div class="viewcode-block" id="StepContext.from_paths"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.from_paths">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_paths</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">direct_dependencies</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">],</span>
+        <span class="n">paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;StepContext&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Instantiate step context from paths.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Preparing for instantiating step context&quot;</span><span class="p">)</span>
+        <span class="n">packages</span> <span class="o">=</span> <span class="p">{</span><span class="n">p</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">():</span> <span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">direct_dependencies</span><span class="p">}</span>
+        <span class="c1"># for package_version in direct_dependencies:</span>
+        <span class="c1">#     package_tuple = package_version.to_tuple()</span>
+        <span class="c1">#     if package_tuple not in packages:</span>
+        <span class="c1">#         packages[package_tuple] = package_version</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="n">develop</span> <span class="o">=</span> <span class="n">packages</span><span class="p">[</span><span class="n">path</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">develop</span>
+            <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">packages</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="n">package_version</span> <span class="o">=</span> <span class="n">PackageVersion</span><span class="p">(</span>
+                    <span class="n">name</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                    <span class="n">version</span><span class="o">=</span><span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                    <span class="n">develop</span><span class="o">=</span><span class="n">develop</span><span class="p">,</span>
+                    <span class="n">index</span><span class="o">=</span><span class="n">Source</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]),</span>
+                <span class="p">)</span>
+                <span class="n">packages</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
+
+        <span class="c1"># Explicitly assign paths to direct dependencies to have them present even if they do not have any dependency.</span>
+        <span class="k">for</span> <span class="n">direct_dependency</span> <span class="ow">in</span> <span class="n">direct_dependencies</span><span class="p">:</span>
+            <span class="n">paths</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">direct_dependency</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()])</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Instantiating step context and constructing dependency graph adaptation&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">packages</span><span class="o">=</span><span class="n">packages</span><span class="p">,</span>
+            <span class="n">dependency_graph_adaptation</span><span class="o">=</span><span class="n">DependencyGraphAdaptation</span><span class="o">.</span><span class="n">from_paths</span><span class="p">(</span><span class="n">paths</span><span class="p">),</span>
+        <span class="p">)</span></div>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">stats</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StepStats</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve statistics kept during steps computation.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stats</span>
 
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">raw_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Return raw paths to packages, as kept internally.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="p">[</span><span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">]</span>
-
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">transitive_dependencies_map</span><span class="p">(</span>
-        <span class="bp">self</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PackageVersion</span><span class="p">]]]:</span>
-        <span class="sd">&quot;&quot;&quot;Retrieve transitive dependencies map.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transitive_dependencies_map</span>
-
-<div class="viewcode-block" id="StepContext.change"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.change">[docs]</a>    <span class="k">def</span> <span class="nf">change</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_StepChangeContext</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get stack context change.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">_StepChangeContext</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">graceful</span><span class="p">)</span></div>
-
-<div class="viewcode-block" id="StepContext.add_resolved_direct_dependency"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.add_resolved_direct_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">add_resolved_direct_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Add a resolved (pinned down direct dependency).&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_map</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_map</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="n">it</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_map</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
-            <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="n">it</span> <span class="o">=</span> <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
-            <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_score</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()]</span> <span class="o">=</span> <span class="mf">0.0</span></div>
-
-    <span class="k">def</span> <span class="nf">_add_transitive_dependency_tuple</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">index_url</span><span class="p">:</span> <span class="nb">str</span>
+<div class="viewcode-block" id="StepContext.sort_paths"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.sort_paths">[docs]</a>    <span class="k">def</span> <span class="nf">sort_paths</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">comparision_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="n">PackageVersion</span><span class="p">],</span> <span class="nb">int</span><span class="p">],</span>
+        <span class="n">reverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Add a transitive dependency based on tuple.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">package_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transitive_dependencies_map</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_transitive_dependencies_map</span><span class="p">[</span><span class="n">package_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="n">it</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transitive_dependencies_map</span><span class="p">[</span><span class="n">package_name</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">package_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
-            <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="n">it</span> <span class="o">=</span> <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="p">]</span>
-        <span class="n">source</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_indexes_used</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">source</span><span class="p">:</span>
-            <span class="n">source</span> <span class="o">=</span> <span class="n">Source</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_indexes_used</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span> <span class="o">=</span> <span class="n">source</span>
-
-        <span class="k">if</span> <span class="n">index_url</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
-            <span class="n">it</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span> <span class="o">=</span> <span class="n">PackageVersion</span><span class="p">(</span>
-                <span class="n">name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">version</span><span class="o">=</span><span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">package_version</span><span class="p">,</span>  <span class="c1"># Always adding a locked version</span>
-                <span class="n">develop</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-                <span class="n">index</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
-            <span class="p">)</span>
+        <span class="sd">&quot;&quot;&quot;Sort paths in the dependency graph.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dependency_graph_adaptation</span><span class="o">.</span><span class="n">sort_paths</span><span class="p">(</span><span class="n">comparision_func</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="n">reverse</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="StepContext.iter_direct_dependencies"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.iter_direct_dependencies">[docs]</a>    <span class="k">def</span> <span class="nf">iter_direct_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Iterate over direct dependencies, respect their ordering.&quot;&quot;&quot;</span>
-        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span></div>
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">iter_direct_dependencies_tuple</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span></div>
 
 <div class="viewcode-block" id="StepContext.iter_direct_dependencies_tuple"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.iter_direct_dependencies_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">iter_direct_dependencies_tuple</span><span class="p">(</span>
         <span class="bp">self</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Iterate over direct dependencies, respect their ordering and return a package tuple.&quot;&quot;&quot;</span>
-        <span class="k">yield from</span> <span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="p">)</span></div>
+        <span class="c1"># Cast to list is required due to possible removals which would</span>
+        <span class="c1"># cause runtime errors for dictionary changed size during iteration</span>
+        <span class="k">yield from</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dependency_graph_adaptation</span><span class="o">.</span><span class="n">iter_direct_dependencies_tuple</span><span class="p">()</span>
+        <span class="p">)</span></div>
 
 <div class="viewcode-block" id="StepContext.iter_transitive_dependencies"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.iter_transitive_dependencies">[docs]</a>    <span class="k">def</span> <span class="nf">iter_transitive_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Iterate over indirect (transitive) dependencies, respect their ordering.&quot;&quot;&quot;</span>
-        <span class="k">for</span> <span class="n">indexes</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transitive_dependencies_map</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-            <span class="k">for</span> <span class="n">versions</span> <span class="ow">in</span> <span class="n">indexes</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-                <span class="k">yield from</span> <span class="n">versions</span><span class="o">.</span><span class="n">values</span><span class="p">()</span></div>
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">iter_transitive_dependencies_tuple</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span></div>
 
-<div class="viewcode-block" id="StepContext.iter_transitive_dependencies_tuple"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.iter_transitive_dependencies_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">iter_transitive_dependencies_tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="StepContext.iter_transitive_dependencies_tuple"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.iter_transitive_dependencies_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">iter_transitive_dependencies_tuple</span><span class="p">(</span>
+        <span class="bp">self</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Iterate over indirect (transitive) dependencies, respect their ordering.&quot;&quot;&quot;</span>
-        <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
-                <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
-                    <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
-                    <span class="k">yield</span> <span class="n">package_tuple</span></div>
+        <span class="c1"># Cast to list is required due to possible removals which would</span>
+        <span class="c1"># cause runtime errors for dictionary changed size during iteration</span>
+        <span class="k">yield from</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dependency_graph_adaptation</span><span class="o">.</span><span class="n">iter_transitive_dependencies_tuple</span><span class="p">()</span>
+        <span class="p">)</span></div>
 
 <div class="viewcode-block" id="StepContext.iter_all_dependencies"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.iter_all_dependencies">[docs]</a>    <span class="k">def</span> <span class="nf">iter_all_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Iterate over all possible dependencies, make sure each dependency is returned once.&quot;&quot;&quot;</span>
-        <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-
-        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">iter_direct_dependencies</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">iter_transitive_dependencies</span><span class="p">()</span>
-        <span class="p">):</span>
-            <span class="n">package_tuple</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
-            <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
-                <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
-                <span class="k">yield</span> <span class="n">package_version</span></div>
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">iter_all_dependencies_tuple</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span></div>
 
 <div class="viewcode-block" id="StepContext.iter_all_dependencies_tuple"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.iter_all_dependencies_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">iter_all_dependencies_tuple</span><span class="p">(</span>
         <span class="bp">self</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Iterate over all the dependencies, return each as a tuple.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="p">(</span>
-            <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
-            <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">iter_all_dependencies</span><span class="p">()</span>
-        <span class="p">)</span></div>
-
-<div class="viewcode-block" id="StepContext.add_paths"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.add_paths">[docs]</a>    <span class="k">def</span> <span class="nf">add_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">paths</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Add all the paths of transitive dependencies to this instance.&quot;&quot;&quot;</span>
-        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
-                <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;=</span> <span class="mi">1</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_add_transitive_dependency_tuple</span><span class="p">(</span><span class="o">*</span><span class="n">package_tuple</span><span class="p">)</span>
-
-                <span class="c1"># Fill in map for dependency tracking.</span>
-                <span class="k">if</span> <span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
-                    <span class="n">dependency</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="n">idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
-
-                    <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependency_map</span><span class="p">:</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependency_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-
-                    <span class="n">dependency_name</span> <span class="o">=</span> <span class="n">dependency</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-                    <span class="k">if</span> <span class="p">(</span>
-                        <span class="n">dependency</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-                        <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependency_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span>
-                    <span class="p">):</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependency_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">][</span>
-                            <span class="n">dependency_name</span>
-                        <span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependency_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">][</span><span class="n">dependency_name</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
-                        <span class="n">dependency</span>
-                    <span class="p">)</span>
-
-                <span class="c1"># Fill in map for dependent tracking.</span>
-                <span class="k">if</span> <span class="n">idx</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="n">dependent</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="n">idx</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
-
-                    <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependent_map</span><span class="p">:</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependent_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependent_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">dependent</span><span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="o">.</span><span class="n">extend</span><span class="p">((</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">)</span></div>
-
-    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_create_record</span><span class="p">(</span><span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">,</span> <span class="n">dependency_map</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dependency_map</span><span class="p">:</span>
-            <span class="n">dependency_map</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="n">it</span> <span class="o">=</span> <span class="n">dependency_map</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
-            <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="n">it</span> <span class="o">=</span> <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">it</span><span class="p">:</span>
-            <span class="n">it</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
-
-<div class="viewcode-block" id="StepContext.remove_package_tuple"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.remove_package_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">remove_package_tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Remove the given package from all the resolution paths.&quot;&quot;&quot;</span>
-        <span class="n">old_paths_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">)</span>
-        <span class="n">old_direct_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="p">)</span>
-
-        <span class="n">new_paths_idx</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">stack</span> <span class="o">=</span> <span class="n">deque</span><span class="p">([</span><span class="n">package_tuple</span><span class="p">])</span>
-        <span class="n">removed</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-        <span class="c1"># Assign all at first.</span>
-        <span class="n">paths_idx</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">))</span>
-        <span class="c1"># We update associate dependency map once we know the given package is actually removed.</span>
-        <span class="n">to_remove_associate_dependency_map</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-
-        <span class="k">while</span> <span class="n">stack</span><span class="p">:</span>
-            <span class="n">to_remove_tuple</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
-            <span class="n">removed</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">to_remove_tuple</span><span class="p">)</span>
-
-            <span class="k">for</span> <span class="n">path_idx</span> <span class="ow">in</span> <span class="n">paths_idx</span><span class="p">:</span>
-                <span class="n">score</span><span class="p">,</span> <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">[</span><span class="n">path_idx</span><span class="p">]</span>
-                <span class="k">if</span> <span class="n">to_remove_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">path</span><span class="p">:</span>
-                    <span class="n">new_paths_idx</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path_idx</span><span class="p">)</span>
-                    <span class="k">continue</span>
-
-                <span class="c1"># Check that if we remove this package, the removal of path does not</span>
-                <span class="c1"># affect direct dependencies of application. If yes, the removal is invalid.</span>
-                <span class="n">dependents</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependent_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">to_remove_tuple</span><span class="p">)</span>
-                <span class="n">last_dependent</span> <span class="o">=</span> <span class="n">to_remove_tuple</span>
-
-                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dependents</span><span class="p">,</span> <span class="nb">set</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">dependents</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="c1"># We have reached the marker.</span>
-                    <span class="k">continue</span>
-                <span class="k">elif</span> <span class="n">dependents</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="c1"># Direct dependency, check we have another direct dependency candidate of a same type.</span>
-                    <span class="k">for</span> <span class="n">direct_package_version</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="p">:</span>
-                        <span class="k">if</span> <span class="n">direct_package_version</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">last_dependent</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="p">(</span>
-                            <span class="n">direct_package_version</span><span class="o">.</span><span class="n">locked_version</span> <span class="o">!=</span> <span class="n">last_dependent</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-                            <span class="ow">or</span> <span class="n">direct_package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span> <span class="o">!=</span> <span class="n">last_dependent</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
-                        <span class="p">):</span>
-                            <span class="k">break</span>
-                    <span class="k">else</span><span class="p">:</span>
-                        <span class="k">raise</span> <span class="n">CannotRemovePackage</span><span class="p">(</span>
-                            <span class="n">f</span><span class="s2">&quot;Cannot remove package </span><span class="si">{package_tuple}</span><span class="s2">, removing this package would lead &quot;</span>
-                            <span class="n">f</span><span class="s2">&quot;to removal of all direct dependencies of package </span><span class="si">{last_dependent[0]!r}</span><span class="s2">&quot;</span>
-                        <span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="c1"># Not direct dependency, check the current state and traverse up if necessary.</span>
-                    <span class="k">for</span> <span class="n">dependent</span> <span class="ow">in</span> <span class="n">dependents</span><span class="p">:</span>
-                        <span class="k">for</span> <span class="n">dependency</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependency_map</span><span class="p">[</span><span class="n">dependent</span><span class="p">][</span>
-                            <span class="n">to_remove_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-                        <span class="p">]:</span>
-                            <span class="c1"># Now check if we have another package of a same type</span>
-                            <span class="c1"># to the one we want to be removed (another candidate). If no, check we do not</span>
-                            <span class="c1"># break any of the dependencies traversing up the dependency graph.</span>
-                            <span class="k">if</span> <span class="n">dependency</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">to_remove_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">and</span> <span class="p">(</span>
-                                <span class="n">dependency</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">to_remove_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-                                <span class="ow">or</span> <span class="n">dependency</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">!=</span> <span class="n">to_remove_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
-                            <span class="p">):</span>
-                                <span class="c1"># An alternate package - package with same</span>
-                                <span class="c1"># name but different version or index.</span>
-                                <span class="k">break</span>
-                        <span class="k">else</span><span class="p">:</span>
-                            <span class="c1"># We cannot satisfy requirements for &quot;dependent&quot; by removing &quot;dependency&quot;,</span>
-                            <span class="c1"># we need to remove dependent as well.</span>
-                            <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dependent</span><span class="p">)</span>
-                            <span class="c1"># Delegate removal of this path to the next round as &quot;dependent&quot; introduced bad</span>
-                            <span class="c1"># package which should be removed.</span>
-                            <span class="n">new_paths_idx</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path_idx</span><span class="p">)</span>
-
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependent_map</span><span class="p">[</span><span class="n">to_remove_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-                    <span class="k">for</span> <span class="n">dependent</span> <span class="ow">in</span> <span class="n">dependents</span><span class="p">:</span>
-                        <span class="n">to_remove_associate_dependency_map</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
-                            <span class="p">(</span><span class="n">dependent</span><span class="p">,</span> <span class="n">to_remove_tuple</span><span class="p">)</span>
-                        <span class="p">)</span>
-
-            <span class="c1"># Filter out markers.</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependent_map</span> <span class="o">=</span> <span class="p">{</span>
-                <span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependent_map</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span>
-            <span class="p">}</span>
-
-            <span class="c1"># Assign new paths with removed packages, we iterate on this list to satisfy all the removals.</span>
-            <span class="n">paths_idx</span> <span class="o">=</span> <span class="n">new_paths_idx</span>
-            <span class="n">new_paths_idx</span> <span class="o">=</span> <span class="p">[]</span>
-
-        <span class="c1"># We need to check we construct direct dependency list from:</span>
-        <span class="c1">#  1. All the direct dependencies stated in paths.</span>
-        <span class="c1">#  2. All the direct dependencies which had no paths.</span>
-        <span class="c1">#</span>
-        <span class="c1"># Besides that we need to perform a check that no direct dependency</span>
-        <span class="c1"># of a type was removed during cut off.</span>
-        <span class="c1">#</span>
-        <span class="c1"># PS: this will be much simpler if we would just maintain paths</span>
-        <span class="c1"># with each direct dependency in place.</span>
-        <span class="n">new_direct_dependencies_from_paths</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">path_idx</span> <span class="ow">in</span> <span class="n">paths_idx</span><span class="p">:</span>
-            <span class="n">new_direct_dependencies_from_paths</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">[</span><span class="n">path_idx</span><span class="p">][</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">])</span>
-
-        <span class="n">old_direct_dependencies_from_paths</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">:</span>
-            <span class="n">old_direct_dependencies_from_paths</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-
-        <span class="n">direct_dependency_types</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-        <span class="n">new_direct_dependencies_tuples</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">new_direct_dependencies_types</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">direct_dependency</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="p">:</span>
-            <span class="n">direct_dependency_types</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">direct_dependency</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-            <span class="n">direct_dependency_tuple</span> <span class="o">=</span> <span class="n">direct_dependency</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
-            <span class="k">if</span> <span class="p">(</span><span class="n">direct_dependency_tuple</span> <span class="ow">in</span> <span class="n">new_direct_dependencies_from_paths</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span>
-                <span class="n">direct_dependency_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">removed</span>
-                <span class="ow">and</span> <span class="n">direct_dependency_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">old_direct_dependencies_from_paths</span>
-            <span class="p">):</span>
-                <span class="n">new_direct_dependencies_tuples</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">direct_dependency_tuple</span><span class="p">)</span>
-                <span class="n">new_direct_dependencies_types</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">direct_dependency_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-
-        <span class="k">for</span> <span class="n">direct_dependency_type</span> <span class="ow">in</span> <span class="n">direct_dependency_types</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">direct_dependency_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">new_direct_dependencies_types</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="n">CannotRemovePackage</span><span class="p">(</span>
-                    <span class="n">f</span><span class="s2">&quot;Cannot remove package </span><span class="si">{package_tuple}</span><span class="s2">, removing this package would lead &quot;</span>
-                    <span class="n">f</span><span class="s2">&quot;to removal of all direct dependencies of package </span><span class="si">{direct_dependency_type!r}</span><span class="s2">&quot;</span>
-                <span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">removed_tuple</span> <span class="ow">in</span> <span class="n">removed</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_transitive_dependencies_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">removed_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-                <span class="n">removed_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="p">{}</span>
-            <span class="p">)</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">removed_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="kc">None</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_stats</span><span class="o">.</span><span class="n">mark_removed_package_tuple</span><span class="p">(</span><span class="n">removed_tuple</span><span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">dependent</span><span class="p">,</span> <span class="n">to_remove_tuple</span> <span class="ow">in</span> <span class="n">to_remove_associate_dependency_map</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_associate_dependency_map</span><span class="p">[</span><span class="n">dependent</span><span class="p">][</span><span class="n">to_remove_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span>
-                <span class="n">to_remove_tuple</span>
-            <span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">path</span> <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">)</span> <span class="k">if</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">paths_idx</span><span class="p">)]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span> <span class="o">=</span> <span class="p">[</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">get_package_version_tuple</span><span class="p">(</span><span class="n">pt</span><span class="p">)</span> <span class="k">for</span> <span class="n">pt</span> <span class="ow">in</span> <span class="n">new_direct_dependencies_tuples</span>
-        <span class="p">]</span>
-        <span class="n">new_direct_dependencies_score</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="n">new_direct_dependencies_map</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="p">:</span>
-            <span class="n">adjust_package_tuple</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
-            <span class="n">new_direct_dependencies_score</span><span class="p">[</span>
-                <span class="n">adjust_package_tuple</span>
-            <span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_score</span><span class="p">[</span><span class="n">adjust_package_tuple</span><span class="p">]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_create_record</span><span class="p">(</span><span class="n">package_version</span><span class="p">,</span> <span class="n">new_direct_dependencies_map</span><span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_score</span> <span class="o">=</span> <span class="n">new_direct_dependencies_score</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_map</span> <span class="o">=</span> <span class="n">new_direct_dependencies_map</span>
-
-        <span class="k">if</span> <span class="n">old_paths_length</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">)</span> <span class="ow">and</span> <span class="n">old_direct_length</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span>
+        <span class="n">seen_tuples</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">iter_direct_dependencies_tuple</span><span class="p">(),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">iter_transitive_dependencies_tuple</span><span class="p">(),</span>
         <span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="s2">&quot;Requested to remove package </span><span class="si">%r</span><span class="s2">, but no changes were made to paths&quot;</span><span class="p">,</span>
-                <span class="n">package_tuple</span><span class="p">,</span>
-            <span class="p">)</span></div>
+            <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen_tuples</span><span class="p">:</span>
+                <span class="n">seen_tuples</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+                <span class="k">yield</span> <span class="n">package_tuple</span></div>
 
-<div class="viewcode-block" id="StepContext.score_path_index"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.score_path_index">[docs]</a>    <span class="k">def</span> <span class="nf">score_path_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">score</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Score the given path based on its index.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">score</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span></div>
+<div class="viewcode-block" id="StepContext.remove_package_tuples"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.remove_package_tuples">[docs]</a>    <span class="k">def</span> <span class="nf">remove_package_tuples</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">package_tuples</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependencyGraphTransaction</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Remove all packages from all the resolution paths, transactional operation.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dependency_graph_adaptation</span><span class="o">.</span><span class="n">remove_package_tuples</span><span class="p">(</span><span class="o">*</span><span class="n">package_tuples</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="StepContext.score_package_tuple"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.score_package_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">score_package_tuple</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">score</span><span class="p">:</span> <span class="nb">float</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Score a path based on a package which is present in the path.&quot;&quot;&quot;</span>
-        <span class="n">some_seen</span> <span class="o">=</span> <span class="kc">False</span>
-        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">path</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="p">):</span>
-            <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">score_path_index</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">score</span><span class="p">)</span>
-                <span class="n">some_seen</span> <span class="o">=</span> <span class="kc">True</span>
-
-        <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_score</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_score</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">+=</span> <span class="n">score</span>
-            <span class="n">some_seen</span> <span class="o">=</span> <span class="kc">True</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">some_seen</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="s2">&quot;No paths were seen with package </span><span class="si">%r</span><span class="s2">, no score adjustment was done&quot;</span><span class="p">,</span>
-                <span class="n">package_tuple</span><span class="p">,</span>
-            <span class="p">)</span></div>
-
-<div class="viewcode-block" id="StepContext.iter_paths_with_score"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.iter_paths_with_score">[docs]</a>    <span class="k">def</span> <span class="nf">iter_paths_with_score</span><span class="p">(</span>
-        <span class="bp">self</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Iterate over paths and return path with its score and index.&quot;&quot;&quot;</span>
-        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span></div>
-
-<div class="viewcode-block" id="StepContext.get_package_version_tuple"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.get_package_version_tuple">[docs]</a>    <span class="k">def</span> <span class="nf">get_package_version_tuple</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackageVersion</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get package version from the dependencies map based on tuple provided.&quot;&quot;&quot;</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transitive_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span>
-                <span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-            <span class="p">][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span>
-        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_map</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]][</span>
-                <span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
-            <span class="p">]</span></div>
-
-<div class="viewcode-block" id="StepContext.final_sort"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.final_sort">[docs]</a>    <span class="k">def</span> <span class="nf">final_sort</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Perform sorting of paths and direct dependencies based on score.</span>
-
-<span class="sd">        This sorting *HAS TO* be performed before the actual scoring if run un un-sorted paths as it does</span>
-<span class="sd">        not take into account scoring.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">def</span> <span class="nf">cmp_function</span><span class="p">(</span>
-            <span class="n">path1</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span>
-            <span class="n">path2</span><span class="p">:</span> <span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]],</span>
-        <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-            <span class="sd">&quot;&quot;&quot;Comparision based on score.&quot;&quot;&quot;</span>
-            <span class="n">score1</span> <span class="o">=</span> <span class="n">path1</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-            <span class="n">score2</span> <span class="o">=</span> <span class="n">path2</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-            <span class="k">return</span> <span class="n">score1</span> <span class="o">-</span> <span class="n">score2</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">cmp_to_key</span><span class="p">(</span><span class="n">cmp_function</span><span class="p">))</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span>
-            <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies_score</span><span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()]</span>
-        <span class="p">)</span></div>
-
-<div class="viewcode-block" id="StepContext.sort_direct_dependencies"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.sort_direct_dependencies">[docs]</a>    <span class="k">def</span> <span class="nf">sort_direct_dependencies</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">cmp_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">reverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Perform sorting on direct dependencies.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_direct_dependencies</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">cmp_to_key</span><span class="p">(</span><span class="n">cmp_function</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="n">reverse</span><span class="p">)</span></div>
-
-<div class="viewcode-block" id="StepContext.sort_paths"><a class="viewcode-back" href="../../../../../thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.sort_paths">[docs]</a>    <span class="k">def</span> <span class="nf">sort_paths</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cmp_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">reverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Perform sorting of paths.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_paths</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">cmp_to_key</span><span class="p">(</span><span class="n">cmp_function</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="n">reverse</span><span class="p">)</span></div></div>
+        <span class="sd">&quot;&quot;&quot;Score positively or negatively the given package making sure it gets precedence/postponed in resolution.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dependency_graph_adaptation</span><span class="o">.</span><span class="n">score_package_tuple</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">,</span> <span class="n">score</span><span class="p">)</span></div></div>
 </pre></div>
 
           </div>
