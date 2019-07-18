@@ -121,6 +121,47 @@ string cannot be parsed as a float) result in schema change errors. These errors
 need to be handled programatically by deployment administrator (ideally avoid
 such conversions).</p>
 </div>
+<div class="section" id="creating-own-performance-indicators">
+<h2>Creating own performance indicators<a class="headerlink" href="#creating-own-performance-indicators" title="Permalink to this headline">¶</a></h2>
+<p>You can create your own performance indicators. To create own performance
+indicator, create a script which tests desired functionality of a library. An
+example can be matrix multiplication script present in <a class="reference external" href="https://github.com/thoth-station/performance/blob/master/tensorflow/matmul.py">performance</a>
+repository. This script can be supplied to Dependency Monkey to validate
+certain combination of libraries in desired runtime and buildtime environment
+or directly on Amun API which will run the given script using desired software
+and hardware configuration. Please follow instructions on how to create a
+performance script shown in the <a class="reference external" href="https://github.com/thoth-station/performance">README of performance repo</a>.</p>
+<p>To create relevant models, adjust <cite>thoth/storages/graph/performance.py</cite> file
+and add your model. Describe parameters (reported in <cite>&#64;parameters</cite> section of
+performance indicator result) and result (reported in <cite>&#64;result</cite>). The name of
+class should match <cite>name</cite> which is reported by performance indicator run.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@attr.s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">PiMatmul</span><span class="p">(</span><span class="n">PerformanceIndicatorBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A class for representing a matrix multiplication micro-performance test.&quot;&quot;&quot;</span>
+
+    <span class="n">SCHEMA_PARAMETERS</span> <span class="o">=</span> <span class="n">Schema</span><span class="p">({</span>
+        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;matrix_size&quot;</span><span class="p">):</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;dtype&quot;</span><span class="p">):</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;reps&quot;</span><span class="p">):</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;device&quot;</span><span class="p">):</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">})</span>
+
+    <span class="n">SCHEMA_RESULT</span> <span class="o">=</span> <span class="n">Schema</span><span class="p">({</span>
+        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;elapsed&quot;</span><span class="p">):</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;rate&quot;</span><span class="p">):</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="p">})</span>
+
+    <span class="c1"># Device used during performance indicator run - CPU/GPU/TPU/...</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="s2">&quot;exact&quot;</span><span class="p">)</span>
+    <span class="n">matrix_size</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+    <span class="n">dtype</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="s2">&quot;exact&quot;</span><span class="p">)</span>
+    <span class="n">reps</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
+    <span class="n">elapsed</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">rate</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>After you have created relevant model, register your model to <cite>ALL_PERFORMANCE_MODELS</cite> and re-generate graph database schema (as discussed above).</p>
+</div>
 <div class="section" id="graph-database-schema">
 <h2>Graph Database Schema<a class="headerlink" href="#graph-database-schema" title="Permalink to this headline">¶</a></h2>
 <img alt="Graph database schema" src="https://raw.githubusercontent.com/thoth-station/storages/master/docs/schema.png" />
@@ -175,7 +216,7 @@ to export changes made to schema diagram to the PNG file in the same directory.<
 </ul>
 </div>
 <p>This documentation corresponds to implementation in version 0.14.8,
-documentation was generated on Jul 17, 2019.</p>
+documentation was generated on Jul 18, 2019.</p>
 </div>
 </div>
 
@@ -195,6 +236,7 @@ documentation was generated on Jul 17, 2019.</p>
 <li><a class="reference internal" href="#automatically-generate-schema-for-graph-database">Automatically generate schema for Graph database</a></li>
 <li><a class="reference internal" href="#running-dgraph-locally">Running Dgraph locally</a></li>
 <li><a class="reference internal" href="#schema-adjustment-in-deployment">Schema adjustment in deployment</a></li>
+<li><a class="reference internal" href="#creating-own-performance-indicators">Creating own performance indicators</a></li>
 <li><a class="reference internal" href="#graph-database-schema">Graph Database Schema</a></li>
 <li><a class="reference internal" href="#crossroad">Crossroad</a></li>
 </ul>

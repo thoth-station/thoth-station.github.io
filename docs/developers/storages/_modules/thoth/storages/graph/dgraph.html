@@ -130,11 +130,9 @@
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">InspectionSoftwareStack</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">InspectionStackInput</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">InstalledFrom</span>
-<span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">ObservedPerformance</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">PackageExtractRun</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">PythonFileDigest</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">FoundFile</span>
-<span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">PiMatmul</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">ProvenanceCheckerRun</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">ProvenanceCheckerStackInput</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">ProvidedBy</span>
@@ -156,9 +154,12 @@
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">UsedInBuild</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">UsedInJob</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">UserSoftwareStack</span>
+<span class="kn">from</span> <span class="nn">.performance</span> <span class="k">import</span> <span class="n">ObservedPerformance</span>
+<span class="kn">from</span> <span class="nn">.performance</span> <span class="k">import</span> <span class="n">PERFORMANCE_MODEL_BY_NAME</span>
 
 <span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">NotFoundError</span>
 <span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">PythonIndexNotRegistered</span>
+<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">PerformanceIndicatorNotRegistered</span>
 <span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">NotConnected</span>
 <span class="kn">from</span> <span class="nn">..advisers</span> <span class="k">import</span> <span class="n">AdvisersResultsStore</span>
 <span class="kn">from</span> <span class="nn">..analyses</span> <span class="k">import</span> <span class="n">AnalysisResultsStore</span>
@@ -1745,7 +1746,18 @@
 <div class="viewcode-block" id="GraphDatabase.sync_inspection_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.sync_inspection_result">[docs]</a>    <span class="nd">@enable_vertex_cache</span>
     <span class="k">def</span> <span class="nf">sync_inspection_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Sync the given inspection document into the graph database.&quot;&quot;&quot;</span>
-        <span class="n">inspection_document_id</span> <span class="o">=</span> <span class="n">InspectionResultsStore</span><span class="o">.</span><span class="n">get_document_id</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+        <span class="c1"># Check if we have such performance model before creating any other records.</span>
+        <span class="n">performance_indicator</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;specification&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;script&quot;</span><span class="p">):</span>  <span class="c1"># We have run an inspection job.</span>
+            <span class="n">performance_indicator_name</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+            <span class="n">performance_model_class</span> <span class="o">=</span> <span class="n">PERFORMANCE_MODEL_BY_NAME</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">performance_indicator_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">performance_model_class</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">PerformanceIndicatorNotRegistered</span><span class="p">(</span>
+                    <span class="n">f</span><span class="s2">&quot;No performance indicator registered for name </span><span class="si">{performance_indicator_name!r}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+            <span class="n">performance_indicator</span> <span class="o">=</span> <span class="n">performance_model_class</span><span class="o">.</span><span class="n">create_from_report</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+            <span class="n">performance_indicator</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
 
         <span class="n">build_cpu</span> <span class="o">=</span> <span class="n">OpenShift</span><span class="o">.</span><span class="n">parse_cpu_spec</span><span class="p">(</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;specification&quot;</span><span class="p">][</span><span class="s2">&quot;build&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">])</span>
         <span class="n">build_memory</span> <span class="o">=</span> <span class="n">OpenShift</span><span class="o">.</span><span class="n">parse_memory_spec</span><span class="p">(</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;specification&quot;</span><span class="p">][</span><span class="s2">&quot;build&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span><span class="s2">&quot;memory&quot;</span><span class="p">])</span>
@@ -1756,6 +1768,7 @@
         <span class="n">run_memory</span> <span class="o">=</span> <span class="n">run_memory</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span>
         <span class="n">build_memory</span> <span class="o">=</span> <span class="n">build_memory</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span>
 
+        <span class="n">inspection_document_id</span> <span class="o">=</span> <span class="n">InspectionResultsStore</span><span class="o">.</span><span class="n">get_document_id</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
         <span class="n">inspection_run</span> <span class="o">=</span> <span class="n">InspectionRun</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
             <span class="n">inspection_document_id</span><span class="o">=</span><span class="n">inspection_document_id</span><span class="p">,</span>
             <span class="n">inspection_datetime</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;created&quot;</span><span class="p">),</span>
@@ -1819,44 +1832,11 @@
             <span class="n">hardware_information_job</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
             <span class="n">UsedInJob</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">hardware_information_job</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">inspection_run</span><span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
 
-            <span class="n">overall_score</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;overall_score&quot;</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;exit_code&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="c1"># We assign negative information here for now if the given performance indicator failed.</span>
-                <span class="n">overall_score</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>
-
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">overall_score</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No overall score found when syncing inspection document </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">inspection_document_id</span><span class="p">)</span>
-
-            <span class="c1"># PERFORMANCE INDICATORS</span>
-            <span class="c1"># We uniquely identify the performance indicators considering:</span>
-            <span class="c1"># - {ML_FRAMEWORK}</span>
-            <span class="c1"># - {ML_PRIMITIVE} or {DATASET}-{ALGORITHM}.</span>
-
-            <span class="c1"># MATMUL</span>
-            <span class="k">if</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;matmul&quot;</span><span class="p">:</span>
-                <span class="n">performance_indicator_matmul</span> <span class="o">=</span> <span class="n">PiMatmul</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
-                    <span class="n">pi_name</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">),</span>
-                    <span class="n">ml_framework</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;framework&quot;</span><span class="p">),</span>
-                    <span class="n">origin</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;specification&quot;</span><span class="p">][</span><span class="s2">&quot;script&quot;</span><span class="p">],</span>
-                    <span class="n">reference</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;script_sha256&quot;</span><span class="p">],</span>
-                    <span class="n">matrix_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># TODO assign matrix size once we allow parameters on Amun.</span>
-                    <span class="n">overall_score</span><span class="o">=</span><span class="n">overall_score</span><span class="p">,</span>
-                <span class="p">)</span>
-                <span class="n">performance_indicator_matmul</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
-
-                <span class="n">ObservedPerformance</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
-                    <span class="n">source</span><span class="o">=</span><span class="n">inspection_run</span><span class="p">,</span>
-                    <span class="n">target</span><span class="o">=</span><span class="n">performance_indicator_matmul</span><span class="p">,</span>
-                    <span class="n">performance_indicator_index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>  <span class="c1"># We can now run only one pi per inspection request.</span>
-                <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="n">PythonIndexNotRegistered</span><span class="p">(</span>
-                    <span class="s2">&quot;We don&#39;t have support for syncing this PI called </span><span class="si">{}</span><span class="s2"> with origin </span><span class="si">{}</span><span class="s2"> and reference </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-                        <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">),</span>
-                        <span class="n">document</span><span class="p">[</span><span class="s2">&quot;specification&quot;</span><span class="p">][</span><span class="s2">&quot;script&quot;</span><span class="p">],</span>
-                        <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;script_sha256&quot;</span><span class="p">],</span>
-                    <span class="p">)</span>
-                <span class="p">)</span></div>
+            <span class="n">ObservedPerformance</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
+                <span class="n">source</span><span class="o">=</span><span class="n">inspection_run</span><span class="p">,</span>
+                <span class="n">target</span><span class="o">=</span><span class="n">performance_indicator</span><span class="p">,</span>
+                <span class="n">performance_indicator_index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>  <span class="c1"># We can now run only one pi per inspection request.</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.create_python_cve_record"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.create_python_cve_record">[docs]</a>    <span class="k">def</span> <span class="nf">create_python_cve_record</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
