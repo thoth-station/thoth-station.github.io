@@ -68,6 +68,7 @@
 <span class="kn">import</span> <span class="nn">stat</span>
 <span class="kn">from</span> <span class="nn">shlex</span> <span class="k">import</span> <span class="n">quote</span>
 <span class="kn">import</span> <span class="nn">hashlib</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="k">import</span> <span class="n">Path</span>
 
 <span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="k">import</span> <span class="n">run_command</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="k">import</span> <span class="n">cwd</span>
@@ -240,6 +241,33 @@
     <span class="k">return</span> <span class="n">digests</span>
 
 
+<span class="k">def</span> <span class="nf">_gather_os_info</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Gather information about operating system used.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">os_release_file</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">/</span> <span class="s2">&quot;etc/os-release&quot;</span>
+    <span class="k">if</span> <span class="n">os_release_file</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">content</span> <span class="o">=</span> <span class="n">os_release_file</span><span class="o">.</span><span class="n">read_text</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Failed to read /etc/os-release file to gather operating system information: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">result</span>
+
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">content</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">key</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s1">&#39;&quot;&#39;</span><span class="p">)</span>
+
+            <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="k">return</span> <span class="n">result</span>
+
+
 <span class="k">def</span> <span class="nf">_run_apt_cache_show</span><span class="p">(</span>
     <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">deb_packages</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
@@ -399,7 +427,8 @@
         <span class="s2">&quot;rpm-dependencies&quot;</span><span class="p">:</span> <span class="n">_run_rpm_repoquery</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">),</span>
         <span class="s2">&quot;deb&quot;</span><span class="p">:</span> <span class="n">deb_packages</span><span class="p">,</span>
         <span class="s2">&quot;deb-dependencies&quot;</span><span class="p">:</span> <span class="n">_run_apt_cache_show</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">deb_packages</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">),</span>
-        <span class="s2">&quot;python-files&quot;</span><span class="p">:</span> <span class="n">_gather_python_file_digests</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+        <span class="s2">&quot;python-files&quot;</span><span class="p">:</span> <span class="n">_gather_python_file_digests</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+        <span class="s2">&quot;operating-system&quot;</span><span class="p">:</span> <span class="n">_gather_os_info</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
     <span class="p">}</span></div>
 </pre></div>
 
