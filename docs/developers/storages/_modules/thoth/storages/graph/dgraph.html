@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.graph.dgraph &#8212; Thoth Storages 0.15.0 documentation</title>
+    <title>thoth.storages.graph.dgraph &#8212; Thoth Storages 0.15.1 documentation</title>
     <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../../index.html">Thoth Storages 0.15.0 documentation</a> &#187;</li>
+        <li><a href="../../../../index.html">Thoth Storages 0.15.1 documentation</a> &#187;</li>
           <li><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -298,7 +298,7 @@
         <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_client</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Adapter is not connected to any Dgraph instance.&quot;</span>
         <span class="n">txn</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_client</span><span class="o">.</span><span class="n">txn</span><span class="p">(</span><span class="n">read_only</span><span class="o">=</span><span class="n">read_only</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_STORAGES_DEBUG_QUERIES&quot;</span><span class="p">))):</span>
+        <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_STORAGES_DEBUG_QUERIES&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))):</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Performing query with variables (read_only=</span><span class="si">%r</span><span class="s2">): </span><span class="si">%r</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">read_only</span><span class="p">,</span> <span class="n">variables</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span>
 
         <span class="k">try</span><span class="p">:</span>
@@ -1755,7 +1755,18 @@
         <span class="sd">&quot;&quot;&quot;Sync the given inspection document into the graph database.&quot;&quot;&quot;</span>
         <span class="c1"># Check if we have such performance model before creating any other records.</span>
         <span class="n">performance_indicator</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">inspection_document_id</span> <span class="o">=</span> <span class="n">InspectionResultsStore</span><span class="o">.</span><span class="n">get_document_id</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;specification&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;script&quot;</span><span class="p">):</span>  <span class="c1"># We have run an inspection job.</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">],</span> <span class="nb">dict</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;Performance indicator did not produce a valid JSON output in </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">inspection_document_id</span><span class="p">,</span>
+                    <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">]:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No values provided for inspection output </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">inspection_document_id</span><span class="p">)</span>
+
             <span class="n">performance_indicator_name</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;job_log&quot;</span><span class="p">][</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
             <span class="n">performance_model_class</span> <span class="o">=</span> <span class="n">PERFORMANCE_MODEL_BY_NAME</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">performance_indicator_name</span><span class="p">)</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">performance_model_class</span><span class="p">:</span>
@@ -1775,7 +1786,6 @@
         <span class="n">run_memory</span> <span class="o">=</span> <span class="n">run_memory</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span>
         <span class="n">build_memory</span> <span class="o">=</span> <span class="n">build_memory</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1024</span> <span class="o">**</span> <span class="mi">3</span><span class="p">)</span>
 
-        <span class="n">inspection_document_id</span> <span class="o">=</span> <span class="n">InspectionResultsStore</span><span class="o">.</span><span class="n">get_document_id</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
         <span class="n">inspection_run</span> <span class="o">=</span> <span class="n">InspectionRun</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
             <span class="n">inspection_document_id</span><span class="o">=</span><span class="n">inspection_document_id</span><span class="p">,</span>
             <span class="n">inspection_datetime</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;created&quot;</span><span class="p">),</span>
