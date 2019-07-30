@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.sync &#8212; Thoth Storages 0.15.2 documentation</title>
+    <title>thoth.storages.sync &#8212; Thoth Storages 0.16.0 documentation</title>
     <link rel="stylesheet" href="../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../index.html">Thoth Storages 0.15.2 documentation</a> &#187;</li>
+        <li><a href="../../../index.html">Thoth Storages 0.16.0 documentation</a> &#187;</li>
           <li><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -78,6 +78,7 @@
 
 <span class="kn">from</span> <span class="nn">.solvers</span> <span class="k">import</span> <span class="n">SolverResultsStore</span>
 <span class="kn">from</span> <span class="nn">.analyses</span> <span class="k">import</span> <span class="n">AnalysisResultsStore</span>
+<span class="kn">from</span> <span class="nn">.package_analyses</span> <span class="k">import</span> <span class="n">PackageAnalysisResultsStore</span>
 <span class="kn">from</span> <span class="nn">.advisers</span> <span class="k">import</span> <span class="n">AdvisersResultsStore</span>
 <span class="kn">from</span> <span class="nn">.inspections</span> <span class="k">import</span> <span class="n">InspectionResultsStore</span>
 <span class="kn">from</span> <span class="nn">.provenance</span> <span class="k">import</span> <span class="n">ProvenanceResultsStore</span>
@@ -204,6 +205,47 @@
                 <span class="n">failed</span> <span class="o">+=</span> <span class="mi">1</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Sync of analysis document with id </span><span class="si">{document_id!r}</span><span class="s2"> skipped - already synced&quot;</span><span class="p">)</span>
+            <span class="n">skipped</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">return</span> <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span></div>
+
+
+<div class="viewcode-block" id="sync_package_analysis_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_package_analysis_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_package_analysis_documents</span><span class="p">(</span>
+        <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Sync package analysis documents into graph.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
+        <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
+        <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">package_analysis_store</span> <span class="o">=</span> <span class="n">PackageAnalysisResultsStore</span><span class="p">()</span>
+    <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+        <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">package_analysis_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="n">f</span><span class="s2">&quot;Syncing package analysis document from </span><span class="si">{package_analysis_store.ceph.host}</span><span class="s2"> &quot;</span>
+                <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph </span><span class="si">{graph.hosts}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">document</span> <span class="o">=</span> <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="n">graph</span><span class="o">.</span><span class="n">sync_package_analysis_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+                <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">graceful</span><span class="p">:</span>
+                    <span class="k">raise</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to sync package analysis result with document id </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                <span class="n">failed</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Sync of package analysis document with id </span><span class="si">{document_id!r}</span><span class="s2"> skipped - already synced&quot;</span><span class="p">)</span>
             <span class="n">skipped</span> <span class="o">+=</span> <span class="mi">1</span>
 
     <span class="k">return</span> <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span></div>
