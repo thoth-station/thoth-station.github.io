@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.python.pipeline.pipeline &#8212; Thoth Adviser 0.4.0 documentation</title>
+    <title>thoth.adviser.python.pipeline.pipeline &#8212; Thoth Adviser 0.5.0 documentation</title>
     <link rel="stylesheet" href="../../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../../../index.html">Thoth Adviser 0.4.0 documentation</a> &#187;</li>
+        <li><a href="../../../../../index.html">Thoth Adviser 0.5.0 documentation</a> &#187;</li>
           <li><a href="../../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -186,6 +186,11 @@
                 <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unresolved</span><span class="p">),</span>
             <span class="p">)</span>
 
+        <span class="c1"># De-instantiate solver - this will cause solver cache to be dropped and references to PackageVersion</span>
+        <span class="c1"># from solver will no longer exist. The garbage collector will correctly clean unreferenced</span>
+        <span class="c1"># PackageVersions if they will be removed from the dependency graph in the pipeline steps.</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span>
+
         <span class="k">return</span> <span class="n">direct_dependencies</span>
 
     <span class="k">def</span> <span class="nf">_resolve_transitive_dependencies</span><span class="p">(</span>
@@ -193,31 +198,24 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StepContext</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Solve all direct dependencies to find all transitive paths (all possible transitive dependencies).&quot;&quot;&quot;</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Retrieving transitive dependencies of direct dependencies&quot;</span><span class="p">)</span>
-        <span class="n">direct_dependencies_tuples</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
-            <span class="p">(</span><span class="n">pv</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">pv</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span> <span class="n">pv</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">)</span> <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="n">direct_dependencies</span>
-        <span class="p">)</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
             <span class="s2">&quot;Direct dependencies considered: </span><span class="si">%r</span><span class="s2"> (count: </span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
-            <span class="n">direct_dependencies_tuples</span><span class="p">,</span>
-            <span class="nb">len</span><span class="p">(</span><span class="n">direct_dependencies_tuples</span><span class="p">),</span>
+            <span class="n">direct_dependencies</span><span class="p">,</span>
+            <span class="nb">len</span><span class="p">(</span><span class="n">direct_dependencies</span><span class="p">),</span>
         <span class="p">)</span>
+
+        <span class="n">direct_dependencies_dict</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="p">(</span><span class="n">pv</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">pv</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span> <span class="n">pv</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">):</span> <span class="n">pv</span> <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="n">direct_dependencies</span>
+        <span class="p">}</span>
+
         <span class="n">paths</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">retrieve_transitive_dependencies_python_multi</span><span class="p">(</span>
-            <span class="n">direct_dependencies_tuples</span><span class="p">,</span>
+            <span class="o">*</span><span class="n">direct_dependencies_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span>
             <span class="n">os_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
             <span class="n">os_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
             <span class="n">python_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="n">paths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">paths</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
 
-        <span class="k">if</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span> <span class="o">==</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
-            <span class="n">total</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-            <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
-                <span class="n">total</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                <span class="s2">&quot;Total number of packages including transitive: </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">total</span><span class="p">)</span>
-            <span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">StepContext</span><span class="o">.</span><span class="n">from_paths</span><span class="p">(</span><span class="n">direct_dependencies</span><span class="p">,</span> <span class="n">paths</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">StepContext</span><span class="o">.</span><span class="n">from_paths</span><span class="p">(</span><span class="n">direct_dependencies_dict</span><span class="p">,</span> <span class="n">paths</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_initialize_stepping</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">StepContext</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Initialize pipeline - resolve direct dependencies and all the transitive dependencies.&quot;&quot;&quot;</span>
@@ -226,23 +224,38 @@
         <span class="n">step_context</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_transitive_dependencies</span><span class="p">(</span><span class="n">direct_dependencies</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">step_context</span>
 
-    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_finalize_stepping</span><span class="p">(</span><span class="n">step_context</span><span class="p">:</span> <span class="n">StepContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependencyGraphWalker</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">_finalize_stepping</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">step_context</span><span class="p">:</span> <span class="n">StepContext</span><span class="p">,</span>
+        <span class="n">count</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">DependencyGraphWalker</span><span class="p">,</span> <span class="n">StackCandidates</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Finalize pipeline - run dependency graph to resolve fully pinned down stacks.&quot;&quot;&quot;</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Finalizing stepping...&quot;</span><span class="p">)</span>
+        <span class="n">direct_dependencies_map</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">():</span> <span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_direct_dependencies</span><span class="p">()</span>
+        <span class="p">}</span>
+        <span class="n">transitive_dependencies_map</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">v</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">():</span> <span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_transitive_dependencies</span><span class="p">()</span>
+        <span class="p">}</span>
+
+        <span class="n">stack_candidates</span> <span class="o">=</span> <span class="n">StackCandidates</span><span class="p">(</span>
+            <span class="n">input_project</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="p">,</span>
+            <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
+            <span class="n">direct_dependencies_map</span><span class="o">=</span><span class="n">direct_dependencies_map</span><span class="p">,</span>
+            <span class="n">transitive_dependencies_map</span><span class="o">=</span><span class="n">transitive_dependencies_map</span><span class="p">,</span>
+        <span class="p">)</span>
+
         <span class="n">scored_package_tuple_pairs</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">step_context</span><span class="o">.</span><span class="n">dependency_graph_adaptation</span><span class="o">.</span><span class="n">to_scored_package_tuple_pairs</span><span class="p">()</span>
         <span class="p">)</span>
+
         <span class="c1"># It&#39;s important to have this sort stable so that we reflect relative ordering of paths</span>
         <span class="c1"># based on for example semver sort which have same score.</span>
         <span class="n">paths</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">scored_package_tuple_pairs</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
         <span class="c1"># We don&#39;t need actual score of paths and remove paths which are direct dependencies.</span>
-        <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
-            <span class="nb">set</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span> <span class="k">if</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="p">)</span>
         <span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span> <span class="k">if</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
         <span class="n">dependency_graph</span> <span class="o">=</span> <span class="n">DependencyGraphWalker</span><span class="p">(</span>
-            <span class="n">direct_dependencies</span><span class="o">=</span><span class="n">direct_dependencies</span><span class="p">,</span> <span class="n">paths</span><span class="o">=</span><span class="n">paths</span>
+            <span class="n">direct_dependencies</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">direct_dependencies_map</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span> <span class="n">paths</span><span class="o">=</span><span class="n">paths</span>
         <span class="p">)</span>
 
         <span class="n">estimated</span> <span class="o">=</span> <span class="n">dependency_graph</span><span class="o">.</span><span class="n">stacks_estimated</span>
@@ -251,7 +264,7 @@
             <span class="n">estimated</span><span class="p">,</span>
             <span class="n">estimated</span><span class="p">,</span>
         <span class="p">)</span>
-        <span class="k">return</span> <span class="n">dependency_graph</span>
+        <span class="k">return</span> <span class="n">dependency_graph</span><span class="p">,</span> <span class="n">stack_candidates</span>
 
     <span class="k">def</span> <span class="nf">_instantiate_strides</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Stride</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Instantiate stride classes with configuration supplied.&quot;&quot;&quot;</span>
@@ -347,21 +360,9 @@
 
         <span class="n">stacks_seen</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="n">stacks_added</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="n">direct_dependencies_map</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="n">v</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">():</span> <span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_direct_dependencies</span><span class="p">()</span>
-        <span class="p">}</span>
-        <span class="n">transitive_dependencies_map</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="n">v</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">():</span> <span class="n">v</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_transitive_dependencies</span><span class="p">()</span>
-        <span class="p">}</span>
-        <span class="n">stack_candidates</span> <span class="o">=</span> <span class="n">StackCandidates</span><span class="p">(</span>
-            <span class="n">input_project</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="p">,</span>
-            <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
-            <span class="n">direct_dependencies_map</span><span class="o">=</span><span class="n">direct_dependencies_map</span><span class="p">,</span>
-            <span class="n">transitive_dependencies_map</span><span class="o">=</span><span class="n">transitive_dependencies_map</span><span class="p">,</span>
-        <span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">strides</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running strides on stack candidates&quot;</span><span class="p">)</span>
-        <span class="n">dependency_graph</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_finalize_stepping</span><span class="p">(</span><span class="n">step_context</span><span class="p">)</span>
+        <span class="n">dependency_graph</span><span class="p">,</span> <span class="n">stack_candidates</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_finalize_stepping</span><span class="p">(</span><span class="n">step_context</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">stack_candidate</span> <span class="ow">in</span> <span class="n">dependency_graph</span><span class="o">.</span><span class="n">walk</span><span class="p">():</span>
                 <span class="n">stacks_seen</span> <span class="o">+=</span> <span class="mi">1</span>

@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.python.solver &#8212; Thoth Adviser 0.4.0 documentation</title>
+    <title>thoth.adviser.python.solver &#8212; Thoth Adviser 0.5.0 documentation</title>
     <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../../index.html">Thoth Adviser 0.4.0 documentation</a> &#187;</li>
+        <li><a href="../../../../index.html">Thoth Adviser 0.5.0 documentation</a> &#187;</li>
           <li><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -176,6 +176,10 @@
             <span class="n">solver_kwargs</span><span class="o">=</span><span class="n">solver_kwargs</span><span class="p">,</span>
             <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
         <span class="p">)</span>
+        <span class="c1"># Do not instantiate multiple objects for same python package tuple to optimize memory usage.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_package_versions</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># Have just one instance of Source object per python package source index url.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span> <span class="o">=</span> <span class="p">{}</span>
 
 <div class="viewcode-block" id="PythonPackageGraphSolver.solve"><a class="viewcode-back" href="../../../../thoth.adviser.python.html#thoth.adviser.python.solver.PythonPackageGraphSolver.solve">[docs]</a>    <span class="k">def</span> <span class="nf">solve</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -212,12 +216,22 @@
                 <span class="nb">list</span><span class="p">(</span><span class="n">resolved</span><span class="o">.</span><span class="n">values</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">all_versions</span> <span class="k">else</span> <span class="n">resolved</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
             <span class="p">):</span>
                 <span class="c1"># We only change version attribute that will be the resolved one.</span>
-                <span class="n">package_version</span> <span class="o">=</span> <span class="n">PackageVersion</span><span class="p">(</span>
-                    <span class="n">name</span><span class="o">=</span><span class="n">dependencies</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                    <span class="n">version</span><span class="o">=</span><span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">version</span><span class="p">,</span>
-                    <span class="n">index</span><span class="o">=</span><span class="n">Source</span><span class="p">(</span><span class="n">index_url</span><span class="p">),</span>
-                    <span class="n">develop</span><span class="o">=</span><span class="n">dependencies</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">develop</span><span class="p">,</span>
-                <span class="p">)</span>
+                <span class="n">package_tuple</span> <span class="o">=</span> <span class="p">(</span><span class="n">dependencies</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span><span class="p">)</span>
+                <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_package_versions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="p">:</span>
+                    <span class="n">source</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">source</span><span class="p">:</span>
+                        <span class="n">source</span> <span class="o">=</span> <span class="n">Source</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span> <span class="o">=</span> <span class="n">source</span>
+
+                    <span class="n">package_version</span> <span class="o">=</span> <span class="n">PackageVersion</span><span class="p">(</span>
+                        <span class="n">name</span><span class="o">=</span><span class="n">dependencies</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="n">version</span><span class="o">=</span><span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">version</span><span class="p">,</span>
+                        <span class="n">index</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
+                        <span class="n">develop</span><span class="o">=</span><span class="n">dependencies</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">develop</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_package_versions</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
+
                 <span class="k">if</span> <span class="n">all_versions</span><span class="p">:</span>
                     <span class="n">result</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
@@ -239,14 +253,23 @@
                 <span class="n">original_package</span> <span class="o">=</span> <span class="n">dependencies_map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
                 <span class="n">result_versions</span> <span class="o">=</span> <span class="p">[]</span>
                 <span class="k">for</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span> <span class="ow">in</span> <span class="n">versions</span> <span class="k">if</span> <span class="n">all_versions</span> <span class="k">else</span> <span class="p">[</span><span class="n">versions</span><span class="p">]:</span>
-                    <span class="n">result_versions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-                        <span class="n">PackageVersion</span><span class="p">(</span>
+                    <span class="n">package_tuple</span> <span class="o">=</span> <span class="p">(</span><span class="n">original_package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span><span class="p">)</span>
+                    <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_package_versions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="p">:</span>
+                        <span class="n">source</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="n">source</span><span class="p">:</span>
+                            <span class="n">source</span> <span class="o">=</span> <span class="n">Source</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span> <span class="o">=</span> <span class="n">source</span>
+
+                        <span class="n">package_version</span> <span class="o">=</span> <span class="n">PackageVersion</span><span class="p">(</span>
                             <span class="n">name</span><span class="o">=</span><span class="n">original_package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
                             <span class="n">version</span><span class="o">=</span><span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">version</span><span class="p">,</span>
-                            <span class="n">index</span><span class="o">=</span><span class="n">Source</span><span class="p">(</span><span class="n">index_url</span><span class="p">),</span>
+                            <span class="n">index</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
                             <span class="n">develop</span><span class="o">=</span><span class="n">original_package</span><span class="o">.</span><span class="n">develop</span><span class="p">,</span>
                         <span class="p">)</span>
-                    <span class="p">)</span>
+
+                    <span class="n">result_versions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
+
                 <span class="n">result</span><span class="p">[</span><span class="n">original_package</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">result_versions</span>
 
         <span class="k">return</span> <span class="n">result</span></div></div>
