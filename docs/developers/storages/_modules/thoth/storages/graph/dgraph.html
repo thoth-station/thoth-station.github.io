@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.graph.dgraph &#8212; Thoth Storages 0.17.0 documentation</title>
+    <title>thoth.storages.graph.dgraph &#8212; Thoth Storages 0.18.0 documentation</title>
     <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../../index.html">Thoth Storages 0.17.0 documentation</a> &#187;</li>
+        <li><a href="../../../../index.html">Thoth Storages 0.18.0 documentation</a> &#187;</li>
           <li><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -158,8 +158,8 @@
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">UsedInBuild</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">UsedInJob</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">UserSoftwareStack</span>
-<span class="kn">from</span> <span class="nn">.performance</span> <span class="k">import</span> <span class="n">ObservedPerformance</span>
-<span class="kn">from</span> <span class="nn">.performance</span> <span class="k">import</span> <span class="n">PERFORMANCE_MODEL_BY_NAME</span>
+<span class="kn">from</span> <span class="nn">.performance</span> <span class="k">import</span> <span class="n">ObservedPerformance</span><span class="p">,</span> <span class="n">PerformanceIndicatorBase</span>
+<span class="kn">from</span> <span class="nn">.performance</span> <span class="k">import</span> <span class="n">PERFORMANCE_MODEL_BY_NAME</span><span class="p">,</span> <span class="n">ALL_PERFORMANCE_MODELS</span>
 
 <span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">NotFoundError</span>
 <span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">PythonIndexNotRegistered</span>
@@ -2601,7 +2601,29 @@
             <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
             <span class="n">count</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;c&quot;</span><span class="p">]</span>
             <span class="n">tot_nodes_per_label</span><span class="p">[</span><span class="n">node_label</span><span class="p">]</span> <span class="o">=</span> <span class="n">count</span>
-        <span class="k">return</span> <span class="n">tot_nodes_per_label</span></div></div>
+        <span class="k">return</span> <span class="n">tot_nodes_per_label</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.get_all_pi_per_framework_count"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.get_all_pi_per_framework_count">[docs]</a>    <span class="k">def</span> <span class="nf">get_all_pi_per_framework_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">framework</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve dictionary with number of Performance Indicators per ML Framework in the graph database.&quot;&quot;&quot;</span>
+        <span class="n">pi_labels</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span> <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">ALL_PERFORMANCE_MODELS</span> <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">PerformanceIndicatorBase</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="n">tot_pi_per_type</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">pi_label</span> <span class="ow">in</span> <span class="n">pi_labels</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">            {</span>
+<span class="s2">                f(func: has(</span><span class="si">%s</span><span class="s2">)) @filter(eq(framework, &quot;</span><span class="si">%s</span><span class="s2">&quot;)){</span>
+<span class="s2">                    c: count(uid)</span>
+<span class="s2">                }</span>
+<span class="s2">            }</span>
+<span class="s2">            &quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span>
+                <span class="n">pi_label</span><span class="p">,</span>
+                <span class="n">framework</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
+            <span class="n">count</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;c&quot;</span><span class="p">]</span>
+            <span class="n">tot_pi_per_type</span><span class="p">[</span><span class="n">pi_label</span><span class="p">]</span> <span class="o">=</span> <span class="n">count</span>
+        <span class="k">return</span> <span class="n">tot_pi_per_type</span></div></div>
 </pre></div>
 
           </div>

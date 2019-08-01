@@ -324,6 +324,77 @@
     <span class="k">return</span> <span class="n">result</span>
 
 
+<span class="k">def</span> <span class="nf">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">root_dir</span><span class="p">):</span>
+    <span class="n">to_ret</span> <span class="o">=</span> <span class="nb">set</span><span class="p">({})</span>
+
+    <span class="c1"># We grep for &#39;0 A&#39; here because all exported symbols are outputted by nm like:</span>
+    <span class="c1"># 00000000 A GLIBC_1.x or:</span>
+    <span class="c1"># 0000000000000000 A GLIBC_1.x</span>
+    <span class="n">command</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;nm -D </span><span class="si">{root_dir}</span><span class="s2">/*so* | grep &#39;0 A&#39;&quot;</span>
+
+    <span class="c1"># Output of Popen is byte like, I decode it to a string to be able to use string functions</span>
+    <span class="n">out</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+
+    <span class="n">lines</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
+        <span class="n">columns</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">to_ret</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">columns</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">to_ret</span>
+
+
+<span class="k">def</span> <span class="nf">_root_lib_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="n">to_ret</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib64&quot;</span><span class="p">)):</span>
+        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib64&quot;</span><span class="p">))</span>
+        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;lib64&quot;</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib32&quot;</span><span class="p">)):</span>
+        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib32&quot;</span><span class="p">))</span>
+        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;lib32&quot;</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib&quot;</span><span class="p">)):</span>
+        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib&quot;</span><span class="p">))</span>
+        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;lib&quot;</span><span class="p">))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="s2">&quot;No usr libraries were found&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">to_ret</span>
+
+
+<span class="k">def</span> <span class="nf">_ld_config_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="n">to_ret</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;etc/&quot;</span><span class="p">)),</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;ld.so.conf&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">():</span>
+            <span class="n">paths</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">p</span><span class="p">),</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">conf_file</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">conf_path</span> <span class="ow">in</span> <span class="n">conf_file</span><span class="o">.</span><span class="n">readlines</span><span class="p">():</span>
+                        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">conf_path</span><span class="o">.</span><span class="n">strip</span><span class="p">()[</span><span class="mi">1</span><span class="p">:])</span>
+
+    <span class="k">return</span> <span class="n">to_ret</span>
+
+
+<span class="c1"># NOTE: Commented out func call below until LD_LIBR... is propagated properly</span>
+<span class="k">def</span> <span class="nf">_ld_env_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="n">to_ret</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">ld_paths</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;LD_LIBRARY_PATH&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ld_paths</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">to_ret</span>
+
+    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">ld_paths</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">):</span>
+        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span>
+
+    <span class="k">return</span> <span class="n">to_ret</span>
+
+
+<span class="k">def</span> <span class="nf">_get_system_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="n">to_ret</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_root_lib_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="c1"># to_ret |= _ld_config_symbols(path)</span>
+    <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_ld_env_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">to_ret</span><span class="p">)</span>
+
+
 <span class="k">def</span> <span class="nf">_get_layer_digest_v1</span><span class="p">(</span><span class="n">layer_def</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Get digest of a layer for v1 container image format.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">layer_def</span><span class="p">[</span><span class="s2">&quot;blobSum&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -429,6 +500,7 @@
         <span class="s2">&quot;deb-dependencies&quot;</span><span class="p">:</span> <span class="n">_run_apt_cache_show</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">deb_packages</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">),</span>
         <span class="s2">&quot;python-files&quot;</span><span class="p">:</span> <span class="n">_gather_python_file_digests</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
         <span class="s2">&quot;operating-system&quot;</span><span class="p">:</span> <span class="n">_gather_os_info</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+        <span class="s2">&quot;system-symbols&quot;</span><span class="p">:</span> <span class="n">_get_system_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
     <span class="p">}</span></div>
 </pre></div>
 
