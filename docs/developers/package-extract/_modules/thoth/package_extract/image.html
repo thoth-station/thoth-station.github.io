@@ -69,6 +69,11 @@
 <span class="kn">from</span> <span class="nn">shlex</span> <span class="k">import</span> <span class="n">quote</span>
 <span class="kn">import</span> <span class="nn">hashlib</span>
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="k">import</span> <span class="n">Path</span>
+<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Generator</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">deque</span>
 
 <span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="k">import</span> <span class="n">run_command</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="k">import</span> <span class="n">cwd</span>
@@ -76,8 +81,6 @@
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">InvalidImageError</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">NotSupported</span>
 <span class="kn">from</span> <span class="nn">.rpmlib</span> <span class="k">import</span> <span class="n">parse_nvra</span>
-
-<span class="kn">import</span> <span class="nn">subprocess</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -119,15 +122,17 @@
             <span class="n">package</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;package: &quot;</span><span class="p">):]</span>
             <span class="k">if</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="s2">&quot;Package </span><span class="si">{!r}</span><span class="s2"> was already stated in the repoquery output, &quot;</span>
-                    <span class="s2">&quot;dependencies will be appended&quot;</span>
+                    <span class="s2">&quot;Package </span><span class="si">%r</span><span class="s2"> was already stated in the repoquery output, &quot;</span>
+                    <span class="s2">&quot;dependencies will be appended&quot;</span><span class="p">,</span>
+                    <span class="n">package</span>
                 <span class="p">)</span>
                 <span class="k">continue</span>
             <span class="n">result</span><span class="p">[</span><span class="n">package</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">elif</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;dependency: &quot;</span><span class="p">):</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">package</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                    <span class="s2">&quot;Stated dependency </span><span class="si">%r</span><span class="s2"> has no package associated (parser error?), this error is not fatal&quot;</span>
+                    <span class="s2">&quot;Stated dependency </span><span class="si">%r</span><span class="s2"> has no package associated (parser error?), this error is not fatal&quot;</span><span class="p">,</span>
+                    <span class="n">package</span>
                 <span class="p">)</span>
             <span class="n">result</span><span class="p">[</span><span class="n">package</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">line</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;dependency: &quot;</span><span class="p">):])</span>
 
@@ -326,75 +331,112 @@
     <span class="k">return</span> <span class="n">result</span>
 
 
-<span class="k">def</span> <span class="nf">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">root_dir</span><span class="p">):</span>
-    <span class="n">to_ret</span> <span class="o">=</span> <span class="nb">set</span><span class="p">({})</span>
+<span class="k">def</span> <span class="nf">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">container_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Get library symbols from a directory.&quot;&quot;&quot;</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="n">path</span>
+    <span class="k">for</span> <span class="n">so_file_path</span> <span class="ow">in</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">container_path</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="s2">&quot;*.so*&quot;</span><span class="p">)):</span>
+        <span class="c1"># We grep for &#39;0 A&#39; here because all exported symbols are outputted by nm like:</span>
+        <span class="c1"># 00000000 A GLIBC_1.x or:</span>
+        <span class="c1"># 0000000000000000 A GLIBC_1.x</span>
+        <span class="n">command</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;nm -D </span><span class="si">{so_file_path!r}</span><span class="s2"> | grep &#39;0 A&#39;&quot;</span>
 
-    <span class="c1"># We grep for &#39;0 A&#39; here because all exported symbols are outputted by nm like:</span>
-    <span class="c1"># 00000000 A GLIBC_1.x or:</span>
-    <span class="c1"># 0000000000000000 A GLIBC_1.x</span>
-    <span class="n">command</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;nm -D </span><span class="si">{root_dir}</span><span class="s2">/*so* | grep &#39;0 A&#39;&quot;</span>
+        <span class="c1"># Drop path to the extracted container in the output.</span>
+        <span class="n">so_file_path</span> <span class="o">=</span> <span class="n">so_file_path</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">container_path</span><span class="p">):]</span>
 
-    <span class="c1"># Output of Popen is byte like, I decode it to a string to be able to use string functions</span>
-    <span class="n">out</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">shell</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Gathering symbols from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">so_file_path</span><span class="p">)</span>
+        <span class="n">command_result</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">120</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">command_result</span><span class="o">.</span><span class="n">return_code</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Failed to obtain library symbols from </span><span class="si">%r</span><span class="s2">; stderr: </span><span class="si">%s</span><span class="s2">, stdout: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">so_file_path</span><span class="p">,</span>
+                <span class="n">command_result</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span>
+                <span class="n">command_result</span><span class="o">.</span><span class="n">stdout</span>
+            <span class="p">)</span>
+            <span class="k">continue</span>
 
-    <span class="n">lines</span> <span class="o">=</span> <span class="n">out</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">:</span>
-        <span class="n">columns</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
-            <span class="n">to_ret</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">columns</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
-    <span class="k">return</span> <span class="n">to_ret</span>
+        <span class="k">if</span> <span class="n">so_file_path</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">so_file_path</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
 
-
-<span class="k">def</span> <span class="nf">_root_lib_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-    <span class="n">to_ret</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib64&quot;</span><span class="p">)):</span>
-        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib64&quot;</span><span class="p">))</span>
-        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;lib64&quot;</span><span class="p">))</span>
-    <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib32&quot;</span><span class="p">)):</span>
-        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib32&quot;</span><span class="p">))</span>
-        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;lib32&quot;</span><span class="p">))</span>
-    <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib&quot;</span><span class="p">)):</span>
-        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib&quot;</span><span class="p">))</span>
-        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;lib&quot;</span><span class="p">))</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="s2">&quot;No usr libraries were found&quot;</span><span class="p">)</span>
-
-    <span class="k">return</span> <span class="n">to_ret</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">command_result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+            <span class="n">columns</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">columns</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">so_file_path</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">columns</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
 
 
-<span class="k">def</span> <span class="nf">_ld_config_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-    <span class="n">to_ret</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-    <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;etc/&quot;</span><span class="p">)),</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;ld.so.conf&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">():</span>
-            <span class="n">paths</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
-            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
-                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">p</span><span class="p">),</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">conf_file</span><span class="p">:</span>
-                    <span class="k">for</span> <span class="n">conf_path</span> <span class="ow">in</span> <span class="n">conf_file</span><span class="o">.</span><span class="n">readlines</span><span class="p">():</span>
-                        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">conf_path</span><span class="o">.</span><span class="n">strip</span><span class="p">()[</span><span class="mi">1</span><span class="p">:])</span>
+<span class="k">def</span> <span class="nf">_ld_config_entries</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Iterate over entries in ld.so.conf, recursively.&quot;&quot;&quot;</span>
+    <span class="n">stack</span> <span class="o">=</span> <span class="n">deque</span><span class="p">([(</span><span class="s2">&quot;etc&quot;</span><span class="p">,</span> <span class="s2">&quot;ld.so.conf&quot;</span><span class="p">)])</span>
 
-    <span class="k">return</span> <span class="n">to_ret</span>
+    <span class="k">while</span> <span class="n">stack</span><span class="p">:</span>
+        <span class="n">relative_path</span><span class="p">,</span> <span class="n">conf_file</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">relative_path</span><span class="p">,</span> <span class="n">conf_file</span><span class="p">),</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;include &quot;</span><span class="p">):</span>
+                        <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;include &quot;</span><span class="p">):]</span>
+                        <span class="c1"># Includes are relative to /etc/</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">):</span>
+                            <span class="n">line</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;etc&quot;</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span><span class="p">:</span>
+                        <span class="k">continue</span>
+
+                    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">):</span>
+                        <span class="n">to_glob</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">line</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">to_glob</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">relative_path</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+
+                    <span class="k">for</span> <span class="n">entry_path</span> <span class="ow">in</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">to_glob</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">entry_path</span><span class="p">):</span>
+                            <span class="k">yield</span> <span class="n">line</span>
+                        <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">entry_path</span><span class="p">):</span>
+                            <span class="c1"># ld.so.conf can point to another configuration files.</span>
+                            <span class="c1"># &quot;foo/nar&quot;</span>
+                            <span class="n">stack</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                                <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">relative_path</span><span class="p">,</span> <span class="n">conf_file</span><span class="p">)),</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">entry_path</span><span class="p">))</span>
+                            <span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Skipping entry </span><span class="si">%r</span><span class="s2"> from symbols extraction not a file or directory&quot;</span><span class="p">,</span> <span class="n">line</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Failed to analyze file </span><span class="si">%r</span><span class="s2"> for available symbols: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">conf_file</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
 
 
-<span class="c1"># NOTE: Commented out func call below until LD_LIBR... is propagated properly</span>
-<span class="k">def</span> <span class="nf">_ld_env_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-    <span class="n">to_ret</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-    <span class="n">ld_paths</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;LD_LIBRARY_PATH&quot;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_ld_config_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Gather library symbols based on ld.so.conf.&quot;&quot;&quot;</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Gathering symbols based on ld.so.conf file&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">_ld_config_entries</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">entry</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Cannot load symbols from </span><span class="si">%r</span><span class="s2"> (based on ld.so.conf configuration): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">entry</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">_ld_env_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Gather library symbols based on entries in LD_LIBRARY_PATH environment variable.&quot;&quot;&quot;</span>
+    <span class="n">ld_paths</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;LD_LIBRARY_PATH&quot;</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">ld_paths</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">to_ret</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No LD_LIBRARY_PATH detected to gather system symbols&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
 
     <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">ld_paths</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">):</span>
-        <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">:]))</span>
-
-    <span class="k">return</span> <span class="n">to_ret</span>
+        <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
 
 
-<span class="k">def</span> <span class="nf">_get_system_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-    <span class="n">to_ret</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-    <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_root_lib_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
-    <span class="c1"># to_ret |= _ld_config_symbols(path)</span>
-    <span class="n">to_ret</span> <span class="o">|=</span> <span class="n">_ld_env_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
-    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">to_ret</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">_get_system_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+    <span class="sd">&quot;&quot;&quot;Get library symbols found in relevant directories, configuration and environment variables.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib64&quot;</span><span class="p">)</span>
+    <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="s2">&quot;lib64&quot;</span><span class="p">)</span>
+    <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib32&quot;</span><span class="p">)</span>
+    <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="s2">&quot;lib32&quot;</span><span class="p">)</span>
+    <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="s2">&quot;usr/lib&quot;</span><span class="p">)</span>
+    <span class="n">_get_lib_dir_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">path</span><span class="p">,</span> <span class="s2">&quot;lib&quot;</span><span class="p">)</span>
+    <span class="n">_ld_config_symbols</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+    <span class="c1"># XXX: Commented out as we need to handle environment variables for this during container image extraction.</span>
+    <span class="c1"># _ld_env_symbols(result, path)</span>
+    <span class="c1"># Convert to list as a result, also good for serialization into JSON happening later on.</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">path</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">symbols</span><span class="p">)</span> <span class="k">for</span> <span class="n">path</span><span class="p">,</span> <span class="n">symbols</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
 
 
 <span class="k">def</span> <span class="nf">_get_layer_digest_v1</span><span class="p">(</span><span class="n">layer_def</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
