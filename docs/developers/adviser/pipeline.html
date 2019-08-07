@@ -53,171 +53,244 @@
 <p>In this section, one can find the developer’s introduction to stack generation
 pipeline used in Thoth’s adviser to generate stacks.</p>
 <p>The pipeline is used to prepare, generate, filter and score software stacks.
-Input to the pipeline is Thoth’s <cite>Project</cite> abstraction carrying information
-about direct dependencies for an application together optional additional
-vector stating runtime environment and hardware available. An optional
-parameter is also library usage, which is an output of tool called <a href="#id3"><span class="problematic" id="id4">`Invectio
-https://github.com/thoth-station/invectio`_</span></a> (static source code analysis which
-states which relevant parts of libraries are used). The output of the pipeline
-is a list of generated <a href="#id1"><span class="problematic" id="id2">`</span></a>Project`s, but with dependencies locked to a specific
-version based on pipeline results. The pipeline is dynamically created based on
-attributes to the stack generation pipeline (direct dependencies, library
-usage, runtime environment characteristics, hardware used, …).</p>
-<p>The pipeline consists of the following two types of units (see Thoth’s
-<cite>PipelineUnitBase</cite> base class):</p>
+The input to the pipeline is Thoth’s <cite>Project</cite> abstraction carrying information
+about direct dependencies for an application together with optional additional
+vector stating software environment, hardware available and also other
+information (see bellow for a complete listing).</p>
+<p>The output of the pipeline is a list of generated <cite>Project</cite> instances, with
+dependencies locked to a specific version based on pipeline results together
+with a score and justification on why a certain stack is better than another
+one.  The pipeline is dynamically created based on the incoming vector to the
+stack generation pipeline.</p>
+<p>The pipeline consists of the following three types of units:</p>
 <ul class="simple">
+<li><p><code class="xref py py-class docutils literal notranslate"><span class="pre">Sieve</span></code></p></li>
 <li><p><a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step.Step" title="thoth.adviser.python.pipeline.step.Step"><code class="xref py py-class docutils literal notranslate"><span class="pre">Step</span></code></a></p></li>
 <li><p><a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stride.Stride" title="thoth.adviser.python.pipeline.stride.Stride"><code class="xref py py-class docutils literal notranslate"><span class="pre">Stride</span></code></a></p></li>
 </ul>
-<p>These units are provided as a list of steps or strides to <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.pipeline.Pipeline" title="thoth.adviser.python.pipeline.pipeline.Pipeline"><code class="xref py py-class docutils literal notranslate"><span class="pre">Pipeline</span></code></a> constructor. They are
-executed respecting their relative order in the supplied list.</p>
-<div class="section" id="steps">
-<h2>Steps<a class="headerlink" href="#steps" title="Permalink to this headline">¶</a></h2>
-<p>A <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step.Step" title="thoth.adviser.python.pipeline.step.Step"><code class="xref py py-class docutils literal notranslate"><span class="pre">Step</span></code></a> abstracts away simple
-operations on “paths” - paths stating serialized dependency graph into a list
-of package tuples, where each package tuple (made out of package name, version
-and index URL) states how a resolution might look like. A list of these lists
-is in fact serialized dependency graph which is being traversed in dependency
-graph implemented in <a class="reference internal" href="libdependency_graph.html#libdependency-graph"><span class="std std-ref">libdependency_graph.so</span></a>.</p>
-<p>Before a first step is executed, there is run initialization (called
-“initialize stepping” in sources) which queries graph database (respecting
-solver information) and returns back a list of paths for the given set of
-direct dependencies of the supplied project.</p>
-<p>A step then operates on a context called <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext" title="thoth.adviser.python.pipeline.step_context.StepContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">step</span> <span class="pre">context</span></code></a> which provides core
-routines on paths and packages which are candidates for resolution (together
-with all their transitive dependencies). The main aim of a step implementation
-can be:</p>
+<p>These units are provided as a list of concrete sieve, step and stride
+implementations to <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.pipeline.Pipeline" title="thoth.adviser.python.pipeline.pipeline.Pipeline"><code class="xref py py-class docutils literal notranslate"><span class="pre">Pipeline</span></code></a> constructor. They are
+executed respecting their relative order in the supplied list (this is a lot of
+times important relation as they might depend on each other).</p>
+<p>The vector coming into the recommendation pipeline consists of the following
+features:</p>
 <ul class="simple">
-<li><p>Prioritize packages in the output project stream which have some impact on software stacks (e.g. make sure first stacks generated out of pipeline have packages or group of packages which have positive performance impact)</p></li>
-<li><p>Remove packages and paths which have bad impact on generated software stacks (e.g. some packages cannot run together because of API incompatibility which is captured in Thoth’s knowledge base)</p></li>
+<li><p>direct dependencies for the application - <em>required</em></p></li>
+<li><p>recommendation type - <em>required</em></p></li>
+<li><p>static source code analysis - library usage - <em>optional</em></p></li>
+<li><p>software environment - <em>optional</em></p></li>
+<li><p>hardware environment - <em>optional</em></p></li>
 </ul>
+<p>A more detailed description of each feature is described bellow.</p>
+<div class="section" id="direct-dependencies-for-the-application">
+<h2>Direct dependencies for the application<a class="headerlink" href="#direct-dependencies-for-the-application" title="Permalink to this headline">¶</a></h2>
+<p>Direct dependencies of the application - these dependencies are coming to the
+resolver but they can also be used in the pipeline builder to configure stack
+generation pipeline (sieves, steps and strides) to be configured for a
+specific application.</p>
 </div>
-<div class="section" id="strides">
-<h2>Strides<a class="headerlink" href="#strides" title="Permalink to this headline">¶</a></h2>
-<p>Strides operate on stack candidates - see <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stack_candidates.StackCandidates" title="thoth.adviser.python.pipeline.stack_candidates.StackCandidates"><code class="xref py py-class docutils literal notranslate"><span class="pre">stack</span> <span class="pre">candidate</span>
-<span class="pre">implementation</span></code></a> and
-<a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stride_context.StrideContext" title="thoth.adviser.python.pipeline.stride_context.StrideContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">stride</span> <span class="pre">context</span></code></a>. The input to a
-stride is a fully resolved software stack encapsulated in <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stride_context.StrideContext" title="thoth.adviser.python.pipeline.stride_context.StrideContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">stride</span>
-<span class="pre">context</span></code></a> (each and
-every package is locked to a specific version coming from a specific Python
-package index). Stride is then used to:</p>
+<div class="section" id="static-source-code-analysis-library-usage">
+<h2>Static source code analysis - library usage<a class="headerlink" href="#static-source-code-analysis-library-usage" title="Permalink to this headline">¶</a></h2>
+<p>A user can use static source code analysis on the client side when asking for
+advises. In that case, sources are scanned for library imports and
+calls (<a href="#id2"><span class="problematic" id="id3">`Invectio https://github.com/thoth-station/invectio`_</span></a> is used). The
+gathered library usage captures libraries and what symbols are used from these
+libraries in sources. This information can be subsequently used in recommendations
+(in stack generation pipeline) to target recommendations specific to user’s application.</p>
+</div>
+<div class="section" id="recommendation-type">
+<h2>Recommendation type<a class="headerlink" href="#recommendation-type" title="Permalink to this headline">¶</a></h2>
+<p>To target user specific requirements for the recommended application stack, there
+were introduced three types of recommendations:</p>
 <ul class="simple">
-<li><p>Decide whether the resolved software stack should be included in the output (e.g. random sampling of generated software stacks on <a class="reference internal" href="dependency_monkey.html#dependency-monkey"><span class="std std-ref">on Dependency Monkey runs</span></a>)</p></li>
-<li><p>Score the resulting software stack (e.g. performance based scoring) - once the stack generation pipeline is finished, the pipeline generates recommended pinned down software stacks</p></li>
+<li><p><strong>LATEST</strong></p></li>
+<li><p><strong>TESTING</strong></p></li>
+<li><p><strong>STABLE</strong></p></li>
 </ul>
+<p><strong>Latest</strong> recommendations recommend the most latest versions of libraries. This
+functionality somehow mimics raw pip or Pipenv but recommended latest versions are
+already analyzed by Thoth and respect package source index configuration the user used.</p>
+<p><strong>Stable</strong> recommendations target the most suited software stacks which, based on
+Thoth’s gathered observations, are considered as stable - always running in
+the given runtime environment.</p>
+<p><strong>Testing</strong> recommendation types recommend software for which there are no negative
+observations but they might not behave stable in all cases.</p>
 </div>
-<div class="section" id="pipeline-architecture-dynamic-pipeline-creation">
-<h2>Pipeline Architecture - Dynamic Pipeline Creation<a class="headerlink" href="#pipeline-architecture-dynamic-pipeline-creation" title="Permalink to this headline">¶</a></h2>
-<p>How pipeline looks like - what steps and what strides (pipeline units) create pipeline, is determined dynamically based on:</p>
+<div class="section" id="software-environment">
+<h2>Software environment<a class="headerlink" href="#software-environment" title="Permalink to this headline">¶</a></h2>
+<p>Software environment is yet another vector coming to the recommendation engine.
+It states additional software present in the environment, such as operating
+system, Python interpreter version or IPython information in case of Jupyter
+Notebooks.</p>
+<p>Software environment can be automatically detected by <a class="reference external" href="https://github.com/thoth-station/thamos">Thamos</a> - a user can use Thoth to get
+recommendations for the same application when running in different software
+(and also hardware) environments (for example different setup for a cluster
+and a local desktop run).</p>
+<p>Software environment together with hardware environment form “<em>runtime environment</em>”.</p>
+</div>
+<div class="section" id="hardware-environment">
+<h2>Hardware environment<a class="headerlink" href="#hardware-environment" title="Permalink to this headline">¶</a></h2>
+<p>Hardware environment is stating what hardware is present to run the given
+application. <a class="reference external" href="https://github.com/thoth-station/thamos">Thamos</a> is capable to
+perform hardware discovery as well (besides software environment discovery). An
+example of hardware environment configuration can be GPU or CPU type.</p>
+<div class="section" id="pipeline-units">
+<h3>Pipeline units<a class="headerlink" href="#pipeline-units" title="Permalink to this headline">¶</a></h3>
+<p>The whole recommendation engine is designed as a pipeline which is made out of
+3 unit types described in the upcoming sections. The configuration of pipeline
+(how these units are grouped together and how are they relatively organized) is
+determined dynamically on user request based on the vector described above to
+target user specific requirements for the application and runtime environment
+where the application runs in.</p>
+<p>The order of pipeline unit types is set by stack generation pipeline
+implementation to semantically distinguish how pipeline units form and score
+the produced software stacks:</p>
 <ol class="arabic simple">
-<li><p>Static analysis of user’s source code using <a class="reference external" href="https://github.com/thoth-station/invectio/">Invectio</a> to find out which library parts are used by user’s application so a specific pipeline units are picked to construct the pipeline</p></li>
-<li><p>Direct dependencies of user’s application</p></li>
-<li><p>Hardware used to run the application</p></li>
-<li><p>Software environment - environment in which the user’s application runs in</p></li>
-<li><p>Additional feature which is also one of:</p></li>
+<li><p><em>Sieves</em> on direct dependencies</p></li>
+<li><p><em>Steps</em> on dependency graph</p></li>
+<li><p><em>Strides</em> on produced software stacks</p></li>
 </ol>
-<blockquote>
-<div><ol class="arabic simple">
-<li><p>Recommendation type (e.g. testing, stable, latest, …) - used for adviser specific stack generation pipelines (see below)</p></li>
-<li><p>Decision function - used in <a class="reference internal" href="dependency_monkey.html#dependency-monkey"><span class="std std-ref">Dependency Monkey</span></a> to judge which software stack will be inspected on Amun service to gather more observations to Thoth’s knowledge base or to save computational resources (see below)</p></li>
-</ol>
-</div></blockquote>
-<p>This dynamic pipeline creation is done in <a class="reference internal" href="thoth.adviser.python.html#thoth.adviser.python.builder.PipelineBuilder" title="thoth.adviser.python.builder.PipelineBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">pipeline</span> <span class="pre">builder</span></code></a>. The main aim of this
-builder is to construct pipeline steps, respecting their relative order and
-their parameters.</p>
-<p>The pipeline builder has two main methods:</p>
-<ul class="simple">
-<li><p><a class="reference internal" href="thoth.adviser.python.html#thoth.adviser.python.builder.PipelineBuilder.get_adviser_pipeline_config" title="thoth.adviser.python.builder.PipelineBuilder.get_adviser_pipeline_config"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_adviser_pipeline_config</span></code></a> - this method constructs pipeline steps and strides for an adviser run</p></li>
-<li><p><a class="reference internal" href="thoth.adviser.python.html#thoth.adviser.python.builder.PipelineBuilder.get_dependency_monkey_pipeline_config" title="thoth.adviser.python.builder.PipelineBuilder.get_dependency_monkey_pipeline_config"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_dependency_monkey_pipeline_config</span></code></a> - this method constructs pipeline steps and strides for a Dependency Monkey run</p></li>
-</ul>
+<p>The order of each pipeline unit implementation inside the group is then formed
+in the stack generation pipeline builder respecting the input vector (see below).</p>
+</div>
+</div>
+<div class="section" id="sieve">
+<h2>Sieve<a class="headerlink" href="#sieve" title="Permalink to this headline">¶</a></h2>
+<p>The very first type of a pipeline unit is called <code class="xref py py-class docutils literal notranslate"><span class="pre">Sieve</span></code>. This pipeline unit works on a
+list of direct dependencies in specific versions (which were resolved based on
+Thoth’s knowledge base) and its aim is to filter out direct dependencies which
+are not suitable. An example can be a sieve that filters out direct
+dependencies which are known for issues based on supplied user’s library usage.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Pipeline builder has attributes such as graph database which can be used to derive additional information. You can query graph database for observations to judge which pipeline units should be excluded or included together with their parameters.</p>
+<p>When to use a sieve?</p>
+<p>If you want to do operations solely on direct dependencies. Each sieve can be written as a step, but by using a sieve you will reduce the overhead needed to construct additional data structures for dependency graph and optimize some of the queries done to the Thoth’s knowledge base.</p>
 </div>
-<a class="reference external image-reference" href="_static/pipeline.png"><img alt="Stack generation pipeline" src="_images/pipeline.png" /></a>
-<p>If you take a look at the builder implementation, you can see that each step
-and stride accepts also configuration (which can be <cite>None</cite> or a dictionary).
-Pipeline builder can parametrize these pipeline units based on its input
-vectors (e.g. be less pedantic on security vulnerabilities for testing
-stacks).</p>
-</div>
-<div class="section" id="developing-own-pipeline-units">
-<h2>Developing own pipeline units<a class="headerlink" href="#developing-own-pipeline-units" title="Permalink to this headline">¶</a></h2>
-<p>As stated earlier, there are two core building blogs (units) of in a stack generation pipeline:</p>
-<ol class="arabic simple">
-<li><p>Steps</p></li>
-<li><p>Strides</p></li>
-</ol>
-<p><strong>When do I want to implement a step?</strong></p>
-<p>Steps work on packages (one or multiple) or paths in dependency graph - they
-adjust dependency graph structure <em>before the actual resoltion</em>. Thus a
-use-case for a step would be:</p>
-<ol class="arabic simple">
-<li><p>You want to filter out packages from resolution (e.g. installation-time errors).</p></li>
-<li><p>You want to penalize packages in resolved software stacks (e.g. security vulnerabilities).</p></li>
-<li><p>You want to prioritize packages in resolved software stacks (e.g. good performance).</p></li>
-</ol>
-<p><strong>When do I want to implement a stride?</strong></p>
-<p>Strides operate on fully resolved software stacks - they accept a list of
-pinned down packages which should be included in the final software stack. An
-example ucases would be:</p>
-<ol class="arabic simple">
-<li><p>You want to filter our some software stacks because of some bad aspect (e.g. a group of packages are not installable into the given runtime environment).</p></li>
-<li><p>You want to prioritze some software stacks based on some characteristics (e.g. good performance).</p></li>
-<li><p>You want to de-prioritize some software stacks based on some characteristics (e.g. bad performance).</p></li>
-<li><p>You want to notify user in the software stack justification about some fact (e.g. warning that Thoth does not have relevant data for some resovled packages).</p></li>
-</ol>
-<p>In both cases, steps and strides should be atomic pieces and <a class="reference external" href="https://en.wikipedia.org/wiki/Unix_philosophy">they should do
-one thing and do it well</a>.</p>
-<p>Steps are instantiated once and each one is run once for step context passed
-between them - the execution respects relative positioning of steps in the step
-lists as created by pipeline builder.</p>
-<p>Strides are instantiated once per a pipeline run, so they can keep state on
-stacks which were passed during pipeline run. As in case of steps, the relative
-positioning of strides (as ordered by pipeline builder) is respected.</p>
-<div class="section" id="developing-own-pipeline-step">
-<h3>Developing own pipeline step<a class="headerlink" href="#developing-own-pipeline-step" title="Permalink to this headline">¶</a></h3>
-<p>To implement a pipeline step, simply derive from <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext" title="thoth.adviser.python.pipeline.step_context.StepContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">StepContext</span></code></a> and implement the
-<code class="docutils literal notranslate"><span class="pre">run</span></code> method:</p>
+<p><strong>Example</strong></p>
+<p>See <a class="reference external" href="https://github.com/tensorflow/tensorflow/issues/30990">this upstream issue</a>. In summary, if user
+uses <cite>LSTM</cite> and <cite>ModelCheckpoint</cite> in a TensorFlow application at the same time
+the model does not work well. An example implementation of a sieve to target
+this issue can be (note the implementation is artificial as the issue was
+present only in nightly builds):</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 
-<span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">Step</span>
-<span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">StepContext</span>
-<span class="kn">from</span> <span class="nn">thoth.adviser.python.dependency_graph</span> <span class="kn">import</span> <span class="n">CannotRemovePackage</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">Sieve</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">SieveContext</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<span class="k">class</span> <span class="nc">Foo</span><span class="p">(</span><span class="n">Step</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;An example Foo step which is removing some packages randomly.&quot;&quot;&quot;</span>
+<span class="k">class</span> <span class="nc">LSTMModelCheckpointIssue</span><span class="p">(</span><span class="n">Sieve</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Filter out direct dependencies based on TensorFlow issue #30990.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">step_context</span><span class="p">:</span> <span class="n">StepContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="bp">None</span><span class="p">:</span>
-          <span class="sd">&quot;&quot;&quot;Remove packages randomly from dependency graph.&quot;&quot;&quot;</span>
-          <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_all_dependencies_tuple</span><span class="p">():</span>
-              <span class="k">if</span> <span class="ow">not</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">([</span><span class="bp">True</span><span class="p">,</span> <span class="bp">False</span><span class="p">]):</span>
-                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Package </span><span class="si">%r</span><span class="s2"> will not be removed&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
-                 <span class="k">continue</span>
-
-              <span class="k">try</span><span class="p">:</span>
-                 <span class="k">with</span> <span class="n">step_context</span><span class="o">.</span><span class="n">change</span><span class="p">(</span><span class="n">graceful</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span> <span class="k">as</span> <span class="n">step_change</span><span class="p">:</span>
-                     <span class="n">step_change</span><span class="o">.</span><span class="n">remove_package_tuple</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
-                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Package </span><span class="si">%r</span><span class="s2"> was removed&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
-              <span class="k">except</span> <span class="n">CannotRemovePackage</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Package </span><span class="si">%r</span><span class="s2"> cannot be removed: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sieve_context</span><span class="p">:</span> <span class="n">SieveContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Filter out TensorFlow releases which have issues with LSTM and ModelCheckpoint use.&quot;&quot;&quot;</span>
+        <span class="n">tensorflow_usage</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">library_usage</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tensorflow&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="k">if</span> <span class="s2">&quot;tensorflow.keras.callbacks.ModelCheckpoint&quot;</span> <span class="ow">in</span> <span class="n">tensorflow_usage</span> <span class="ow">and</span> <span class="s2">&quot;tensorflow.python.keras.layers.LSTM&quot;</span> <span class="ow">in</span> <span class="n">tensorflow_usage</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">sieve_context</span><span class="o">.</span><span class="n">iter_package_versions</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">&quot;tensorflow&quot;</span> <span class="ow">or</span> <span class="nb">list</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span><span class="p">)</span> <span class="o">!=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="bp">None</span><span class="p">,</span> <span class="bp">None</span><span class="p">]:</span>
+                    <span class="c1"># Not 2.0.0 release with the given issue.</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Package </span><span class="si">%r</span><span class="s2"> not affecting issue #30990&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">())</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">sieve_context</span><span class="o">.</span><span class="n">remove_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Package </span><span class="si">%r</span><span class="s2"> excluded due to LSTM and ModelCheckpoint issue #30990&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">())</span>
+                    <span class="k">except</span> <span class="n">CannotRemovePackage</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                        <span class="c1"># Removing would cause invalidity - e.g. all direct dependencies of type TensorFlow would be removed.</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Cannot remove package </span><span class="si">%r</span><span class="s2">, user might encounter TensorFlow issue #30990: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">(),</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;ModelCheckPoint and LSTM not used at the same time&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>The context manager used when accessing <code class="xref py py-func docutils literal notranslate"><span class="pre">StepContext</span></code> is acting as a
+<p>Note the sieve can be added to the stack generation pipeline by pipeline
+builder only if <cite>ModelCheckpoint</cite> and <cite>LSTM</cite> are used together to reduce
+overhead running this sieve in cases when its not desired (see bellow for
+more info).</p>
+<p>A <cite>CannotRemovePackage</cite> exception can be raised if the given package cannot be
+removed.</p>
+<p>Once all sieves are run, Thoth obtains the whole dependency graph out of its
+knowledge base and next pipeline units can be run - steps.</p>
+</div>
+<div class="section" id="steps">
+<h2>Steps<a class="headerlink" href="#steps" title="Permalink to this headline">¶</a></h2>
+<p>A <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step.Step" title="thoth.adviser.python.pipeline.step.Step"><code class="xref py py-class docutils literal notranslate"><span class="pre">Step</span></code></a> abstracts away
+operations on top of dependency graph. One can perform transactional operations
+on top of dependency graph - mark some of the nodes for
+removal in a transaction and once the transaction is committed the logic behind step context
+<a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext" title="thoth.adviser.python.pipeline.step_context.StepContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">step</span> <span class="pre">context</span></code></a>
+ensures the validity of the transaction.</p>
+<p>Besides removal of packages in the dependency graph, one can also score some of
+the packages. When scoring the dependency graph is adjusted in a way the better
+a package score has the higher precedence it has in the final resolution (the
+dependency graph is weighted graph). The score can be positive, but also
+negative (penalize the given package in resolution).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When to use a step?</p>
+<p>If you want to:</p>
+<ul class="simple">
+<li><p>Filter out packages from resolution (e.g. installation-time errors)</p></li>
+<li><p>Penalize packages in resolved software stacks (e.g. security vulnerabilities)</p></li>
+<li><p>Prioritize packages in resolved software stacks (e.g. good performance)</p></li>
+</ul>
+</div>
+<p><strong>Example</strong></p>
+<p>An example implementation of a step can be found below. The implementation of
+the step iterates over all packages present in the dependency graph and
+packages which are pre-releases based on semantic version are removed.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.dependency_graph</span> <span class="kn">import</span> <span class="n">CannotRemovePackage</span>
+
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">Step</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">StepContext</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">CutPreReleases</span><span class="p">(</span><span class="n">Step</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Cut-off pre-releases if project does not explicitly allows them.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">step_context</span><span class="p">:</span> <span class="n">StepContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Cut-off pre-releases if project does not explicitly allows them.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">prereleases_allowed</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Project accepts pre-releases, skipping cutting pre-releases step&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_all_dependencies</span><span class="p">():</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span><span class="o">.</span><span class="n">prerelease</span>
+                <span class="ow">or</span> <span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span><span class="o">.</span><span class="n">build</span>
+            <span class="p">):</span>
+                <span class="n">package_tuple</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Removing package </span><span class="si">%r</span><span class="s2"> - pre-releases are disabled&quot;</span><span class="p">,</span> <span class="n">package_tuple</span>
+                <span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">with</span> <span class="n">step_context</span><span class="o">.</span><span class="n">remove_package_tuples</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span> <span class="k">as</span> <span class="n">txn</span><span class="p">:</span>
+                        <span class="n">txn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+                <span class="k">except</span> <span class="n">CannotRemovePackage</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Cannot produce stack with removing all pre-releases: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+                    <span class="k">raise</span>
+</pre></div>
+</div>
+<p>The context manager used when accessing <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext.remove_package_tuples" title="thoth.adviser.python.pipeline.step_context.StepContext.remove_package_tuples"><code class="xref py py-func docutils literal notranslate"><span class="pre">StepContext</span></code></a> is acting as a
 transaction on top of dependency graph. You can stack multiple removals of
-packages. Once the context is left, all the packages are removed in order they
+packages. Once the transaction gets committed, all the packages are removed in order they
 were scheduled to be removed. If some of the packages causes invalidity to
 dependency graph, the transaction fails (no changes to dependency graph are
 done and all the changes done until reaching the package which would cause
 dependency graph invalidity are rolled back):</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
-    <span class="k">with</span> <span class="n">step_context</span><span class="o">.</span><span class="n">change</span><span class="p">(</span><span class="n">graceful</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span> <span class="k">as</span> <span class="n">step_change</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">some_package_tuples</span><span class="p">:</span>
-           <span class="n">step_change</span><span class="o">.</span><span class="n">remove_package_tuple</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">step_context</span><span class="o">.</span><span class="n">remove_package_tuples</span><span class="p">(</span><span class="n">package_tuple1</span><span class="p">,</span> <span class="n">package_tuple2</span><span class="p">)</span> <span class="k">as</span> <span class="n">txn</span><span class="p">:</span>
+        <span class="k">print</span><span class="p">(</span><span class="n">txn</span><span class="o">.</span><span class="n">to_remove_nodes</span><span class="p">)</span>
+        <span class="k">print</span><span class="p">(</span><span class="n">txn</span><span class="o">.</span><span class="n">to_remove_edges</span><span class="p">)</span>
+        <span class="n">txn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+        <span class="c1"># or txn.abort() in case of cancelling the transaction.</span>
 <span class="k">except</span> <span class="n">CannotRemovePackage</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
      <span class="c1"># The message carried in exception would be something like:</span>
      <span class="c1">#   &quot;Cannot remove package &lt;pkg&gt;, removing this package would lead &quot;</span>
@@ -230,61 +303,74 @@ dependency graph invalidity are rolled back):</p>
     <span class="p">)</span>
 </pre></div>
 </div>
+<p>Once all steps are executed, there is executed <a class="reference internal" href="libdependency_graph.html#libdependency-graph"><span class="std std-ref">libdependency_graph.so</span></a>
+which generates stack candidates based on traversals of the dependency graph. The produced stack
+candidates are in parallel scored in next pipeline units - strides.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Pipeline step has attribute to access graph database which can be used to derive additional information from Thoth’s knowledge base. Taking benefits of using asyncio when querying graph database might be a good idea.</p>
+<p>You can access additional step properties such as software environment, hardware environment, library usage to create complex steps removing based on observations stored in the knowledge base.</p>
 </div>
-<p>In the example above we have shown how to remove a package or set of packages
-from dependency graph. The following example shows how to adjust dependency
-graph in a way, so that packages which have good impact on software stack will
-be prioritized to occur in the resulting pinned down software stack and
-packages which have bad impact on the resulting application are removed or
-de-prioritized:</p>
+</div>
+<div class="section" id="strides">
+<h2>Strides<a class="headerlink" href="#strides" title="Permalink to this headline">¶</a></h2>
+<p>Strides operate on stack candidates - see <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stack_candidates.StackCandidates" title="thoth.adviser.python.pipeline.stack_candidates.StackCandidates"><code class="xref py py-class docutils literal notranslate"><span class="pre">stack</span> <span class="pre">candidate</span>
+<span class="pre">implementation</span></code></a> and
+<a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stride_context.StrideContext" title="thoth.adviser.python.pipeline.stride_context.StrideContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">stride</span> <span class="pre">context</span></code></a>. The input to a
+stride is a fully resolved software stack encapsulated in <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stride_context.StrideContext" title="thoth.adviser.python.pipeline.stride_context.StrideContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">stride</span>
+<span class="pre">context</span></code></a> (each and
+every package is locked to a specific version coming from a specific Python
+package index).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When to use a stride?</p>
+<p>If you want to:</p>
+<ul class="simple">
+<li><p>Filter our some software stacks because of some bad aspect (e.g. a group of packages are not installable into the given runtime environment).</p></li>
+<li><p>Prioritize some software stacks based on some characteristics (e.g. good performance).</p></li>
+<li><p>De-prioritize some software stacks based on some characteristics (e.g. bad performance).</p></li>
+<li><p>Notify user in the software stack justification about some fact (e.g. warning that Thoth does not have relevant data for some resovled packages).</p></li>
+<li><p>Adding additional justification to the resolved stack (this will be shown to the user)</p></li>
+</ul>
+</div>
+<p>An example of a stride which penalizes packages with a CVE can be found below:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 
-<span class="kn">from</span> <span class="nn">..step</span> <span class="kn">import</span> <span class="n">Step</span>
-<span class="kn">from</span> <span class="nn">..step_context</span> <span class="kn">import</span> <span class="n">StepContext</span>
-<span class="kn">from</span> <span class="nn">..units</span> <span class="kn">import</span> <span class="n">get_cve_records</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">Stride</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">StrideContext</span>
+<span class="c1"># To remove a stack candidate, raise StrideRemoveStack:</span>
+<span class="c1"># from thoth.adviser.python.pipeline.exceptions import StrideRemoveStack</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<span class="k">class</span> <span class="nc">CvePenalization</span><span class="p">(</span><span class="n">Step</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">CveScoring</span><span class="p">(</span><span class="n">Stride</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Penalization based on CVE being present in stack.&quot;&quot;&quot;</span>
 
-    <span class="c1"># These are default parameters, they can be adjusted in the pipeline</span>
-    <span class="c1"># builder as desired (e.g. based on recommendation type requested).</span>
     <span class="n">PARAMETERS_DEFAULT</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;cve_penalization&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.2</span><span class="p">}</span>
 
-    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">step_context</span><span class="p">:</span> <span class="n">StepContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Penalize stacks with a CVE.&quot;&quot;&quot;</span>
-        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_all_dependencies_tuple</span><span class="p">():</span>
-            <span class="n">cve_records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_cve_records</span><span class="p">(</span>
-                <span class="n">package_name</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-                <span class="n">package_version</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
-                <span class="n">index_url</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
-             <span class="p">)</span>
-             <span class="k">if</span> <span class="n">cve_records</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Found a CVEs for </span><span class="si">%r</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">,</span> <span class="n">cve_records</span><span class="p">)</span>
-                <span class="c1"># Positive score adjusts dependency graph in a way positive</span>
-                <span class="c1"># the &quot;positive&quot; packages will occur in the resolved stacks</span>
-                <span class="c1"># sooner (will take precedence):</span>
-                <span class="n">step_context</span><span class="o">.</span><span class="n">score_package_tuple</span><span class="p">(</span>
-                    <span class="n">package_tuple</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;cve_penalization&quot;</span><span class="p">]</span>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stride_context</span><span class="p">:</span> <span class="n">StrideContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="bp">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Score stacks with a CVE in a negative way.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">stride_context</span><span class="o">.</span><span class="n">stack_candidate</span><span class="p">:</span>
+            <span class="n">cve_records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_cve_records</span><span class="p">(</span><span class="n">package_name</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">package_version</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="k">for</span> <span class="n">cve_record</span> <span class="ow">in</span> <span class="n">cve_records</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Found a CVE for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
+                <span class="c1"># Add additional fields to the produced justification for user:</span>
+                <span class="n">cve_record</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="n">f</span><span class="s2">&quot;Found a CVE for package {package_tuple[0]} in version {package_tuple[1]}&quot;</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+
+                <span class="c1"># Penalize the resolved stack:</span>
+                <span class="n">stride_context</span><span class="o">.</span><span class="n">adjust_score</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;cve_penalization&quot;</span><span class="p">],</span> <span class="n">justification</span><span class="o">=</span><span class="p">[</span><span class="n">cve_record</span><span class="p">]</span>
                 <span class="p">)</span>
 </pre></div>
 </div>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>You can access additional step properties such as runtime sorfware information, hardware information (runtime environment), library usage to create complex steps adjusting dependency graph.</p>
-</div>
-<p>Make sure your implementation fits into project structure, that is, place your
-step implementation into thoth/adviser/python/pipeline/steps/ directory.</p>
-</div>
-<div class="section" id="developing-own-pipeline-stride">
-<h3>Developing own pipeline stride<a class="headerlink" href="#developing-own-pipeline-stride" title="Permalink to this headline">¶</a></h3>
-<p>To develop a pipeline stride, derive from <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.stride.Stride" title="thoth.adviser.python.pipeline.stride.Stride"><code class="xref py py-class docutils literal notranslate"><span class="pre">Stride</span></code></a> and implement the <code class="docutils literal notranslate"><span class="pre">run</span></code> method
-as shown bellow:</p>
+<p>The stride implementation can raise <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext" title="thoth.adviser.python.pipeline.step_context.StepContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">StrideRemoveStack</span></code></a> which will cause
+removal of the produced stack candidate:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">random</span>
 
 <span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">Stride</span>
@@ -303,32 +389,71 @@ as shown bellow:</p>
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Pipeline stride has attributes such as graph database which can be used to derive additional information from Thoth’s knowledge base. Taking benefits of using asyncio when querying graph database might be a good idea.</p>
+<p>You can access additional stride properties such as software environment, hardware environment, library usage to create complex strides filtering or scoring stack candidates based on observations in Thoth’s knowledge base.</p>
 </div>
-<p>In the example below, we are creating a scoring stride, which scores based on library usage:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">Stride</span>
-<span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">StrideContext</span>
-
-<span class="k">class</span> <span class="nc">UsagePrioritization</span><span class="p">(</span><span class="n">Stride</span><span class="p">):</span>
-    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">stride_context</span><span class="p">:</span> <span class="n">StrideContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="bp">None</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">stride_context</span><span class="o">.</span><span class="n">stack_candidate</span><span class="p">:</span>
-          <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">has_good_usage</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">):</span>
-              <span class="n">stride_context</span><span class="o">.</span><span class="n">adjust_score</span><span class="p">(</span>
-                 <span class="o">+</span><span class="mf">2.0</span><span class="p">,</span>
-                 <span class="n">justification</span><span class="o">=</span><span class="p">[{</span>
-                     <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
-                     <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="n">f</span><span class="s2">&quot;Package {package_tuple} is popular&quot;</span><span class="p">,</span>
-                 <span class="p">}]</span>
-              <span class="p">)</span>
-</pre></div>
+<p>Once all the strides are executed (due to limit for number of software stacks
+produced or all the stacks were already generated), stack candidates are turned
+into <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.product.PipelineProduct" title="thoth.adviser.python.pipeline.product.PipelineProduct"><code class="xref py py-class docutils literal notranslate"><span class="pre">pipeline</span> <span class="pre">products</span></code></a>.</p>
 </div>
+<div class="section" id="pipeline-architecture-dynamic-pipeline-creation">
+<h2>Pipeline Architecture - Dynamic Pipeline Creation<a class="headerlink" href="#pipeline-architecture-dynamic-pipeline-creation" title="Permalink to this headline">¶</a></h2>
+<p>The dynamic pipeline creation is done in <a class="reference internal" href="thoth.adviser.python.html#thoth.adviser.python.builder.PipelineBuilder" title="thoth.adviser.python.builder.PipelineBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">pipeline</span> <span class="pre">builder</span></code></a>. The main aim of this
+builder is to construct pipeline sieves, steps and strides respecting
+their relative order and adjust their parameters, if needed.</p>
+<p>The pipeline builder has two main methods:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="thoth.adviser.python.html#thoth.adviser.python.builder.PipelineBuilder.get_adviser_pipeline_config" title="thoth.adviser.python.builder.PipelineBuilder.get_adviser_pipeline_config"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_adviser_pipeline_config</span></code></a> - this method constructs pipeline steps and strides for an adviser run</p></li>
+<li><p><a class="reference internal" href="thoth.adviser.python.html#thoth.adviser.python.builder.PipelineBuilder.get_dependency_monkey_pipeline_config" title="thoth.adviser.python.builder.PipelineBuilder.get_dependency_monkey_pipeline_config"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_dependency_monkey_pipeline_config</span></code></a> - this method constructs pipeline steps and strides for a Dependency Monkey run</p></li>
+</ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>You can access additional stride properties such as runtime sorfware information, hardware information (runtime environment), library usage to create complex strides filtering or scoring software stacks.</p>
+<p>Pipeline builder has attributes graph database, project (stating runtime environment) and library_usage which can be used during pipeline configuration creation.</p>
 </div>
-<p>Implementations of all strides live in
-<code class="docutils literal notranslate"><span class="pre">thoth/adviser/python/pipeline/strides/</span></code>. Make sure you place implementation
-there to respect project structure and integrate with other parts of adviser.</p>
+<a class="reference external image-reference" href="_static/pipeline.png"><img alt="Stack generation pipeline" src="_images/pipeline.png" /></a>
+<p>If you take a look at the builder implementation, you can see that each sieve,
+step and stride accepts also configuration (which can be <cite>None</cite> or a
+dictionary).  Pipeline builder can parametrize these pipeline units based on
+its input vectors (e.g. be less pedantic on security vulnerabilities for
+testing stacks).</p>
+</div>
+<div class="section" id="creating-adviser-s-pipeline-configuration-programmatically">
+<h2>Creating adviser’s pipeline configuration programmatically<a class="headerlink" href="#creating-adviser-s-pipeline-configuration-programmatically" title="Permalink to this headline">¶</a></h2>
+<p>If you would like to experiment with adviser and recommendations interactively
+(e.g. from within Jupyter Notebooks), you can use prepared methods to do so:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">thoth.adviser.python</span> <span class="kn">import</span> <span class="n">Adviser</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.enums</span> <span class="kn">import</span> <span class="n">RecommendationType</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">Pipeline</span>
+<span class="kn">import</span> <span class="nn">thoth.adviser.python.pipeline.sieves</span> <span class="kn">as</span> <span class="nn">sieves</span>
+<span class="kn">import</span> <span class="nn">thoth.adviser.python.pipeline.steps</span> <span class="kn">as</span> <span class="nn">steps</span>
+<span class="kn">import</span> <span class="nn">thoth.adviser.python.pipeline.strides</span> <span class="kn">as</span> <span class="nn">strides</span>
+
+<span class="c1"># Get top 10 stacks found, limit scoring to 100 stacks found for STABLE recommendations:</span>
+<span class="n">adviser</span> <span class="o">=</span> <span class="n">Adviser</span><span class="p">(</span>
+    <span class="n">count</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+    <span class="n">limit</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
+    <span class="n">recommendation_type</span><span class="o">=</span><span class="n">RecommendationType</span><span class="o">.</span><span class="n">STABLE</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="c1"># Add sieves, steps and strides for pipeline configuration as desired:</span>
+<span class="n">pipeline</span> <span class="o">=</span> <span class="n">Pipeline</span><span class="p">(</span>
+    <span class="n">sieves</span><span class="o">=</span><span class="p">[</span>
+      <span class="p">(</span><span class="n">sieve</span><span class="o">.</span><span class="n">ExampleSieve1</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;param1&quot;</span><span class="p">:</span> <span class="mf">3.14</span><span class="p">}),</span>
+      <span class="p">(</span><span class="n">sieve</span><span class="o">.</span><span class="n">ExampleSieve2</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+    <span class="p">],</span>
+    <span class="n">steps</span><span class="o">=</span><span class="p">[</span>
+      <span class="p">(</span><span class="n">steps</span><span class="o">.</span><span class="n">ExampleStep1</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+    <span class="p">],</span>
+    <span class="n">strides</span><span class="o">=</span><span class="p">[</span>
+      <span class="p">(</span><span class="n">strides</span><span class="o">.</span><span class="n">ExampleStride1</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;penalization&quot;</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.2</span><span class="p">}),</span>
+      <span class="p">(</span><span class="n">strides</span><span class="o">.</span><span class="n">ExampleStride2</span><span class="p">,</span> <span class="bp">None</span><span class="p">),</span>
+    <span class="p">],</span>
+<span class="p">)</span>
+<span class="n">report</span> <span class="o">=</span> <span class="n">adviser</span><span class="o">.</span><span class="n">compute_using_pipeline</span><span class="p">(</span><span class="n">pipeline</span><span class="o">=</span><span class="n">Pipeline</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This is especially useful when developing or experimenting with new pipeline units.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In all cases, sieves, steps and strides should be atomic pieces and <a class="reference external" href="https://en.wikipedia.org/wiki/Unix_philosophy">they should do one thing and do it well</a>.</p>
 </div>
 </div>
 </div>
@@ -345,14 +470,19 @@ there to respect project structure and integrate with other parts of adviser.</p
   <h3><a href="index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Stack generation pipeline</a><ul>
+<li><a class="reference internal" href="#direct-dependencies-for-the-application">Direct dependencies for the application</a></li>
+<li><a class="reference internal" href="#static-source-code-analysis-library-usage">Static source code analysis - library usage</a></li>
+<li><a class="reference internal" href="#recommendation-type">Recommendation type</a></li>
+<li><a class="reference internal" href="#software-environment">Software environment</a></li>
+<li><a class="reference internal" href="#hardware-environment">Hardware environment</a><ul>
+<li><a class="reference internal" href="#pipeline-units">Pipeline units</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sieve">Sieve</a></li>
 <li><a class="reference internal" href="#steps">Steps</a></li>
 <li><a class="reference internal" href="#strides">Strides</a></li>
 <li><a class="reference internal" href="#pipeline-architecture-dynamic-pipeline-creation">Pipeline Architecture - Dynamic Pipeline Creation</a></li>
-<li><a class="reference internal" href="#developing-own-pipeline-units">Developing own pipeline units</a><ul>
-<li><a class="reference internal" href="#developing-own-pipeline-step">Developing own pipeline step</a></li>
-<li><a class="reference internal" href="#developing-own-pipeline-stride">Developing own pipeline stride</a></li>
-</ul>
-</li>
+<li><a class="reference internal" href="#creating-adviser-s-pipeline-configuration-programmatically">Creating adviser’s pipeline configuration programmatically</a></li>
 </ul>
 </li>
 </ul>
