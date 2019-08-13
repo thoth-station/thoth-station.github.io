@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.python.package_version &#8212; Thoth&#39;s Python library 0.6.0 documentation</title>
+    <title>thoth.python.package_version &#8212; Thoth&#39;s Python library 0.6.1 documentation</title>
     <link rel="stylesheet" href="../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     
@@ -28,7 +28,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../index.html">Thoth&#39;s Python library 0.6.0 documentation</a> &#187;</li>
+        <li><a href="../../../index.html">Thoth&#39;s Python library 0.6.1 documentation</a> &#187;</li>
           <li><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -60,6 +60,7 @@
 
 <span class="sd">&quot;&quot;&quot;Representation of packages in the application stack.&quot;&quot;&quot;</span>
 
+<span class="kn">import</span> <span class="nn">re</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">typing</span>
 <span class="kn">from</span> <span class="nn">copy</span> <span class="k">import</span> <span class="n">copy</span>
@@ -75,11 +76,21 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
+<span class="n">_RE_NORMALIZE_PYTHON_PACKAGE_NAME</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[-_.]+&quot;</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Normalize Python package name based on PEP-0503.&quot;&quot;&quot;</span>
+    <span class="c1"># Make sure we have normalized names in the graph database according to PEP:</span>
+    <span class="c1">#   https://www.python.org/dev/peps/pep-0503/#normalized-names</span>
+    <span class="k">return</span> <span class="n">_RE_NORMALIZE_PYTHON_PACKAGE_NAME</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="n">package_name</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+
 <div class="viewcode-block" id="PackageVersion"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.package_version.PackageVersion">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">PackageVersion</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;A package version as described in the Pipfile.lock entry.&quot;&quot;&quot;</span>
 
-    <span class="n">name</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">converter</span><span class="o">=</span><span class="n">_normalize_python_package_name</span><span class="p">)</span>
     <span class="n">version</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
     <span class="n">develop</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
     <span class="n">index</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">Source</span><span class="p">)</span>
@@ -116,6 +127,14 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Comparing package versions of different package - </span><span class="si">{self.name}</span><span class="s2"> and </span><span class="si">{other.name}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">semantic_version</span> <span class="o">&gt;</span> <span class="n">other</span><span class="o">.</span><span class="n">semantic_version</span>
+
+<div class="viewcode-block" id="PackageVersion.normalize_python_package_name"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.package_version.PackageVersion.normalize_python_package_name">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">normalize_python_package_name</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Normalize Python package name based on PEP-0503.</span>
+
+<span class="sd">        https://www.python.org/dev/peps/pep-0503/#normalized-names</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">_normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="PackageVersion.from_model"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.package_version.PackageVersion.from_model">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">from_model</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">develop</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
