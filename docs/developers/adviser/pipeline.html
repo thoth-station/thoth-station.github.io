@@ -244,6 +244,7 @@ packages which are pre-releases based on semantic version are removed.</p>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 
 <span class="kn">from</span> <span class="nn">thoth.adviser.python.dependency_graph</span> <span class="kn">import</span> <span class="n">CannotRemovePackage</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.python.dependency_graph</span> <span class="kn">import</span> <span class="n">PackageNotFound</span>
 
 <span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">Step</span>
 <span class="kn">from</span> <span class="nn">thoth.adviser.python.pipeline</span> <span class="kn">import</span> <span class="n">StepContext</span>
@@ -261,7 +262,7 @@ packages which are pre-releases based on semantic version are removed.</p>
             <span class="p">)</span>
             <span class="k">return</span>
 
-        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">step_context</span><span class="o">.</span><span class="n">iter_all_dependencies</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">step_context</span><span class="o">.</span><span class="n">iter_all_dependencies</span><span class="p">()):</span>
             <span class="k">if</span> <span class="p">(</span>
                 <span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span><span class="o">.</span><span class="n">prerelease</span>
                 <span class="ow">or</span> <span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span><span class="o">.</span><span class="n">build</span>
@@ -273,6 +274,9 @@ packages which are pre-releases based on semantic version are removed.</p>
                 <span class="k">try</span><span class="p">:</span>
                     <span class="k">with</span> <span class="n">step_context</span><span class="o">.</span><span class="n">remove_package_tuples</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span> <span class="k">as</span> <span class="n">txn</span><span class="p">:</span>
                         <span class="n">txn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+                <span class="k">except</span> <span class="n">PackageNotFound</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Package </span><span class="si">%r</span><span class="s2"> was already removed as part of one of the sub-graphs&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
+                    <span class="k">continue</span>
                 <span class="k">except</span> <span class="n">CannotRemovePackage</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Cannot produce stack with removing all pre-releases: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
                     <span class="k">raise</span>
@@ -282,7 +286,7 @@ packages which are pre-releases based on semantic version are removed.</p>
 transaction on top of dependency graph. You can stack multiple removals of
 packages. Once the transaction gets committed, all the packages are removed in order they
 were scheduled to be removed. If some of the packages causes invalidity to
-dependency graph, the transaction fails (no changes to dependency graph are
+the dependency graph, the transaction fails (no changes to the dependency graph are
 done and all the changes done until reaching the package which would cause
 dependency graph invalidity are rolled back):</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
@@ -291,6 +295,9 @@ dependency graph invalidity are rolled back):</p>
         <span class="k">print</span><span class="p">(</span><span class="n">txn</span><span class="o">.</span><span class="n">to_remove_edges</span><span class="p">)</span>
         <span class="n">txn</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
         <span class="c1"># or txn.abort() in case of cancelling the transaction.</span>
+<span class="k">except</span> <span class="n">PackageNotFound</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Package </span><span class="si">%r</span><span class="s2"> was already removed as part of one of the sub-graphs&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
+    <span class="k">continue</span>
 <span class="k">except</span> <span class="n">CannotRemovePackage</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
      <span class="c1"># The message carried in exception would be something like:</span>
      <span class="c1">#   &quot;Cannot remove package &lt;pkg&gt;, removing this package would lead &quot;</span>
@@ -303,6 +310,11 @@ dependency graph invalidity are rolled back):</p>
     <span class="p">)</span>
 </pre></div>
 </div>
+<p>Note that a package can be removed as part of a sub-graph of a previously removed package (it would be stated in the <code class="docutils literal notranslate"><span class="pre">to_remove_nodes</span></code> property of the transaction). For this reason, a developer of a step implantation needs to ensure two things:</p>
+<ul class="simple">
+<li><p>As the actual listing of packages present in the dependency graph changes over the iteration in removals, generators returned by <code class="docutils literal notranslate"><span class="pre">iter_*</span></code> methods provided by <a class="reference internal" href="thoth.adviser.python.pipeline.html#thoth.adviser.python.pipeline.step_context.StepContext" title="thoth.adviser.python.pipeline.step_context.StepContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">step</span> <span class="pre">context</span></code></a> need to be explicitly casted to a list (not to encounter runtime errors reporting the iterator is iterating over a structure which changes over time).</p></li>
+<li><p>As the listing of packages that is obtained by the <code class="docutils literal notranslate"><span class="pre">iter_*</span></code> methods captures also packages that are part of sub-graphs which could be removed in one of the iterations, there needs to be explicitly captured exception <code class="docutils literal notranslate"><span class="pre">PackageNotFound</span></code> as shown above.</p></li>
+</ul>
 <p>Once all steps are executed, there is executed <a class="reference internal" href="libdependency_graph.html#libdependency-graph"><span class="std std-ref">libdependency_graph.so</span></a>
 which generates stack candidates based on traversals of the dependency graph. The produced stack
 candidates are in parallel scored in next pipeline units - strides.</p>
