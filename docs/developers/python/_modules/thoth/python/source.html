@@ -63,7 +63,6 @@
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">re</span>
 <span class="kn">import</span> <span class="nn">typing</span>
-<span class="kn">import</span> <span class="nn">hashlib</span>
 <span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">lru_cache</span>
 <span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="k">import</span> <span class="n">urlparse</span>
 
@@ -76,13 +75,7 @@
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">InternalError</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">VersionIdentifierError</span>
 <span class="kn">from</span> <span class="nn">.configuration</span> <span class="k">import</span> <span class="n">config</span>
-
-<span class="kn">import</span> <span class="nn">io</span>
-<span class="kn">from</span> <span class="nn">zipfile</span> <span class="k">import</span> <span class="n">ZipFile</span>
-<span class="kn">import</span> <span class="nn">tarfile</span>
-<span class="kn">from</span> <span class="nn">contextlib</span> <span class="k">import</span> <span class="n">closing</span>
-<span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">import</span> <span class="nn">tempfile</span>
+<span class="kn">from</span> <span class="nn">.artifact</span> <span class="k">import</span> <span class="n">Artifact</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -175,50 +168,6 @@
         <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
 
-    <span class="k">def</span> <span class="nf">_get_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">artifact_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Download wheel file and calculate hash for it.&quot;&quot;&quot;</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Downloading artifact from url </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">artifact_url</span><span class="p">)</span>
-        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">artifact_url</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">verify_ssl</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
-        <span class="n">digest</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">iter_content</span><span class="p">(</span><span class="n">chunk_size</span><span class="o">=</span><span class="mi">1024</span><span class="p">):</span>
-            <span class="k">if</span> <span class="n">chunk</span><span class="p">:</span>  <span class="c1"># filter out keep-alive new chunks</span>
-                <span class="n">digest</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">chunk</span><span class="p">)</span>
-
-        <span class="n">digest</span> <span class="o">=</span> <span class="n">digest</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Computed artifact sha256 digest for </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">artifact_url</span><span class="p">,</span> <span class="n">digest</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">digest</span>
-
-    <span class="k">def</span> <span class="nf">_gather_hashes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Calculate checksums and gather hashes of all file in the given artifact.&quot;&quot;&quot;</span>
-        <span class="n">digests</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">root</span><span class="p">,</span> <span class="n">dirs</span><span class="p">,</span> <span class="n">files</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
-            <span class="k">for</span> <span class="n">file_</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
-                <span class="n">filepath</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">root</span><span class="p">,</span> <span class="n">file_</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">filepath</span><span class="p">):</span>
-                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">my_file</span><span class="p">:</span>
-                        <span class="n">digests</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
-                            <span class="s2">&quot;filepath&quot;</span><span class="p">:</span> <span class="n">filepath</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:],</span>
-                            <span class="s2">&quot;sha256&quot;</span><span class="p">:</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">my_file</span><span class="o">.</span><span class="n">read</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
-                        <span class="p">})</span>
-        <span class="k">return</span> <span class="n">digests</span>
-
-    <span class="k">def</span> <span class="nf">_get_digests</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">artifact_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">artifact_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Gather digests for all files in the given artifact.&quot;&quot;&quot;</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Downloading artifact from url </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">artifact_url</span><span class="p">)</span>
-        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">artifact_url</span><span class="p">,</span> <span class="n">verify</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">verify_ssl</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
-
-        <span class="k">with</span> <span class="n">closing</span><span class="p">(</span><span class="n">response</span><span class="p">),</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmpdir</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">artifact_url</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.whl&quot;</span><span class="p">):</span>
-                <span class="k">with</span> <span class="n">ZipFile</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">content</span><span class="p">))</span> <span class="k">as</span> <span class="n">zip_</span><span class="p">:</span>
-                    <span class="n">zip_</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="n">artifact_name</span><span class="p">))</span>
-            <span class="k">elif</span> <span class="n">artifact_url</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.gz&quot;</span><span class="p">):</span>
-                <span class="k">with</span> <span class="n">tarfile</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;r:gz&quot;</span><span class="p">,</span> <span class="n">fileobj</span><span class="o">=</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">content</span><span class="p">))</span> <span class="k">as</span> <span class="n">tf</span><span class="p">:</span>
-                    <span class="n">tf</span><span class="o">.</span><span class="n">extractall</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="n">artifact_name</span><span class="p">))</span>
-
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_gather_hashes</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="n">artifact_name</span><span class="p">))</span>
-
     <span class="k">def</span> <span class="nf">_warehouse_get_package_hashes</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">with_included_files</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
@@ -232,7 +181,9 @@
             <span class="p">)</span>
             <span class="c1"># this checks whether to gather digests for all files in the given artifact</span>
             <span class="k">if</span> <span class="n">with_included_files</span><span class="p">:</span>
-                <span class="n">result</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s2">&quot;digests&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_digests</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;filename&quot;</span><span class="p">])</span>
+                <span class="n">artifact</span> <span class="o">=</span> <span class="n">Artifact</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;filename&quot;</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">],</span> <span class="n">verify_ssl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">verify_ssl</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s2">&quot;digests&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">gather_hashes</span><span class="p">()</span>
+                <span class="n">result</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="s2">&quot;symbols&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">get_versioned_symbols</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">result</span>
 
@@ -379,10 +330,9 @@
 
         <span class="k">return</span> <span class="n">artifacts</span>
 
-    <span class="k">def</span> <span class="nf">_download_artifacts_sha</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">with_included_files</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Generator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Download the given artifact from Warehouse and compute its SHA.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="Source.get_package_artifacts"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.source.Source.get_package_artifacts">[docs]</a>    <span class="k">def</span> <span class="nf">get_package_artifacts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return list of artifacts corresponding to package name and package version.&quot;&quot;&quot;</span>
+        <span class="n">to_return</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">artifact_name</span><span class="p">,</span> <span class="n">artifact_url</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_simple_repository_list_artifacts</span><span class="p">(</span><span class="n">package_name</span><span class="p">):</span>
             <span class="c1"># Convert all artifact names to lowercase - as a shortcut we simply convert everything to lowercase.</span>
             <span class="n">artifact_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
@@ -397,17 +347,38 @@
                     <span class="n">package_name</span><span class="p">,</span>
                 <span class="p">)</span>
                 <span class="k">continue</span>
+            <span class="n">to_return</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Artifact</span><span class="p">(</span><span class="n">artifact_name</span><span class="p">,</span> <span class="n">artifact_url</span><span class="p">,</span> <span class="n">verify_ssl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">verify_ssl</span><span class="p">))</span>
 
-            <span class="n">url_parts</span> <span class="o">=</span> <span class="n">artifact_url</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">to_return</span></div>
 
-            <span class="c1"># this checks if sha256 hash is already given on the url</span>
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">url_parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">url_parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;sha256=&quot;</span><span class="p">):</span>
-                <span class="n">digest</span> <span class="o">=</span> <span class="n">url_parts</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;sha256=&quot;</span><span class="p">):]</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Using SHA256 stated in URL: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">url_parts</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">digest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_hash</span><span class="p">(</span><span class="n">artifact_url</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_download_artifacts_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">with_included_files</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Generator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Download the given artifact from Warehouse and compute desired info.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">artifact_name</span><span class="p">,</span> <span class="n">artifact_url</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_simple_repository_list_artifacts</span><span class="p">(</span><span class="n">package_name</span><span class="p">):</span>
+            <span class="c1"># Convert all artifact names to lowercase - as a shortcut we simply convert everything to lowercase.</span>
+            <span class="n">artifact_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">artifact_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;</span><span class="si">{package_name}</span><span class="s2">-</span><span class="si">{package_version}</span><span class="s2">&quot;</span><span class="p">):</span>
+                <span class="c1"># TODO: this logic has to be improved as package version can be a suffix of another package version:</span>
+                <span class="c1">#   mypackage-1.0.whl, mypackage-1.0.0.whl, ...</span>
+                <span class="c1"># This will require parsing based on PEP or some better logic.</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Skipping artifact </span><span class="si">%r</span><span class="s2"> as it does not match required version </span><span class="si">%r</span><span class="s2"> for package </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">artifact_name</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="p">,</span>
+                    <span class="n">package_name</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+            <span class="n">artifact</span> <span class="o">=</span> <span class="n">Artifact</span><span class="p">(</span><span class="n">artifact_name</span><span class="p">,</span> <span class="n">artifact_url</span><span class="p">,</span> <span class="n">verify_ssl</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">verify_ssl</span><span class="p">)</span>
+
+            <span class="n">symbols</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">hashes</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">with_included_files</span><span class="p">:</span>
+                <span class="n">symbols</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">get_versioned_symbols</span><span class="p">()</span>
+                <span class="n">hashes</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">gather_hashes</span><span class="p">()</span>
+
             <span class="k">yield</span> <span class="p">(</span>
-                <span class="n">artifact_name</span><span class="p">,</span> <span class="n">digest</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_digests</span><span class="p">(</span><span class="n">artifact_url</span><span class="p">,</span> <span class="n">artifact_name</span><span class="p">)</span> <span class="k">if</span> <span class="n">with_included_files</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="n">artifact_name</span><span class="p">,</span> <span class="n">artifact</span><span class="o">.</span><span class="n">sha</span><span class="p">,</span> <span class="n">hashes</span><span class="p">,</span> <span class="n">symbols</span><span class="p">,</span>
             <span class="p">)</span>
 
 <div class="viewcode-block" id="Source.provides_package_version"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.source.Source.provides_package_version">[docs]</a>    <span class="k">def</span> <span class="nf">provides_package_version</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
@@ -418,20 +389,39 @@
             <span class="c1"># Package was not found on the index.</span>
             <span class="k">return</span> <span class="kc">False</span></div>
 
+<div class="viewcode-block" id="Source.get_package_data"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.source.Source.get_package_data">[docs]</a>    <span class="nd">@lru_cache</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">get_package_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">with_included_files</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get information about release hashes and symbols available in this source index.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warehouse</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_warehouse_get_package_hashes</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span><span class="p">,</span> <span class="n">with_included_files</span><span class="p">)</span>
+
+        <span class="n">artifacts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_package_artifacts</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">artifact</span> <span class="ow">in</span> <span class="n">artifacts</span><span class="p">:</span>
+            <span class="n">doc</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">artifact_name</span>
+            <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">sha</span>
+            <span class="k">if</span> <span class="n">with_included_files</span><span class="p">:</span>
+                <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;digests&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">gather_hashes</span><span class="p">()</span>
+                <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;symbols&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">get_versioned_symbols</span><span class="p">()</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
 <div class="viewcode-block" id="Source.get_package_hashes"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.source.Source.get_package_hashes">[docs]</a>    <span class="nd">@lru_cache</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
     <span class="k">def</span> <span class="nf">get_package_hashes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">with_included_files</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get information about release hashes available in this source index.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">warehouse</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_warehouse_get_package_hashes</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span><span class="p">,</span> <span class="n">with_included_files</span><span class="p">)</span>
 
-        <span class="n">artifacts_sha</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_download_artifacts_sha</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span><span class="p">,</span> <span class="n">with_included_files</span><span class="p">)</span>
+        <span class="n">artifacts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_package_artifacts</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span><span class="p">)</span>
         <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">artifact_item</span> <span class="ow">in</span> <span class="n">artifacts_sha</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">artifact</span> <span class="ow">in</span> <span class="n">artifacts</span><span class="p">:</span>
             <span class="n">doc</span> <span class="o">=</span> <span class="p">{}</span>
-            <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact_item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-            <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact_item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">artifact_name</span>
+            <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">sha</span>
             <span class="k">if</span> <span class="n">with_included_files</span><span class="p">:</span>
-                <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;digests&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact_item</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+                <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;digests&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">gather_hashes</span><span class="p">()</span>
             <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">result</span></div></div>
