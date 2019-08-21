@@ -176,7 +176,7 @@
         <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">resolved_direct_dependencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
             <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">iter_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)),</span>
-            <span class="n">graceful</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">graceful</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="n">all_versions</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="p">)</span>
 
@@ -186,17 +186,26 @@
                 <span class="c1"># This means that there were found versions in the graph</span>
                 <span class="c1"># database but none was matching the given version range.</span>
                 <span class="n">unresolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                    <span class="s2">&quot;No versions were found for direct dependency </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_name</span>
-                <span class="p">)</span>
+
+                <span class="n">error_msg</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;No versions were found for direct dependency </span><span class="si">{package_name!r}</span><span class="s2">&quot;</span>
+                <span class="n">runtime_environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span>
+                <span class="k">if</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
+                    <span class="n">error_msg</span> <span class="o">+=</span> <span class="n">f</span><span class="s2">&quot;; operating system </span><span class="si">{runtime_environment.operating_system.name!r}</span><span class="s2">&quot;</span>
+                    <span class="k">if</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">:</span>
+                        <span class="n">error_msg</span> <span class="o">+=</span> <span class="n">f</span><span class="s2">&quot; in OS version </span><span class="si">{runtime_environment.operating_system.version!r}</span><span class="s2">&quot;</span>
+
+                <span class="k">if</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">:</span>
+                    <span class="n">error_msg</span> <span class="o">+=</span> <span class="n">f</span><span class="s2">&quot; for Python in version </span><span class="si">{runtime_environment.python_version!r}</span><span class="s2">&quot;</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
                 <span class="k">continue</span>
 
             <span class="n">direct_dependencies</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">package_versions</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">unresolved</span><span class="p">:</span>
             <span class="k">raise</span> <span class="n">SolverException</span><span class="p">(</span>
-                <span class="s2">&quot;Unable to resolve all direct dependencies, no versions were found for packages </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unresolved</span><span class="p">),</span>
+                <span class="s2">&quot;Unable to resolve all direct dependencies, no versions &quot;</span>
+                <span class="s2">&quot;were found for packages </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unresolved</span><span class="p">),</span>
             <span class="p">)</span>
 
         <span class="c1"># De-instantiate solver - this will cause solver cache to be dropped and references to PackageVersion</span>
