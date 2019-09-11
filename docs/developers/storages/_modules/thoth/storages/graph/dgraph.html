@@ -84,6 +84,7 @@
 <span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">ChainMap</span>
 <span class="kn">import</span> <span class="nn">asyncio</span>
 <span class="kn">from</span> <span class="nn">math</span> <span class="k">import</span> <span class="n">nan</span>
+<span class="kn">import</span> <span class="nn">re</span>
 
 <span class="kn">import</span> <span class="nn">pkg_resources</span>
 <span class="kn">import</span> <span class="nn">grpc</span>
@@ -123,6 +124,7 @@
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">UserHardwareInformation</span> <span class="k">as</span> <span class="n">UserHardwareInformationModel</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">HasArtifact</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">Investigated</span>
+<span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">HasSymbol</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">HasVulnerability</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">Identified</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">InspectionBuildSoftwareEnvironmentInput</span>
@@ -147,6 +149,7 @@
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">PythonPackageVersionEntity</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">RequirementsInput</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">Requires</span>
+<span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">RequiresSymbol</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">Resolved</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">RPMPackageVersion</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">RPMRequirement</span>
@@ -158,6 +161,7 @@
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">UsedInBuild</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">UsedInJob</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">UserSoftwareStack</span>
+<span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">VersionedSymbol</span>
 <span class="kn">from</span> <span class="nn">.performance</span> <span class="k">import</span> <span class="n">ObservedPerformance</span><span class="p">,</span> <span class="n">PerformanceIndicatorBase</span>
 <span class="kn">from</span> <span class="nn">.performance</span> <span class="k">import</span> <span class="n">PERFORMANCE_MODEL_BY_NAME</span><span class="p">,</span> <span class="n">ALL_PERFORMANCE_MODELS</span>
 
@@ -313,7 +317,7 @@
         <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">json</span><span class="p">)</span>
 
     <span class="k">async</span> <span class="k">def</span> <span class="nf">_query_raw_async</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">query</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;An async wrapper for a query call.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Async wrapper for a query call.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_query_raw</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_query_raw_concurrent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">queries</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
@@ -2097,6 +2101,27 @@
                 <span class="n">file_path</span><span class="o">=</span><span class="n">py_file</span><span class="p">[</span><span class="s2">&quot;filepath&quot;</span><span class="p">],</span>
             <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
 
+    <span class="k">def</span> <span class="nf">_system_symbols_analysis_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_extract_run</span><span class="p">:</span> <span class="n">PackageExtractRun</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">lib</span><span class="p">,</span> <span class="n">syms</span> <span class="ow">in</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;system-symbols&quot;</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">sym</span> <span class="ow">in</span> <span class="n">syms</span><span class="p">:</span>
+                <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\w_\d&quot;</span><span class="p">,</span> <span class="n">sym</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">match</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">sym_vertex</span> <span class="o">=</span> <span class="n">VersionedSymbol</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
+                        <span class="n">library_name</span><span class="o">=</span><span class="n">library</span><span class="p">,</span>
+                        <span class="n">symbol</span><span class="o">=</span><span class="n">sym</span><span class="p">,</span>
+                        <span class="n">version</span><span class="o">=</span><span class="s2">&quot;N/A&quot;</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">sym_vertex</span> <span class="o">=</span> <span class="n">VersionedSymbol</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
+                        <span class="n">library_name</span><span class="o">=</span><span class="n">library</span><span class="p">,</span>
+                        <span class="n">symbol</span><span class="o">=</span><span class="n">sym</span><span class="p">[:</span><span class="n">split_index</span><span class="o">+</span><span class="mi">1</span><span class="p">],</span>
+                        <span class="n">version</span><span class="o">=</span><span class="n">sym</span><span class="p">[</span><span class="n">split_index</span><span class="o">+</span><span class="mi">2</span><span class="p">:],</span>
+                    <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
+                <span class="n">HasSymbol</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
+                    <span class="n">source</span><span class="o">=</span><span class="n">package_extract_run</span><span class="p">,</span>
+                    <span class="n">target</span><span class="o">=</span><span class="n">sym_vertex</span><span class="p">,</span>
+                <span class="p">)</span>
+
 <div class="viewcode-block" id="GraphDatabase.sync_analysis_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.sync_analysis_result">[docs]</a>    <span class="nd">@enable_vertex_cache</span>
     <span class="k">def</span> <span class="nf">sync_analysis_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Sync the given analysis result to the graph database.&quot;&quot;&quot;</span>
@@ -2160,7 +2185,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_rpm_sync_analysis_result</span><span class="p">(</span><span class="n">package_extract_run</span><span class="p">,</span> <span class="n">document</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_deb_sync_analysis_result</span><span class="p">(</span><span class="n">package_extract_run</span><span class="p">,</span> <span class="n">document</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_python_sync_analysis_result</span><span class="p">(</span><span class="n">package_extract_run</span><span class="p">,</span> <span class="n">document</span><span class="p">,</span> <span class="n">environment</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_python_file_digests_sync_analysis_result</span><span class="p">(</span><span class="n">package_extract_run</span><span class="p">,</span> <span class="n">document</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_python_file_digests_sync_analysis_result</span><span class="p">(</span><span class="n">package_extract_run</span><span class="p">,</span> <span class="n">document</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_system_symbols_analysis_result</span><span class="p">(</span><span class="n">package_extract_run</span><span class="p">,</span> <span class="n">document</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.sync_package_analysis_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.sync_package_analysis_result">[docs]</a>    <span class="nd">@enable_vertex_cache</span>
     <span class="k">def</span> <span class="nf">sync_package_analysis_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -2233,7 +2259,28 @@
                         <span class="n">package_analysis_document_id</span><span class="o">=</span><span class="n">package_analysis_document_id</span><span class="p">,</span>
                     <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;File </span><span class="si">%r</span><span class="s2"> found inside artifact not synced&quot;</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span></div>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;File </span><span class="si">%r</span><span class="s2"> found inside artifact not synced&quot;</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">library</span><span class="p">,</span> <span class="n">symbols</span> <span class="ow">in</span> <span class="n">artifact</span><span class="p">[</span><span class="s2">&quot;symbols&quot;</span><span class="p">]:</span>
+                <span class="k">for</span> <span class="n">symbol</span> <span class="ow">in</span> <span class="n">symbols</span><span class="p">:</span>
+                    <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\w_\d&quot;</span><span class="p">,</span> <span class="n">symbol</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">match</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">sym_vertex</span> <span class="o">=</span> <span class="n">VersionedSymbol</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
+                            <span class="n">library_name</span><span class="o">=</span><span class="n">library</span><span class="p">,</span>
+                            <span class="n">symbol</span><span class="o">=</span><span class="n">symbol</span><span class="p">,</span>
+                            <span class="n">version</span><span class="o">=</span><span class="s2">&quot;N/A&quot;</span>
+                        <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">sym_vertex</span> <span class="o">=</span> <span class="n">VersionedSymbol</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
+                            <span class="n">library_name</span><span class="o">=</span><span class="n">library</span><span class="p">,</span>
+                            <span class="n">symbol</span><span class="o">=</span><span class="n">symbol</span><span class="p">[:</span><span class="n">split_index</span><span class="o">+</span><span class="mi">1</span><span class="p">],</span>
+                            <span class="n">version</span><span class="o">=</span><span class="n">symbol</span><span class="p">[</span><span class="n">split_index</span><span class="o">+</span><span class="mi">2</span><span class="p">:],</span>
+                        <span class="p">)</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="p">)</span>
+
+                    <span class="n">RequiresSymbol</span><span class="o">.</span><span class="n">from_properties</span><span class="p">(</span>
+                        <span class="n">source</span><span class="o">=</span><span class="n">python_artifact</span><span class="p">,</span>
+                        <span class="n">target</span><span class="o">=</span><span class="n">sym_vertex</span><span class="p">,</span>
+                    <span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.sync_solver_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.dgraph.GraphDatabase.sync_solver_result">[docs]</a>    <span class="nd">@enable_vertex_cache</span>
     <span class="k">def</span> <span class="nf">sync_solver_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
