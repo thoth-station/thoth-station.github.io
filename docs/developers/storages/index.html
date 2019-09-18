@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>Thoth Storages &#8212; Thoth Storages 0.18.6 documentation</title>
+    <title>Thoth Storages &#8212; Thoth Storages 0.19.3 documentation</title>
     <link rel="stylesheet" href="_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     
@@ -36,7 +36,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="#">Thoth Storages 0.18.6 documentation</a> &#187;</li> 
+        <li><a href="#">Thoth Storages 0.19.3 documentation</a> &#187;</li> 
       </ul>
     </div>
     
@@ -50,7 +50,7 @@
   <div class="section" id="thoth-storages">
 <h1>Thoth Storages<a class="headerlink" href="#thoth-storages" title="Permalink to this headline">¶</a></h1>
 <p>This library provides a library called <a class="reference external" href="https://pypi.org/project/thoth-storages">thoth-storages</a> used in project <a class="reference external" href="https://thoth-station.ninja">Thoth</a>.  The library exposes core queries and methods
-for Dgraph database as well as adapters for manipulating with Ceph via its
+for PostgreSQL database as well as adapters for manipulating with Ceph via its
 S3 compatible API.</p>
 <div class="section" id="installation-and-usage">
 <h2>Installation and Usage<a class="headerlink" href="#installation-and-usage" title="Permalink to this headline">¶</a></h2>
@@ -70,34 +70,16 @@ supporting other parts of Thoth.</p>
 </pre></div>
 </div>
 </div>
-<div class="section" id="automatically-generate-schema-for-graph-database">
-<h2>Automatically generate schema for Graph database<a class="headerlink" href="#automatically-generate-schema-for-graph-database" title="Permalink to this headline">¶</a></h2>
-<p>To automatically generate schema for the graph database from models defined in
-this module, run:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">PYTHONPATH=. pipenv run python3 ./create_schema.py --output thoth/storages/graph/schema.rdf</span>
-</pre></div>
-</div>
-<p>After running this command, the RDF file describing schema will be updated
-based on changes in model.</p>
-<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
-
-<span class="c1"># Also provide configuration if needed.</span>
-<span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
-<span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
-<span class="n">graph</span><span class="o">.</span><span class="n">initialize_schema</span><span class="p">()</span>
-</pre></div>
-</div>
-</div>
-<div class="section" id="running-dgraph-locally">
-<h2>Running Dgraph locally<a class="headerlink" href="#running-dgraph-locally" title="Permalink to this headline">¶</a></h2>
-<p>You can use <cite>docker-compose</cite> present in this repository to run a local Dgraph instance. It does not use TLS certificates (so you must not to provide <cite>GRAPH_TLS_PATH</cite> environment variable).</p>
+<div class="section" id="running-postgresql-locally">
+<h2>Running PostgreSQL locally<a class="headerlink" href="#running-postgresql-locally" title="Permalink to this headline">¶</a></h2>
+<p>You can use <cite>docker-compose</cite> present in this repository to run a local PostgreSQL instance:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> docker-compose up
 </pre></div>
 </div>
-<p>After running the command above (make sure your big fat daemon is up using <cite>systemctl start docker</cite>), you should be able to access a local Dgraph instance at <cite>localhost:9080</cite>. This is also the default configuration for Dgraph’s adapter - you don’t need to provide <cite>GRAPH_SERVICE_HOST</cite> explicitly.</p>
-<p>The provided <cite>docker-compose</cite> has also Ratel enabled for to have an UI for graph database content. To access it visit <a class="reference external" href="http://localhost:8080">http://localhost:8000/</a>.</p>
-<p>The provided <cite>docker-compose</cite> uses volume mounted from <cite>/tmp</cite>. After you computer restart, the content will not be available anymore.</p>
-<p>If you would like to experiment with Dgraph programatically, you can use the following code snippet as a starting point:</p>
+<p>After running the command above (make sure your big fat daemon is up using <cite>systemctl start docker</cite>), you should be able to access a local PostgreSQL instance at <cite>localhost:5432</cite>. This is also the default configuration for PostgreSQL’s adapter - you don’t need to provide <cite>GRAPH_SERVICE_HOST</cite> explicitly. The default configuration uses database named <cite>thoth</cite> which can be accessed using <cite>postgres</cite> user and <cite>postgres</cite> password (SSL is disabled).</p>
+<p>The provided <cite>docker-compose</cite> has also PGweb enabled for to have an UI for the database content. To access it visit <a class="reference external" href="http://localhost:8081">http://localhost:8081/</a>.</p>
+<p>The provided <cite>docker-compose</cite> does not use any volume. After you containers restart, the content will not be available anymore.</p>
+<p>If you would like to experiment with PostgreSQL programatically, you can use the following code snippet as a starting point:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="kn">import</span> <span class="n">GraphDatabase</span>
 
 <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
@@ -111,15 +93,20 @@ based on changes in model.</p>
 </div>
 <div class="section" id="schema-adjustment-in-deployment">
 <h2>Schema adjustment in deployment<a class="headerlink" href="#schema-adjustment-in-deployment" title="Permalink to this headline">¶</a></h2>
-<p>It’s possible to perform adjustments of schema in a deployemnt. It’s important
-that there are no open transactions (simply retry schema creation until it
-succeeds). You can use relevant endpoint on Management API for this purpose.</p>
-<p>If there are changes in types, Dgraph tries to automatically perform conversion
-from an old type to the new one as described in the new schema (e.g. a float to
-string). Invalid schema changes (e.g. parsing string into a float, but the
-string cannot be parsed as a float) result in schema change errors. These errors
-need to be handled programatically by deployment administrator (ideally avoid
-such conversions).</p>
+<p>TBD.</p>
+</div>
+<div class="section" id="generate-schema-images">
+<h2>Generate schema images<a class="headerlink" href="#generate-schema-images" title="Permalink to this headline">¶</a></h2>
+<p>You can use shipped CLI <code class="docutils literal notranslate"><span class="pre">thoth-storages</span></code> to automatically generate schema images out of the current models:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> First, make sure you have dev packages installed:
+<span class="go">pipenv install --dev</span>
+<span class="go">PYTHONPATH=. pipenv run python3 ./thoth-storages generate-schema</span>
+</pre></div>
+</div>
+<p>The command above will produce 2 images named <code class="docutils literal notranslate"><span class="pre">schema.png</span></code> and
+<code class="docutils literal notranslate"><span class="pre">schema_cache.png</span></code>. The first PNG file shows schema for the main PostgreSQL
+instance and the latter one, as the name suggests, shows how cache schema looks
+like.</p>
 </div>
 <div class="section" id="creating-own-performance-indicators">
 <h2>Creating own performance indicators<a class="headerlink" href="#creating-own-performance-indicators" title="Permalink to this headline">¶</a></h2>
@@ -131,44 +118,87 @@ certain combination of libraries in desired runtime and buildtime environment
 or directly on Amun API which will run the given script using desired software
 and hardware configuration. Please follow instructions on how to create a
 performance script shown in the <a class="reference external" href="https://github.com/thoth-station/performance">README of performance repo</a>.</p>
-<p>To create relevant models, adjust <cite>thoth/storages/graph/performance.py</cite> file
+<p>To create relevant models, adjust <cite>thoth/storages/graph/models_performance.py</cite> file
 and add your model. Describe parameters (reported in <cite>&#64;parameters</cite> section of
 performance indicator result) and result (reported in <cite>&#64;result</cite>). The name of
 class should match <cite>name</cite> which is reported by performance indicator run.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nd">@attr.s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="bp">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">PiMatmul</span><span class="p">(</span><span class="n">PerformanceIndicatorBase</span><span class="p">):</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">PiMatmul</span><span class="p">(</span><span class="n">Base</span><span class="p">,</span> <span class="n">BaseExtension</span><span class="p">,</span> <span class="n">PerformanceIndicatorBase</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;A class for representing a matrix multiplication micro-performance test.&quot;&quot;&quot;</span>
 
-    <span class="n">SCHEMA_PARAMETERS</span> <span class="o">=</span> <span class="n">Schema</span><span class="p">({</span>
-        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;matrix_size&quot;</span><span class="p">):</span> <span class="nb">int</span><span class="p">,</span>
-        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;dtype&quot;</span><span class="p">):</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;reps&quot;</span><span class="p">):</span> <span class="nb">int</span><span class="p">,</span>
-        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;device&quot;</span><span class="p">):</span> <span class="nb">str</span><span class="p">,</span>
-    <span class="p">})</span>
-
-    <span class="n">SCHEMA_RESULT</span> <span class="o">=</span> <span class="n">Schema</span><span class="p">({</span>
-        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;elapsed&quot;</span><span class="p">):</span> <span class="nb">float</span><span class="p">,</span>
-        <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;rate&quot;</span><span class="p">):</span> <span class="nb">float</span><span class="p">,</span>
-    <span class="p">})</span>
-
     <span class="c1"># Device used during performance indicator run - CPU/GPU/TPU/...</span>
-    <span class="n">device</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="s2">&quot;exact&quot;</span><span class="p">)</span>
-    <span class="n">matrix_size</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
-    <span class="n">dtype</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="s2">&quot;exact&quot;</span><span class="p">)</span>
-    <span class="n">reps</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="s2">&quot;int&quot;</span><span class="p">)</span>
-    <span class="n">elapsed</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
-    <span class="n">rate</span> <span class="o">=</span> <span class="n">model_property</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">device</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">String</span><span class="p">(</span><span class="mi">128</span><span class="p">),</span> <span class="n">nullable</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">matrix_size</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Integer</span><span class="p">,</span> <span class="n">nullable</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">dtype</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">String</span><span class="p">(</span><span class="mi">128</span><span class="p">),</span> <span class="n">nullable</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">reps</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Integer</span><span class="p">,</span> <span class="n">nullable</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">elapsed</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Float</span><span class="p">,</span> <span class="n">nullable</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
+    <span class="n">rate</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">Float</span><span class="p">,</span> <span class="n">nullable</span><span class="o">=</span><span class="bp">False</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>After you have created relevant model, register your model to <cite>ALL_PERFORMANCE_MODELS</cite> and re-generate graph database schema (as discussed above).</p>
+<p>All the models use <a class="reference external" href="https://www.sqlalchemy.org/">SQLAchemy</a>.
+See <a class="reference external" href="https://docs.sqlalchemy.org/">docs</a> for more info.</p>
 </div>
-<div class="section" id="online-debugging-of-queries-done-to-dgraph">
-<h2>Online debugging of queries done to Dgraph<a class="headerlink" href="#online-debugging-of-queries-done-to-dgraph" title="Permalink to this headline">¶</a></h2>
-<p>You can print to logger all the queries that are performed to a Dgraph instance. To do so, set the following environment variables:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">export</span> <span class="n">THOTH_LOG_STORAGES</span><span class="o">=</span><span class="n">DEBUG</span>
-<span class="n">export</span> <span class="n">THOTH_STORAGES_DEBUG_QUERIES</span><span class="o">=</span><span class="mi">1</span>
+<div class="section" id="online-debugging-of-queries">
+<h2>Online debugging of queries<a class="headerlink" href="#online-debugging-of-queries" title="Permalink to this headline">¶</a></h2>
+<p>You can print to logger all the queries that are performed to a PostgreSQL instance. To do so, set the following environment variable:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">export</span> <span class="n">THOTH_STORAGES_DEBUG_QUERIES</span><span class="o">=</span><span class="mi">1</span>
 </pre></div>
 </div>
+</div>
+<div class="section" id="id2">
+<h2>Online debugging of queries<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h2>
+<p>You can print information about PostgreSQL adapter together with statisics on
+the graph cache and memory cache usage to logger (it has to have at least level
+<cite>INFO</cite> set). To do so, set the following environment variable:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">export</span> <span class="n">THOTH_STORAGES_LOG_STATS</span><span class="o">=</span><span class="mi">1</span>
+</pre></div>
+</div>
+<p>These statistics will be printed once the database adapter is destructed.</p>
+</div>
+<div class="section" id="graph-database-cache">
+<h2>Graph database cache<a class="headerlink" href="#graph-database-cache" title="Permalink to this headline">¶</a></h2>
+<p>The implementation of this library also provides a cache to speed up queries to
+graph database. This cache is especially suitable for prod systems not to query
+for popular packages multiple times.</p>
+<p>The cache can be created with shipped CLI tool:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> When using version from this Git repository:
+<span class="go">PYTHONPATH=. THOTH_STORAGES_GRAPH_CACHE=&quot;cache.sqlite3&quot; pipenv run ./thoth-storages graph-cache -c ../adviser/cache_conf.yaml</span>
+
+<span class="gp">#</span> When using a version installed from PyPI:
+<span class="go">THOTH_STORAGES_GRAPH_CACHE=&quot;cache.sqlite3&quot; thoth-storages graph-cache -c ../adviser/cache_conf.yaml</span>
+</pre></div>
+</div>
+<p>The command above creates a SQLite3 database which carries some of the data
+loaded from the PostgreSQL database which help resolver resolve software stacks
+faster.  The path to cache can be supplied using environment variable
+<code class="docutils literal notranslate"><span class="pre">THOTH_STORAGES_GRAPH_CACHE</span></code>. By default, the module will create an in-memory
+SQLite3 database and will not persist it onto disk. If the configuration points
+to non-existing file, an SQLite3 database will be created and persisted onto
+disk with data which were added into it based on runtime usage. This naturally
+re-uses graph cache multiple times across runs (filled with the data needed) as
+expected.</p>
+<p>Take a look at adviser repo, at <code class="docutils literal notranslate"><span class="pre">cache_conf.yaml</span></code> file specifically, to
+see how <code class="docutils literal notranslate"><span class="pre">cache_conf.yaml</span></code> file should be structured. An example could be:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">python-packages</span><span class="p">:</span>
+ <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">thoth-storages</span>
+ <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">tensorflow</span>
+</pre></div>
+</div>
+<p>With the configuration above, the cache will be created. This cache will hold a
+serialized dependency graph of TensorFlow and thoth-storages packages, together
+with node information to effectively construct TensorFlow’s dependency graph
+for transitive queries.</p>
+<p>Note only information which should not change over time are captured in the
+cache; for example, packages which were not yet resolved during cache creation
+are not added to cache so system explicitly asks for resolution results next
+time (they might be resolved meanwhile).</p>
+<p>To enable inserts into graph cache, set
+<code class="docutils literal notranslate"><span class="pre">THOTH_STORAGES_GRAPH_CACHE_INSERTS_DISABLED</span></code> to <code class="docutils literal notranslate"><span class="pre">0</span></code> (the default value of
+<code class="docutils literal notranslate"><span class="pre">1</span></code> disables it). Disabling inserts might be benefitial in deployments where
+you want to avoid building cache (overhead needed to insert data into graph
+cache, checks of uniqueness of entries and cache index creation which in sum
+are expensive operations).</p>
+<p>To disable graph cache completely, set <code class="docutils literal notranslate"><span class="pre">THOTH_STORAGES_GRAPH_CACHE_DISABLED</span></code>
+environment variable to <code class="docutils literal notranslate"><span class="pre">1</span></code> (the default value of <code class="docutils literal notranslate"><span class="pre">0</span></code> enables it).</p>
 </div>
 <div class="section" id="graph-database-schema">
 <h2>Graph Database Schema<a class="headerlink" href="#graph-database-schema" title="Permalink to this headline">¶</a></h2>
@@ -206,8 +236,10 @@ to export changes made to schema diagram to the PNG file in the same directory.<
 <li class="toctree-l2"><a class="reference internal" href="thoth.storages.html#module-thoth.storages.buildlogs_analyses_cache">thoth.storages.buildlogs_analyses_cache module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="thoth.storages.html#module-thoth.storages.ceph">thoth.storages.ceph module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="thoth.storages.html#module-thoth.storages.ceph_cache">thoth.storages.ceph_cache module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.storages.html#module-thoth.storages.cli">thoth.storages.cli module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="thoth.storages.html#module-thoth.storages.dependency_monkey_reports">thoth.storages.dependency_monkey_reports module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="thoth.storages.html#module-thoth.storages.exceptions">thoth.storages.exceptions module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thoth.storages.html#module-thoth.storages.graph_cache">thoth.storages.graph_cache module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="thoth.storages.html#module-thoth.storages.inspection_schema">thoth.storages.inspection_schema module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="thoth.storages.html#module-thoth.storages.inspections">thoth.storages.inspections module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="thoth.storages.html#module-thoth.storages.observations">thoth.storages.observations module</a></li>
@@ -223,8 +255,8 @@ to export changes made to schema diagram to the PNG file in the same directory.<
 </li>
 </ul>
 </div>
-<p>This documentation corresponds to implementation in version 0.18.6,
-documentation was generated on Sep 17, 2019.</p>
+<p>This documentation corresponds to implementation in version 0.19.3,
+documentation was generated on Sep 18, 2019.</p>
 </div>
 </div>
 
@@ -241,11 +273,13 @@ documentation was generated on Sep 17, 2019.</p>
   <ul>
 <li><a class="reference internal" href="#">Thoth Storages</a><ul>
 <li><a class="reference internal" href="#installation-and-usage">Installation and Usage</a></li>
-<li><a class="reference internal" href="#automatically-generate-schema-for-graph-database">Automatically generate schema for Graph database</a></li>
-<li><a class="reference internal" href="#running-dgraph-locally">Running Dgraph locally</a></li>
+<li><a class="reference internal" href="#running-postgresql-locally">Running PostgreSQL locally</a></li>
 <li><a class="reference internal" href="#schema-adjustment-in-deployment">Schema adjustment in deployment</a></li>
+<li><a class="reference internal" href="#generate-schema-images">Generate schema images</a></li>
 <li><a class="reference internal" href="#creating-own-performance-indicators">Creating own performance indicators</a></li>
-<li><a class="reference internal" href="#online-debugging-of-queries-done-to-dgraph">Online debugging of queries done to Dgraph</a></li>
+<li><a class="reference internal" href="#online-debugging-of-queries">Online debugging of queries</a></li>
+<li><a class="reference internal" href="#id2">Online debugging of queries</a></li>
+<li><a class="reference internal" href="#graph-database-cache">Graph database cache</a></li>
 <li><a class="reference internal" href="#graph-database-schema">Graph Database Schema</a></li>
 <li><a class="reference internal" href="#crossroad">Crossroad</a></li>
 </ul>

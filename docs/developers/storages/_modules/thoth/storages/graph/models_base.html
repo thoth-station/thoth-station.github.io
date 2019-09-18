@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.graph.models_base &#8212; Thoth Storages 0.18.6 documentation</title>
+    <title>thoth.storages.graph.models_base &#8212; Thoth Storages 0.19.3 documentation</title>
     <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../../index.html">Thoth Storages 0.18.6 documentation</a> &#187;</li>
+        <li><a href="../../../../index.html">Thoth Storages 0.19.3 documentation</a> &#187;</li>
           <li><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -65,447 +65,86 @@
 <span class="c1"># You should have received a copy of the GNU General Public License</span>
 <span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
 
-<span class="sd">&quot;&quot;&quot;Base operations on top of Dgraph&#39;s models.&quot;&quot;&quot;</span>
+<span class="sd">&quot;&quot;&quot;A base and utilities for implementing SQLAlchemy based models.&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">re</span>
-<span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">import</span> <span class="nn">random</span>
-<span class="kn">import</span> <span class="nn">time</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Callable</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">json</span>
-<span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">wraps</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="k">import</span> <span class="n">combinations</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
 
-<span class="kn">from</span> <span class="nn">hashlib</span> <span class="k">import</span> <span class="n">sha1</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="k">import</span> <span class="n">Index</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy.ext.declarative</span> <span class="k">import</span> <span class="n">declarative_base</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="k">import</span> <span class="n">class_mapper</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="k">import</span> <span class="n">ColumnProperty</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy.exc</span> <span class="k">import</span> <span class="n">IntegrityError</span>
 
-<span class="kn">from</span> <span class="nn">pydgraph</span> <span class="k">import</span> <span class="n">DgraphClient</span>
-<span class="kn">from</span> <span class="nn">pydgraph</span> <span class="k">import</span> <span class="n">AbortedError</span>
 
-<span class="kn">import</span> <span class="nn">attr</span>
-
-<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">MultipleFoundError</span>
-<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">NotFoundError</span>
-<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">UnboundModel</span>
-<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">RetryTransaction</span>
+<span class="n">Base</span> <span class="o">=</span> <span class="n">declarative_base</span><span class="p">()</span>
 
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="model_property"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.model_property">[docs]</a><span class="k">def</span> <span class="nf">model_property</span><span class="p">(</span><span class="nb">type</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">count</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Define a property with its attributes.</span>
+<div class="viewcode-block" id="BaseExtension"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.BaseExtension">[docs]</a><span class="k">class</span> <span class="nc">BaseExtension</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Extend base class with additional functionality.&quot;&quot;&quot;</span>
 
-<span class="sd">    Make sure metadata get stored for later automatic schema generation.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">metadata</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;dgraph&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">}</span>
+<div class="viewcode-block" id="BaseExtension.get_or_create"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.BaseExtension.get_or_create">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">get_or_create</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">session</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Query for the given entity, create if it does not exist yet.&quot;&quot;&quot;</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">filter_by</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">instance</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">instance</span><span class="p">,</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">begin_nested</span><span class="p">()</span>
+                <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">instance</span><span class="p">)</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+                <span class="k">return</span> <span class="n">instance</span><span class="p">,</span> <span class="kc">False</span>
+            <span class="k">except</span> <span class="n">IntegrityError</span><span class="p">:</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Integrity error for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">filter_by</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span><span class="o">.</span><span class="n">one</span><span class="p">(),</span> <span class="kc">True</span></div>
 
-    <span class="k">if</span> <span class="n">index</span><span class="p">:</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;dgraph&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">f</span><span class="s2">&quot;@index(</span><span class="si">{index}</span><span class="s2">) &quot;</span>
-        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">and</span> <span class="n">index</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
-            <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;dgraph&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">f</span><span class="s2">&quot;@index &quot;</span>
+<div class="viewcode-block" id="BaseExtension.attribute_names"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.BaseExtension.attribute_names">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">attribute_names</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get names of attributes for the given model declaration.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">prop</span><span class="o">.</span><span class="n">key</span> <span class="k">for</span> <span class="n">prop</span> <span class="ow">in</span> <span class="n">class_mapper</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">iterate_properties</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">prop</span><span class="p">,</span> <span class="n">ColumnProperty</span><span class="p">)]</span></div>
 
-    <span class="k">if</span> <span class="n">reverse</span><span class="p">:</span>
-        <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;dgraph&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">f</span><span class="s2">&quot;@reverse &quot;</span>
-
-    <span class="k">if</span> <span class="n">count</span><span class="p">:</span>
-        <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;count&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">f</span><span class="s2">&quot;@count&quot;</span>
-
-    <span class="k">return</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">type</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">default</span><span class="p">,</span> <span class="n">metadata</span><span class="o">=</span><span class="n">metadata</span><span class="p">)</span></div>
-
-
-<div class="viewcode-block" id="Element"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">Element</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;An abstract class with common methods for vertex and edge.&quot;&quot;&quot;</span>
-
-    <span class="n">_RE_CAMEL2SNAKE</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="s2">&quot;(?!^)([A-Z]+)&quot;</span><span class="p">)</span>
-    <span class="n">_UPSERT_RETRIES_COUNT</span> <span class="o">=</span> <span class="mi">5</span>
-
-    <span class="n">ELEMENT_NAME</span> <span class="o">=</span> <span class="kc">None</span>
-
-    <span class="c1"># Dgraph uses uint64_t for UID.</span>
-    <span class="n">uid</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-
-<div class="viewcode-block" id="Element.compute_label_hash"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.compute_label_hash">[docs]</a>    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">compute_label_hash</span><span class="p">(</span><span class="n">data</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get hash of this element.&quot;&quot;&quot;</span>
-        <span class="n">content</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">sha1</span><span class="p">(</span><span class="n">content</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span></div>
-
-<div class="viewcode-block" id="Element.get_label"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.get_label">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">get_label</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Retrieve label of the given vertex or edge.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span> <span class="o">+</span> <span class="s1">&#39;_label&#39;</span></div>
-
-<div class="viewcode-block" id="Element.get_name"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.get_name">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">get_name</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get name of edge.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">ELEMENT_NAME</span> <span class="ow">or</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_RE_CAMEL2SNAKE</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;_\1&quot;</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span></div>
-
-<div class="viewcode-block" id="Element.to_dict"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">without_uid</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Covert an edge or vertex representation to a dict.&quot;&quot;&quot;</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">asdict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">without_uid</span><span class="p">:</span>
-            <span class="n">result</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;uid&quot;</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">result</span></div>
-
-<div class="viewcode-block" id="Element.get_or_create"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.get_or_create">[docs]</a>    <span class="k">def</span> <span class="nf">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get or create the given entity.&quot;&quot;&quot;</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
-
-<div class="viewcode-block" id="Element.delete"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.delete">[docs]</a>    <span class="k">def</span> <span class="nf">delete</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Delete the given element from graph database.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">uid</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">UnboundModel</span><span class="p">(</span>
-                <span class="s2">&quot;Cannot delete model which has no association with any object in the graph &quot;</span>
-                <span class="s2">&quot;database - either multiple deletions were performed or use query mechanism &quot;</span>
-                <span class="s2">&quot;to obtain bound model&quot;</span>
-            <span class="p">)</span>
-
-        <span class="n">transaction</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">txn</span><span class="p">(</span><span class="n">read_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-        <span class="n">transaction</span><span class="o">.</span><span class="n">mutate</span><span class="p">(</span><span class="n">del_obj</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;uid&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">uid</span><span class="p">},</span> <span class="n">commit_now</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">uid</span> <span class="o">=</span> <span class="kc">None</span></div>
-
-<div class="viewcode-block" id="Element.get_properties"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.get_properties">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">get_properties</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get all properties with their corresponding type.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="BaseExtension.to_dict"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.BaseExtension.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">without_id</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Convert model to a dictionary representation keeping just rows as attributes.&quot;&quot;&quot;</span>
         <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">attribute</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__attrs_attrs__</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">attribute</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;source&quot;</span><span class="p">,</span> <span class="s2">&quot;target&quot;</span><span class="p">,</span> <span class="s2">&quot;uid&quot;</span><span class="p">):</span>
-                <span class="c1"># Edge attributes for storing source and target vertex or uid which is automatically generated.</span>
+        <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">__table__</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">without_id</span> <span class="ow">and</span> <span class="n">column</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span>
                 <span class="k">continue</span>
 
-            <span class="n">result</span><span class="p">[</span><span class="n">attribute</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">attribute</span><span class="o">.</span><span class="n">type</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">column</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">column</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
 
-        <span class="k">return</span> <span class="n">result</span></div>
+        <span class="k">return</span> <span class="n">result</span></div></div>
 
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_do_upsert</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">label_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Perform upsert operation.&quot;&quot;&quot;</span>
-        <span class="n">upsert_query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">        {</span>
-<span class="s2">            all(func: eq(</span><span class="si">%s</span><span class="s2">, &quot;</span><span class="si">%s</span><span class="s2">&quot;)) {</span>
-<span class="s2">                uid</span>
-<span class="s2">                </span><span class="si">%s</span><span class="s2"></span>
-<span class="s2">            }</span>
-<span class="s2">        }&quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">label_hash</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span>
-        <span class="n">retries_count</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="n">transaction</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">txn</span><span class="p">(</span><span class="n">read_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-                <span class="k">try</span><span class="p">:</span>
-                    <span class="n">res</span> <span class="o">=</span> <span class="n">transaction</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">upsert_query</span><span class="p">)</span>
-                    <span class="n">entries</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">json</span><span class="p">)</span>
 
-                    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">entries</span><span class="p">[</span><span class="s2">&quot;all&quot;</span><span class="p">])</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-                        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">entries</span><span class="p">[</span><span class="s2">&quot;all&quot;</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-                            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Found multiple entities with label </span><span class="si">{label!r}</span><span class="s2"> with hash </span><span class="si">{label_hash!r}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-                        <span class="n">uid</span> <span class="o">=</span> <span class="n">entries</span><span class="p">[</span><span class="s2">&quot;all&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;uid&quot;</span><span class="p">]</span>
-                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Using entity </span><span class="si">%r</span><span class="s2"> with uid </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">uid</span><span class="p">)</span>
-                        <span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
-                        <span class="k">return</span> <span class="n">uid</span><span class="p">,</span> <span class="kc">True</span>
-
-                    <span class="n">res</span> <span class="o">=</span> <span class="n">transaction</span><span class="o">.</span><span class="n">mutate</span><span class="p">(</span><span class="n">set_obj</span><span class="o">=</span><span class="n">data</span><span class="p">)</span>
-                    <span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
-                    <span class="k">break</span>
-                <span class="k">finally</span><span class="p">:</span>
-                    <span class="n">transaction</span><span class="o">.</span><span class="n">discard</span><span class="p">()</span>
-            <span class="k">except</span> <span class="n">AbortedError</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">retries_count</span> <span class="o">&gt;</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_UPSERT_RETRIES_COUNT</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="n">RetryTransaction</span><span class="p">(</span>
-                        <span class="n">f</span><span class="s2">&quot;Transaction has been aborted - concurrent upsert writes for </span><span class="si">{label!r}</span><span class="s2"> with&quot;</span>
-                        <span class="n">f</span><span class="s2">&quot;hash </span><span class="si">{label_hash}</span><span class="s2">; back-off retries count exceeded {retries_count - 1}&quot;</span>
-                    <span class="p">)</span>
-
-                <span class="n">retries_count</span> <span class="o">+=</span> <span class="mi">1</span>
-                <span class="n">sleep_time</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">)</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="s2">&quot;Transaction for </span><span class="si">%r</span><span class="s2"> has been aborted due to concurrent writes, performing &quot;</span>
-                    <span class="s2">&quot;random back-off for </span><span class="si">%.2f</span><span class="s2"> seconds&quot;</span><span class="p">,</span>
-                    <span class="n">label</span><span class="p">,</span> <span class="n">sleep_time</span>
+<div class="viewcode-block" id="get_python_package_version_index_combinations"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.get_python_package_version_index_combinations">[docs]</a><span class="k">def</span> <span class="nf">get_python_package_version_index_combinations</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">index_as_property</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Index</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Create index for all possible combinations which we can query.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">_columns_to_variate</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;index_url&quot;</span> <span class="k">if</span> <span class="n">index_as_property</span> <span class="k">else</span> <span class="s2">&quot;python_package_index_id&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;os_name&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;os_version&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;python_version&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">_columns_to_variate</span><span class="p">)):</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">variation</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">combinations</span><span class="p">(</span><span class="n">_columns_to_variate</span><span class="p">,</span> <span class="n">i</span><span class="p">)):</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="n">Index</span><span class="p">(</span>
+                    <span class="n">f</span><span class="s2">&quot;python_package_version_index_idx_</span><span class="si">{i}{j}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;package_name&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;package_version&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;index_url&quot;</span> <span class="k">if</span> <span class="n">index_as_property</span> <span class="k">else</span> <span class="s2">&quot;python_package_index_id&quot;</span><span class="p">,</span>
+                    <span class="o">*</span><span class="n">variation</span><span class="p">,</span>
                 <span class="p">)</span>
-                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">sleep_time</span><span class="p">)</span>
-
-        <span class="c1"># If JSON is sent as an input, Dgraph assigns &quot;blank-0&quot; for the blank node being</span>
-        <span class="c1"># synced. We use it as a key to obtain assigned UID from the graph.</span>
-        <span class="n">uid</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">uids</span><span class="p">[</span><span class="s2">&quot;blank-0&quot;</span><span class="p">]</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Created a new entity </span><span class="si">%r</span><span class="s2"> with uid </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">uid</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">uid</span><span class="p">,</span> <span class="kc">False</span>
-
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_do_query</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">,</span> <span class="n">keys</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;Element&quot;</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Perform the actual query to the Dgraph instance.&quot;&quot;&quot;</span>
-        <span class="n">label</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
-
-        <span class="n">filter_str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
-        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">keys</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="k">if</span> <span class="n">filter_str</span><span class="p">:</span>
-                <span class="n">filter_str</span> <span class="o">+=</span> <span class="s2">&quot; AND &quot;</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-                <span class="n">filter_str</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;eq(</span><span class="si">{key}</span><span class="s1">, &quot;</span><span class="si">{value}</span><span class="s1">&quot;)&#39;</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">filter_str</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;eq(</span><span class="si">{key}</span><span class="s1">, </span><span class="si">{value}</span><span class="s1">)&#39;</span>
-
-        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">        {</span>
-<span class="s2">            q(func: has(</span><span class="si">%s</span><span class="s2">)) @filter(</span><span class="si">%s</span><span class="s2">) {</span>
-<span class="s2">                uid</span>
-<span class="s2">                </span><span class="si">%s</span><span class="s2"></span>
-<span class="s2">            }</span>
-<span class="s2">        }</span>
-<span class="s2">        &quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">filter_str</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">get_properties</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
-        <span class="n">query_result</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">txn</span><span class="p">(</span><span class="n">read_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
-        <span class="n">query_result</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">query_result</span><span class="o">.</span><span class="n">json</span><span class="p">)[</span><span class="s2">&quot;q&quot;</span><span class="p">]</span>
-
-        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">attrs</span> <span class="ow">in</span> <span class="n">query_result</span><span class="p">:</span>
-            <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">attrs</span><span class="p">)</span>
-            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">instance</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">result</span>
-
-<div class="viewcode-block" id="Element.query_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.query_all">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">query_all</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">raise_on_not_found</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">keys</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;Element&quot;</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Query graph database for entity with the given set of parameters.&quot;&quot;&quot;</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_do_query</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">keys</span><span class="p">)</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span> <span class="ow">and</span> <span class="n">raise_on_not_found</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span>
-                <span class="n">f</span><span class="s2">&quot;Entity with label {cls.get_label()!r} not found in the database with: </span><span class="si">{keys!r}</span><span class="s2">&quot;</span>
             <span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">result</span></div>
-
-<div class="viewcode-block" id="Element.query_one"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.query_one">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">query_one</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">raise_on_not_found</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">keys</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Element&quot;</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Query graph database for entity with the given set of parameters for an entity.&quot;&quot;&quot;</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_do_query</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">keys</span><span class="p">)</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span> <span class="ow">and</span> <span class="n">raise_on_not_found</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span>
-                <span class="n">f</span><span class="s2">&quot;Entity with label {cls.get_label()!r} not found in the database with properties: </span><span class="si">{keys!r}</span><span class="s2">&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">MultipleFoundError</span><span class="p">(</span>
-                <span class="n">f</span><span class="s2">&quot;Multiple entities with label {cls.get_label()!r} found with properties: </span><span class="si">{keys!r}</span><span class="s2">&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span></div>
-
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_do_modify</span><span class="p">(</span>
-            <span class="bp">cls</span><span class="p">,</span>
-            <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">,</span>
-            <span class="o">*</span><span class="p">,</span>
-            <span class="n">keys</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
-            <span class="n">properties</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
-            <span class="n">raise_on_not_found</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-            <span class="n">only_one</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;Element&quot;</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Perform modification of an entity matching the given keys.&quot;&quot;&quot;</span>
-        <span class="n">label</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
-
-        <span class="n">filter_str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
-        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">keys</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="k">if</span> <span class="n">filter_str</span><span class="p">:</span>
-                <span class="n">filter_str</span> <span class="o">+=</span> <span class="s2">&quot; AND &quot;</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-                <span class="n">filter_str</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;eq(</span><span class="si">{key}</span><span class="s1">, &quot;</span><span class="si">{value}</span><span class="s1">&quot;)&#39;</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">filter_str</span> <span class="o">+=</span> <span class="n">f</span><span class="s1">&#39;eq(</span><span class="si">{key}</span><span class="s1">, </span><span class="si">{value}</span><span class="s1">)&#39;</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">keys</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;No keys supplied to perform modification on </span><span class="si">{label}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">properties</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;No properties supplied to perform modification on </span><span class="si">{label}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-        <span class="n">query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">        {</span>
-<span class="s2">            q(func: has(</span><span class="si">%s</span><span class="s2">)) @filter(</span><span class="si">%s</span><span class="s2">) {</span>
-<span class="s2">                uid</span>
-<span class="s2">                </span><span class="si">%s</span><span class="s2"></span>
-<span class="s2">            }</span>
-<span class="s2">        }</span>
-<span class="s2">        &quot;&quot;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">label</span><span class="p">,</span> <span class="n">filter_str</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">get_properties</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
-
-        <span class="n">instances</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">transaction</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">txn</span><span class="p">(</span><span class="n">read_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">result</span> <span class="o">=</span> <span class="n">transaction</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">query</span><span class="p">)</span>
-            <span class="n">result</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">json</span><span class="p">)[</span><span class="s2">&quot;q&quot;</span><span class="p">]</span>
-
-            <span class="k">if</span> <span class="n">raise_on_not_found</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">result</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span>
-                    <span class="n">f</span><span class="s2">&quot;No entities </span><span class="si">{label}</span><span class="s2"> found for modification with filter criteria </span><span class="si">{filter_str}</span><span class="s2">&quot;</span>
-                <span class="p">)</span>
-
-            <span class="k">if</span> <span class="n">only_one</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="n">MultipleFoundError</span><span class="p">(</span>
-                    <span class="n">f</span><span class="s2">&quot;Multiple entities </span><span class="si">{label}</span><span class="s2"> found for modification with filter criteria </span><span class="si">{filter_str}</span><span class="s2">&quot;</span>
-                <span class="p">)</span>
-
-            <span class="k">for</span> <span class="n">original_properties</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
-                <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">original_properties</span><span class="p">)</span>
-                <span class="k">for</span> <span class="n">property_key</span><span class="p">,</span> <span class="n">property_value</span> <span class="ow">in</span> <span class="n">properties</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                    <span class="nb">setattr</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">property_key</span><span class="p">,</span> <span class="n">property_value</span><span class="p">)</span>
-                    <span class="n">transaction</span><span class="o">.</span><span class="n">mutate</span><span class="p">(</span><span class="n">set_obj</span><span class="o">=</span><span class="n">instance</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">without_uid</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
-                    <span class="n">instances</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">instance</span><span class="p">)</span>
-
-            <span class="n">transaction</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
-        <span class="k">finally</span><span class="p">:</span>
-            <span class="n">transaction</span><span class="o">.</span><span class="n">discard</span><span class="p">()</span>
-
-        <span class="k">return</span> <span class="n">instances</span>
-
-<div class="viewcode-block" id="Element.modify_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.modify_all">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">modify_all</span><span class="p">(</span>
-            <span class="bp">cls</span><span class="p">,</span>
-            <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">,</span>
-            <span class="o">*</span><span class="p">,</span>
-            <span class="n">properties</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
-            <span class="n">raise_on_not_found</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">keys</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;Element&quot;</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Modify all properties of models stored inside graph database matching the given keys.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_do_modify</span><span class="p">(</span>
-            <span class="n">client</span><span class="p">,</span>
-            <span class="n">keys</span><span class="o">=</span><span class="n">keys</span><span class="p">,</span>
-            <span class="n">raise_on_not_found</span><span class="o">=</span><span class="n">raise_on_not_found</span><span class="p">,</span>
-            <span class="n">properties</span><span class="o">=</span><span class="n">properties</span><span class="p">,</span>
-            <span class="n">only_one</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="p">)</span></div>
-
-<div class="viewcode-block" id="Element.modify_one"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.Element.modify_one">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">modify_one</span><span class="p">(</span>
-            <span class="bp">cls</span><span class="p">,</span>
-            <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">,</span>
-            <span class="o">*</span><span class="p">,</span>
-            <span class="n">properties</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
-            <span class="n">raise_on_not_found</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-            <span class="o">**</span><span class="n">keys</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Element&quot;</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Modify all properties of models stored inside graph database matching the given keys.&quot;&quot;&quot;</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_do_modify</span><span class="p">(</span>
-            <span class="n">client</span><span class="p">,</span>
-            <span class="n">keys</span><span class="o">=</span><span class="n">keys</span><span class="p">,</span>
-            <span class="n">raise_on_not_found</span><span class="o">=</span><span class="n">raise_on_not_found</span><span class="p">,</span>
-            <span class="n">properties</span><span class="o">=</span><span class="n">properties</span><span class="p">,</span>
-            <span class="n">only_one</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="p">[]</span></div></div>
-
-
-<div class="viewcode-block" id="VertexBase"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.VertexBase">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">VertexBase</span><span class="p">(</span><span class="n">Element</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;A base class for implementing vertexes.&quot;&quot;&quot;</span>
-
-    <span class="n">_CACHE</span> <span class="o">=</span> <span class="kc">None</span>
-
-<div class="viewcode-block" id="VertexBase.from_properties"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.VertexBase.from_properties">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_properties</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">**</span><span class="n">properties</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Instantiate a vertex from properties.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="n">properties</span><span class="p">)</span></div>
-
-<div class="viewcode-block" id="VertexBase.get_or_create"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.VertexBase.get_or_create">[docs]</a>    <span class="k">def</span> <span class="nf">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get or create the given vertex.</span>
-
-<span class="sd">        This is implementation of the upsert procedure.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">without_uid</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="n">label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
-        <span class="n">label_hash</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_label_hash</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-        <span class="n">data</span><span class="p">[</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="n">label_hash</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_CACHE</span> <span class="ow">and</span> <span class="n">label_hash</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_CACHE</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Vertex with label </span><span class="si">%r</span><span class="s2"> found in vertex cache </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">label_hash</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">uid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_CACHE</span><span class="p">[</span><span class="n">label_hash</span><span class="p">]</span>
-            <span class="k">return</span> <span class="kc">True</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">uid</span><span class="p">,</span> <span class="n">existed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_upsert</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">label_hash</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_CACHE</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_CACHE</span><span class="p">[</span><span class="n">label_hash</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">uid</span>
-
-        <span class="k">return</span> <span class="n">existed</span></div></div>
-
-
-<div class="viewcode-block" id="EdgeBase"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.EdgeBase">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">EdgeBase</span><span class="p">(</span><span class="n">Element</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;A base class for implementing edges.&quot;&quot;&quot;</span>
-
-    <span class="n">source</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">VertexBase</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-    <span class="n">target</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">VertexBase</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-
-<div class="viewcode-block" id="EdgeBase.from_properties"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.EdgeBase.from_properties">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_properties</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">source</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="o">**</span><span class="n">properties</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Instantiate a vertex from properties.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">target</span><span class="p">,</span> <span class="o">**</span><span class="n">properties</span><span class="p">)</span></div>
-
-<div class="viewcode-block" id="EdgeBase.get_or_create"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.EdgeBase.get_or_create">[docs]</a>    <span class="k">def</span> <span class="nf">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">client</span><span class="p">:</span> <span class="n">DgraphClient</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get or create the given edge.&quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">source</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;No source vertex provided&quot;</span>
-        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;No target vertex provided&quot;</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">source</span><span class="o">.</span><span class="n">uid</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Source vertex not mapped to any entity in graph database, was get_or_create() called?&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">uid</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="s2">&quot;Target vertex not mapped to any entity in graph database, was get_or_create() called?&quot;</span>
-            <span class="p">)</span>
-
-        <span class="n">edge_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">without_uid</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="n">data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;target&quot;</span><span class="p">)</span>
-        <span class="n">data</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;source&quot;</span><span class="p">)</span>
-        <span class="n">edge_def</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;uid&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">source</span><span class="o">.</span><span class="n">uid</span><span class="p">,</span>
-            <span class="c1"># Respect Facets syntax in JSON.</span>
-            <span class="n">edge_name</span><span class="p">:</span> <span class="p">{</span><span class="n">f</span><span class="s2">&quot;</span><span class="si">{edge_name}</span><span class="s2">|</span><span class="si">{k}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="o">!=</span> <span class="s2">&quot;uid&quot;</span><span class="p">},</span>
-        <span class="p">}</span>
-        <span class="n">label</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_label</span><span class="p">()</span>
-        <span class="n">edge_def</span><span class="p">[</span><span class="n">edge_name</span><span class="p">][</span><span class="s2">&quot;uid&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">target</span><span class="o">.</span><span class="n">uid</span>
-        <span class="n">label_hash</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_label_hash</span><span class="p">(</span><span class="n">edge_def</span><span class="p">)</span>
-        <span class="n">edge_def</span><span class="p">[</span><span class="n">edge_name</span><span class="p">][</span><span class="n">label</span><span class="p">]</span> <span class="o">=</span> <span class="n">label_hash</span>
-        <span class="c1"># Edges have no relevant uid, do not assign it.</span>
-        <span class="n">_</span><span class="p">,</span> <span class="n">existed</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_upsert</span><span class="p">(</span><span class="n">client</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">label_hash</span><span class="p">,</span> <span class="n">edge_def</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">existed</span></div></div>
-
-
-<div class="viewcode-block" id="ReverseEdgeBase"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.ReverseEdgeBase">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">ReverseEdgeBase</span><span class="p">(</span><span class="n">EdgeBase</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;An edge which stores also reverse direction.&quot;&quot;&quot;</span></div>
-
-
-<div class="viewcode-block" id="enable_vertex_cache"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.models_base.enable_vertex_cache">[docs]</a><span class="k">def</span> <span class="nf">enable_vertex_cache</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">):</span>  <span class="c1"># Ignore PyDocStyleBear</span>
-    <span class="sd">&quot;&quot;&quot;Enable vertex caching.&quot;&quot;&quot;</span>
-
-    <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
-    <span class="k">def</span> <span class="nf">wrapped</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-        <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_STORAGES_DISABLE_CACHE&quot;</span><span class="p">,</span> <span class="s2">&quot;0&quot;</span><span class="p">))):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Disabling vertex graph cache&quot;</span><span class="p">)</span>
-            <span class="c1"># We could just return directly function call here, but</span>
-            <span class="c1"># this version works as expected in Jupyter notebooks.</span>
-            <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Enabling vertex graph cache&quot;</span><span class="p">)</span>
-        <span class="n">VertexBase</span><span class="o">.</span><span class="n">_CACHE</span> <span class="o">=</span> <span class="p">{}</span>
-
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">result</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
-        <span class="k">finally</span><span class="p">:</span>
-            <span class="c1"># We delete cache once sync is done.</span>
-            <span class="n">VertexBase</span><span class="o">.</span><span class="n">_CACHE</span> <span class="o">=</span> <span class="kc">None</span>
-
-        <span class="k">return</span> <span class="n">result</span>
-
-    <span class="k">return</span> <span class="n">wrapped</span></div>
+    <span class="k">return</span> <span class="n">result</span></div>
 </pre></div>
 
           </div>

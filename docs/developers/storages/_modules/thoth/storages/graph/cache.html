@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.graph.cache &#8212; Thoth Storages  documentation</title>
+    <title>thoth.storages.graph.cache &#8212; Thoth Storages 0.19.3 documentation</title>
     <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../../index.html">Thoth Storages  documentation</a> &#187;</li>
+        <li><a href="../../../../index.html">Thoth Storages 0.19.3 documentation</a> &#187;</li>
           <li><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -50,7 +50,7 @@
   <h1>Source code for thoth.storages.graph.cache</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
 <span class="c1"># thoth-storages</span>
-<span class="c1"># Copyright(C) 2018, 2019 Fridolin Pokorny</span>
+<span class="c1"># Copyright(C) 2019 Fridolin Pokorny</span>
 <span class="c1">#</span>
 <span class="c1"># This program is free software: you can redistribute it and / or modify</span>
 <span class="c1"># it under the terms of the GNU General Public License as published by</span>
@@ -65,40 +65,309 @@
 <span class="c1"># You should have received a copy of the GNU General Public License</span>
 <span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
 
-<span class="sd">&quot;&quot;&quot;A cache to optimize syncs to JanusGraph database.&quot;&quot;&quot;</span>
+<span class="sd">&quot;&quot;&quot;A graph database cache implementation to speed up queries.</span>
 
-<span class="kn">from</span> <span class="nn">collections</span> <span class="k">import</span> <span class="n">deque</span>
+<span class="sd">The implementation uses actually two caches - one in-memory for LRU based on</span>
+<span class="sd">method calls and another one which is build on top of SQLite3.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">functools</span>
+<span class="kn">from</span> <span class="nn">sqlite3</span> <span class="k">import</span> <span class="n">dbapi2</span> <span class="k">as</span> <span class="n">sqlite</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Union</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+
+<span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="k">import</span> <span class="n">create_engine</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="k">import</span> <span class="n">sessionmaker</span>
+
+<span class="kn">from</span> <span class="nn">.sql_base</span> <span class="k">import</span> <span class="n">SQLBase</span>
+<span class="kn">from</span> <span class="nn">.models_cache</span> <span class="k">import</span> <span class="n">CacheBase</span> <span class="k">as</span> <span class="n">Base</span>
+<span class="kn">from</span> <span class="nn">.models_cache</span> <span class="k">import</span> <span class="n">DependsOn</span>
+<span class="kn">from</span> <span class="nn">.models_cache</span> <span class="k">import</span> <span class="n">PythonPackageVersion</span>
+<span class="kn">from</span> <span class="nn">.models_cache</span> <span class="k">import</span> <span class="n">PythonPackageVersionEntity</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="CacheMiss"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.CacheMiss">[docs]</a><span class="k">class</span> <span class="nc">CacheMiss</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Exception raised when the given item is not present inside cache.&quot;&quot;&quot;</span></div>
+<span class="k">def</span> <span class="nf">_only_if_enabled</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A decorator to make sure the graph database cache is used only if enabled.&quot;&quot;&quot;</span>
+    <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">is_enabled</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">wrapper</span>
 
 
-<div class="viewcode-block" id="Cache"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.Cache">[docs]</a><span class="k">class</span> <span class="nc">Cache</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;A generic cache for non-hashable item-value pairs.&quot;&quot;&quot;</span>
+<span class="k">def</span> <span class="nf">_only_if_inserts_enabled</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Decorator to make sure inserts are noop on production systems to reduce cache building overhead.&quot;&quot;&quot;</span>
+    <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">is_inserts_enabled</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">None</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Initialize cache.&quot;&quot;&quot;</span>
-        <span class="c1"># Let&#39;s implement cache as a linked list now.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span> <span class="o">=</span> <span class="n">deque</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
 
-<div class="viewcode-block" id="Cache.wipe"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.Cache.wipe">[docs]</a>    <span class="k">def</span> <span class="nf">wipe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Clear the cache.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+    <span class="k">return</span> <span class="n">wrapper</span>
 
-<div class="viewcode-block" id="Cache.get"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.Cache.get">[docs]</a>    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Get the given item from cache.&quot;&quot;&quot;</span>
-        <span class="n">item</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">entry</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">item</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">entry</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 
-        <span class="k">raise</span> <span class="n">CacheMiss</span></div>
+<span class="k">def</span> <span class="nf">_get_python_package_version_filter_kwargs</span><span class="p">(</span>
+    <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">package_version</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+    <span class="n">index_url</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">os_name</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+    <span class="n">os_version</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+    <span class="n">python_version</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Get filter kwargs to query PythonPackageVersion records.&quot;&quot;&quot;</span>
+    <span class="n">filter_kwargs</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_name</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">package_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">filter_kwargs</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
+    <span class="k">if</span> <span class="n">index_url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">filter_kwargs</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">index_url</span>
+    <span class="k">if</span> <span class="n">os_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">filter_kwargs</span><span class="p">[</span><span class="s2">&quot;os_name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os_name</span>
+    <span class="k">if</span> <span class="n">os_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">filter_kwargs</span><span class="p">[</span><span class="s2">&quot;os_version&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os_version</span>
+    <span class="k">if</span> <span class="n">python_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">filter_kwargs</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">python_version</span>
 
-<div class="viewcode-block" id="Cache.put"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.Cache.put">[docs]</a>    <span class="k">def</span> <span class="nf">put</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Store the given item with the given value into a cache.&quot;&quot;&quot;</span>
-        <span class="n">item</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>  <span class="c1"># Do not store ids as they are the actual value.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_cache</span><span class="o">.</span><span class="n">appendleft</span><span class="p">((</span><span class="n">item</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span></div></div>
+    <span class="k">return</span> <span class="n">filter_kwargs</span>
+
+
+<div class="viewcode-block" id="GraphCache"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.GraphCache">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">()</span>  <span class="c1"># Do not use slots here as methodtools will fail.</span>
+<span class="k">class</span> <span class="nc">GraphCache</span><span class="p">(</span><span class="n">SQLBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A Dgraph database cache to speed up resolution of popular packages and packages with overlapping dependencies.&quot;&quot;&quot;</span>
+
+    <span class="c1"># This is a default graph cache - using in-memory. In a deployment we point to a path on disk.</span>
+    <span class="n">DEFAULT_CACHE_PATH</span> <span class="o">=</span> <span class="s2">&quot;:memory:&quot;</span>
+    <span class="n">ENV_CACHE_PATH</span> <span class="o">=</span> <span class="s2">&quot;THOTH_STORAGES_GRAPH_CACHE&quot;</span>
+    <span class="n">_DECLARATIVE_BASE</span> <span class="o">=</span> <span class="n">Base</span>
+
+    <span class="n">sqlite_cache_stats</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">cache</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="nd">@sqlite_cache_stats</span><span class="o">.</span><span class="n">default</span>
+    <span class="k">def</span> <span class="nf">_sqlite_cache_stats_default</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;get_python_package_version_records&quot;</span><span class="p">:</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">((</span><span class="s2">&quot;misses&quot;</span><span class="p">,</span> <span class="s2">&quot;hits&quot;</span><span class="p">),</span> <span class="mi">0</span><span class="p">),</span>
+            <span class="s2">&quot;get_depends_on&quot;</span><span class="p">:</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">((</span><span class="s2">&quot;misses&quot;</span><span class="p">,</span> <span class="s2">&quot;hits&quot;</span><span class="p">),</span> <span class="mi">0</span><span class="p">),</span>
+        <span class="p">}</span>
+
+<div class="viewcode-block" id="GraphCache.is_enabled"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.GraphCache.is_enabled">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">is_enabled</span><span class="p">():</span>
+        <span class="sd">&quot;&quot;&quot;Check if this cache is enabled.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_STORAGES_GRAPH_CACHE_DISABLED&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span></div>
+
+<div class="viewcode-block" id="GraphCache.is_inserts_enabled"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.GraphCache.is_inserts_enabled">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">is_inserts_enabled</span><span class="p">():</span>
+        <span class="sd">&quot;&quot;&quot;Check if inserts to this cache are enabled.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_STORAGES_GRAPH_CACHE_INSERTS_DISABLED&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)))</span></div>
+
+<div class="viewcode-block" id="GraphCache.load"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.GraphCache.load">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;GraphCache&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Prepare graph cache by loading an already existing one or a new one.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cache</span><span class="p">:</span>
+            <span class="n">cache</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">ENV_CACHE_PATH</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">DEFAULT_CACHE_PATH</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cache</span> <span class="o">==</span> <span class="s2">&quot;:memory:&quot;</span><span class="p">:</span>
+            <span class="n">cache</span> <span class="o">=</span> <span class="s2">&quot;sqlite://&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cache</span> <span class="o">=</span> <span class="n">f</span><span class="s2">&quot;sqlite:///{cache if cache.startswith(&#39;/&#39;) else os.path.join(os.getcwd(), cache)}&quot;</span>
+
+        <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span>
+        <span class="n">instance</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">instance</span><span class="o">.</span><span class="n">is_enabled</span><span class="p">():</span>
+            <span class="n">instance</span><span class="o">.</span><span class="n">initialize_schema</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">cache</span> <span class="o">!=</span> <span class="s2">&quot;sqlite://&quot;</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using database cache from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">cache</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using in-memory database cache&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Database cache is disabled&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">instance</span><span class="o">.</span><span class="n">is_inserts_enabled</span><span class="p">():</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Inserts into database cache are disabled, cache will be used only for reading pre-cached data&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">instance</span></div>
+
+<div class="viewcode-block" id="GraphCache.connect"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.GraphCache.connect">[docs]</a>    <span class="k">def</span> <span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Connect to the database.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_connected</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot connect, the adapter is already connected&quot;</span><span class="p">)</span>
+
+        <span class="n">echo</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_STORAGES_DEBUG_QUERIES&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
+        <span class="c1"># self._engine = create_engine(f&quot;sqlite+pysqlite:///{self.cache}&quot;, echo=echo, module=sqlite)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cache</span><span class="p">,</span> <span class="n">echo</span><span class="o">=</span><span class="n">echo</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="n">sqlite</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">sessionmaker</span><span class="p">(</span><span class="n">bind</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="p">)()</span></div>
+
+<div class="viewcode-block" id="GraphCache.get_depends_on"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.GraphCache.get_depends_on">[docs]</a>    <span class="nd">@_only_if_enabled</span>
+    <span class="k">def</span> <span class="nf">get_depends_on</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">index_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">os_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">os_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">python_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve dependencies for the given packages.&quot;&quot;&quot;</span>
+        <span class="n">filter_kwargs</span> <span class="o">=</span> <span class="n">_get_python_package_version_filter_kwargs</span><span class="p">(</span>
+            <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+            <span class="n">package_version</span><span class="o">=</span><span class="n">package_version</span><span class="p">,</span>
+            <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span>
+            <span class="n">os_name</span><span class="o">=</span><span class="n">os_name</span><span class="p">,</span>
+            <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
+            <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">dependencies</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">filter_by</span><span class="p">(</span><span class="o">**</span><span class="n">filter_kwargs</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">DependsOn</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span> <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">all</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">dependencies</span><span class="p">:</span>
+            <span class="c1"># No record in the cache - for packages which do not depend on anything, we have (None, None) record.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sqlite_cache_stats</span><span class="p">[</span><span class="s2">&quot;get_depends_on&quot;</span><span class="p">][</span><span class="s2">&quot;misses&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">dependency_name</span><span class="p">,</span> <span class="n">dependency_version</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">dependency_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">dependency_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">dependency_name</span><span class="p">,</span> <span class="n">dependency_version</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">sqlite_cache_stats</span><span class="p">[</span><span class="s2">&quot;get_depends_on&quot;</span><span class="p">][</span><span class="s2">&quot;hits&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="GraphCache.get_python_package_version_records"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.GraphCache.get_python_package_version_records">[docs]</a>    <span class="nd">@_only_if_enabled</span>
+    <span class="k">def</span> <span class="nf">get_python_package_version_records</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">index_url</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+        <span class="n">os_name</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+        <span class="n">os_version</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+        <span class="n">python_version</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get records for Python packages matching the given criteria for environment.&quot;&quot;&quot;</span>
+        <span class="n">filter_kwargs</span> <span class="o">=</span> <span class="n">_get_python_package_version_filter_kwargs</span><span class="p">(</span>
+            <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+            <span class="n">package_version</span><span class="o">=</span><span class="n">package_version</span><span class="p">,</span>
+            <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span>
+            <span class="n">os_name</span><span class="o">=</span><span class="n">os_name</span><span class="p">,</span>
+            <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
+            <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+                <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
+                <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
+                <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">index_url</span><span class="p">,</span>
+                <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">os_name</span><span class="p">,</span>
+                <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">os_version</span><span class="p">,</span>
+                <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="o">.</span><span class="n">filter_by</span><span class="p">(</span><span class="o">**</span><span class="n">filter_kwargs</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">all</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">result</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sqlite_cache_stats</span><span class="p">[</span><span class="s2">&quot;get_python_package_version_records&quot;</span><span class="p">][</span><span class="s2">&quot;hits&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">return</span> <span class="p">[</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                    <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                    <span class="s2">&quot;index_url&quot;</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+                    <span class="s2">&quot;os_name&quot;</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+                    <span class="s2">&quot;os_version&quot;</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span>
+                    <span class="s2">&quot;python_version&quot;</span><span class="p">:</span> <span class="n">item</span><span class="p">[</span><span class="mi">5</span><span class="p">],</span>
+                <span class="p">}</span>
+                <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span>
+            <span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">sqlite_cache_stats</span><span class="p">[</span><span class="s2">&quot;get_python_package_version_records&quot;</span><span class="p">][</span><span class="s2">&quot;misses&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="GraphCache.add_depends_on"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.GraphCache.add_depends_on">[docs]</a>    <span class="nd">@_only_if_enabled</span>
+    <span class="nd">@_only_if_inserts_enabled</span>
+    <span class="k">def</span> <span class="nf">add_depends_on</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">index_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">os_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">os_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">python_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">dependency_name</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+        <span class="n">dependency_version</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add a new entry of depends on for a Python package.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">dependency_name</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">dependency_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">or</span> <span class="n">dependency_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="ow">and</span> <span class="n">dependency_version</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Integrity error - cannot insert </span><span class="si">{dependency_name}</span><span class="s2"> in version </span><span class="si">{dependency_version}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">begin</span><span class="p">(</span><span class="n">subtransactions</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                <span class="n">python_package_version</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="p">,</span>
+                    <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">=</span><span class="n">package_version</span><span class="p">,</span>
+                    <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span>
+                    <span class="n">os_name</span><span class="o">=</span><span class="n">os_name</span><span class="p">,</span>
+                    <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
+                    <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">entity</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="p">,</span> <span class="n">package_name</span><span class="o">=</span><span class="n">dependency_name</span><span class="p">,</span> <span class="n">package_version</span><span class="o">=</span><span class="n">dependency_version</span>
+                <span class="p">)</span>
+                <span class="n">DependsOn</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="p">,</span> <span class="n">entity_id</span><span class="o">=</span><span class="n">entity</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">version_id</span><span class="o">=</span><span class="n">python_package_version</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+            <span class="k">raise</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="GraphCache.stats"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.GraphCache.stats">[docs]</a>    <span class="k">def</span> <span class="nf">stats</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get statistics for the graph cache.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;table_size&quot;</span><span class="p">:</span> <span class="p">{}}</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_enabled</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">result</span>
+
+        <span class="k">for</span> <span class="n">table_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">table_names</span><span class="p">():</span>
+            <span class="n">table_object</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_DECLARATIVE_BASE</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">tables</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">table_name</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">&quot;table_size&quot;</span><span class="p">][</span><span class="n">table_name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">table_object</span><span class="p">)</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+
+        <span class="n">result</span><span class="p">[</span><span class="s2">&quot;sqlite_cache_info&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sqlite_cache_stats</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="GraphCache.clear_in_memory_cache"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.cache.GraphCache.clear_in_memory_cache">[docs]</a>    <span class="k">def</span> <span class="nf">clear_in_memory_cache</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Clear in-memory cache.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_python_package_version_records</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_depends_on</span><span class="p">):</span>
+            <span class="n">method</span><span class="o">.</span><span class="n">cache_clear</span><span class="p">()</span></div></div>
 </pre></div>
 
           </div>
@@ -110,10 +379,10 @@
     
 
 <div id="searchbox" style="display: none" role="search">
-  <h3>Quick search</h3>
+  <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../../../../search.html" method="get">
-      <input type="text" name="q" />
+      <input type="text" name="q" aria-labelledby="searchlabel" />
       <input type="submit" value="Go" />
     </form>
     </div>
@@ -138,7 +407,7 @@
 
     <div class="footer" role="contentinfo">
         &#169; Copyright 2019, Thoth team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.0.1.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.0.
     </div>
 <script type="text/javascript">
   (function() {

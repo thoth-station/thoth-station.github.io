@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.storages.graph_cache &#8212; Thoth Storages 0.19.3 documentation</title>
+    <link rel="stylesheet" href="../../../_static/pydoctheme.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="../../../_static/sidebar.js"></script>
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <link rel="shortcut icon" type="image/png" href="../../../_static/favicon.png" />
+    <meta name="viewport" content="width=device-width,initial-scale=0.8">
+    
+    
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
+        <li><a href="../../../index.html">Thoth Storages 0.19.3 documentation</a> &#187;</li>
+          <li><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>
+    
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.storages.graph_cache</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-storages</span>
+<span class="c1"># Copyright(C) 2018, 2019 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Graph cache backup for incremental cache builds.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">.ceph</span> <span class="k">import</span> <span class="n">CephStore</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">NotFoundError</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="GraphCacheStore"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.graph_cache.GraphCacheStore">[docs]</a><span class="k">class</span> <span class="nc">GraphCacheStore</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;A graph cache store for storing and restoring graph cache.&quot;&quot;&quot;</span>
+
+    <span class="n">_OBJECT_NAME</span> <span class="o">=</span> <span class="s2">&quot;graph_cache.sqlite3&quot;</span>
+
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize graph cache store.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span> <span class="ow">or</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">/</span><span class="si">{}</span><span class="s2">/</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_CEPH_BUCKET_PREFIX&quot;</span><span class="p">],</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_DEPLOYMENT_NAME&quot;</span><span class="p">],</span> <span class="s2">&quot;graph-cache&quot;</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ceph</span> <span class="o">=</span> <span class="n">CephStore</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="p">)</span>
+
+<div class="viewcode-block" id="GraphCacheStore.connect"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.graph_cache.GraphCacheStore.connect">[docs]</a>    <span class="k">def</span> <span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Connect to the remote store.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ceph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="GraphCacheStore.retrieve"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.graph_cache.GraphCacheStore.retrieve">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve a cache from remote Ceph.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Restoring </span><span class="si">%r</span><span class="s2"> from </span><span class="si">%r</span><span class="s2"> to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_OBJECT_NAME</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="p">,</span> <span class="n">cache_file</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">cache_file</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">blob_file</span><span class="p">:</span>
+            <span class="n">blob_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_ceph</span><span class="o">.</span><span class="n">retrieve_blob</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_OBJECT_NAME</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="GraphCacheStore.store"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.graph_cache.GraphCacheStore.store">[docs]</a>    <span class="k">def</span> <span class="nf">store</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">cache_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Store the given cache onto remote Ceph.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Storing </span><span class="si">%r</span><span class="s2"> to </span><span class="si">%r</span><span class="s2">, object name is </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">cache_file</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_OBJECT_NAME</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">cache_file</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">blob_file</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_ceph</span><span class="o">.</span><span class="n">store_blob</span><span class="p">(</span><span class="n">blob_file</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_OBJECT_NAME</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">FileNotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;File </span><span class="si">{cache_file!r}</span><span class="s2"> was not found: {str(exc)}&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+    <a id="sidebar-anchor"></a>
+    
+
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+      </ul>
+    </div>
+
+
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Thoth team.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.0.
+    </div>
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
