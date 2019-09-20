@@ -80,6 +80,7 @@
 
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">methodtools</span> <span class="k">import</span> <span class="n">lru_cache</span>
+<span class="kn">from</span> <span class="nn">alembic.config</span> <span class="k">import</span> <span class="n">main</span> <span class="k">as</span> <span class="n">alembic_main</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="k">import</span> <span class="n">create_engine</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="k">import</span> <span class="n">desc</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="k">import</span> <span class="n">func</span>
@@ -89,6 +90,8 @@
 <span class="kn">from</span> <span class="nn">sqlalchemy.dialects.postgresql</span> <span class="k">import</span> <span class="n">insert</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy.pool</span> <span class="k">import</span> <span class="n">NullPool</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy.dialects</span> <span class="k">import</span> <span class="n">postgresql</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy_utils.functions</span> <span class="k">import</span> <span class="n">create_database</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy_utils.functions</span> <span class="k">import</span> <span class="n">database_exists</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">PackageVersion</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Pipfile</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">PipfileLock</span>
@@ -184,7 +187,7 @@
             <span class="n">f</span><span class="s2">&quot;postgresql+psycopg2://&quot;</span>
             <span class="n">f</span><span class="s2">&quot;{os.getenv(&#39;KNOWLEDGE_GRAPH_USER&#39;, &#39;postgres&#39;)}:{os.getenv(&#39;KNOWLEDGE_GRAPH_PASSWORD&#39;, &#39;postgres&#39;)}&quot;</span>
             <span class="n">f</span><span class="s2">&quot;@{os.getenv(&#39;KNOWLEDGE_GRAPH_HOST&#39;, &#39;localhost&#39;)}:{os.getenv(&#39;KNOWLEDGE_GRAPH_PORT&#39;, 5432)}&quot;</span>
-            <span class="n">f</span><span class="s2">&quot;/{os.getenv(&#39;KNOWLEDGE_GRAPH_DATABASE&#39;, &#39;thoth&#39;)}&quot;</span>
+            <span class="n">f</span><span class="s2">&quot;/{os.getenv(&#39;KNOWLEDGE_GRAPH_DATABASE&#39;, &#39;postgres&#39;)}&quot;</span>
         <span class="p">)</span>
 
         <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;KNOWLEDGE_GRAPH_SSL_DISABLED&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))):</span>
@@ -206,6 +209,17 @@
         <span class="c1"># We do not use connection pool, but directly talk to the database.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">construct_connection_string</span><span class="p">(),</span> <span class="n">echo</span><span class="o">=</span><span class="n">echo</span><span class="p">,</span> <span class="n">poolclass</span><span class="o">=</span><span class="n">NullPool</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">sessionmaker</span><span class="p">(</span><span class="n">bind</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="p">)()</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.initialize_schema"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.initialize_schema">[docs]</a>    <span class="k">def</span> <span class="nf">initialize_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialize schema of database.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_connected</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot initialize schema: the adapter is not connected yet&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">database_exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">url</span><span class="p">):</span>
+            <span class="n">create_database</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running Alembic migrations...&quot;</span><span class="p">)</span>
+        <span class="n">alembic_main</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;upgrade&quot;</span><span class="p">,</span> <span class="s2">&quot;head&quot;</span><span class="p">])</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.normalize_python_package_name"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.normalize_python_package_name">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -1232,6 +1246,47 @@
         <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">hardware_information</span><span class="p">,</span> <span class="n">software_environment</span>
+
+<div class="viewcode-block" id="GraphDatabase.create_python_package_version_entity"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.create_python_package_version_entity">[docs]</a>    <span class="k">def</span> <span class="nf">create_python_package_version_entity</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">index_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">only_if_package_seen</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">PythonPackageVersionEntity</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Create a Python package version entity record in the system.</span>
+
+<span class="sd">        By creating this entity, the system will record and track the given package.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">only_if_package_seen</span><span class="p">:</span>
+            <span class="n">seen_count</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">count</span><span class="p">()</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">seen_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">begin</span><span class="p">(</span><span class="n">subtransactions</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                <span class="n">index</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">if</span> <span class="n">index_url</span><span class="p">:</span>
+                    <span class="n">index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_or_create_python_package_index</span><span class="p">(</span><span class="n">index_url</span><span class="p">,</span> <span class="n">only_if_enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+                <span class="n">entity</span><span class="p">,</span> <span class="n">existed</span> <span class="o">=</span> <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="p">,</span>
+                    <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">=</span><span class="n">package_version</span><span class="p">,</span>
+                    <span class="n">python_package_index_id</span><span class="o">=</span><span class="n">index</span><span class="o">.</span><span class="n">id</span> <span class="k">if</span> <span class="n">index</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">rollback</span><span class="p">()</span>
+            <span class="k">raise</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">commit</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">entity</span><span class="p">,</span> <span class="n">existed</span></div>
 
     <span class="k">def</span> <span class="nf">_create_python_package_version</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
