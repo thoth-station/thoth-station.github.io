@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.19.5 documentation</title>
+    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.19.6 documentation</title>
     <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../../index.html">Thoth Storages 0.19.5 documentation</a> &#187;</li>
+        <li><a href="../../../../index.html">Thoth Storages 0.19.6 documentation</a> &#187;</li>
           <li><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -96,6 +96,7 @@
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Pipfile</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">PipfileLock</span>
 <span class="kn">from</span> <span class="nn">thoth.common.helpers</span> <span class="k">import</span> <span class="n">format_datetime</span>
+<span class="kn">from</span> <span class="nn">thoth.common.helpers</span> <span class="k">import</span> <span class="n">cwd</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="k">import</span> <span class="n">OpenShift</span>
 
 <span class="kn">from</span> <span class="nn">.cache</span> <span class="k">import</span> <span class="n">GraphCache</span>
@@ -212,14 +213,53 @@
 
 <div class="viewcode-block" id="GraphDatabase.initialize_schema"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.initialize_schema">[docs]</a>    <span class="k">def</span> <span class="nf">initialize_schema</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Initialize schema of database.&quot;&quot;&quot;</span>
+        <span class="kn">import</span> <span class="nn">thoth.storages</span>
+        <span class="kn">from</span> <span class="nn">alembic</span> <span class="k">import</span> <span class="n">config</span>
+        <span class="kn">from</span> <span class="nn">alembic</span> <span class="k">import</span> <span class="n">command</span>
+
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_connected</span><span class="p">():</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot initialize schema: the adapter is not connected yet&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">database_exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">url</span><span class="p">):</span>
             <span class="n">create_database</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
 
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Running Alembic migrations...&quot;</span><span class="p">)</span>
-        <span class="n">alembic_main</span><span class="p">(</span><span class="n">argv</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;upgrade&quot;</span><span class="p">,</span> <span class="s2">&quot;head&quot;</span><span class="p">])</span></div>
+        <span class="c1"># Change directory to data dir as that&#39;s where alembic configuration sits in and refers revisions.</span>
+        <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">storages</span><span class="o">.</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;data&quot;</span><span class="p">)):</span>
+            <span class="n">alembic_cfg</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;alembic.ini&quot;</span><span class="p">)</span>
+            <span class="c1"># Overwrite URL based on deployment configuration.</span>
+            <span class="n">alembic_cfg</span><span class="o">.</span><span class="n">set_main_option</span><span class="p">(</span><span class="s1">&#39;sqlalchemy.url&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">construct_connection_string</span><span class="p">())</span>
+            <span class="n">command</span><span class="o">.</span><span class="n">upgrade</span><span class="p">(</span><span class="n">alembic_cfg</span><span class="p">,</span> <span class="s2">&quot;head&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.drop_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.drop_all">[docs]</a>    <span class="k">def</span> <span class="nf">drop_all</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Drop all content stored in the database.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">drop_all</span><span class="p">()</span>
+        <span class="c1"># Drop alembic version to be able re-run alembic migrations next time.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="s2">&quot;DROP TABLE alembic_version;&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.is_schema_up2date"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.is_schema_up2date">[docs]</a>    <span class="k">def</span> <span class="nf">is_schema_up2date</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if the current schema is up2date with the one configured on database side.&quot;&quot;&quot;</span>
+        <span class="kn">import</span> <span class="nn">thoth.storages</span>
+        <span class="kn">from</span> <span class="nn">alembic</span> <span class="k">import</span> <span class="n">config</span>
+        <span class="kn">from</span> <span class="nn">alembic</span> <span class="k">import</span> <span class="n">script</span>
+        <span class="kn">from</span> <span class="nn">alembic.runtime</span> <span class="k">import</span> <span class="n">migration</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_connected</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot check schema: the adapter is not connected yet&quot;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">storages</span><span class="o">.</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;data&quot;</span><span class="p">)):</span>
+            <span class="n">alembic_cfg</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;alembic.ini&quot;</span><span class="p">)</span>
+            <span class="n">directory</span> <span class="o">=</span> <span class="n">script</span><span class="o">.</span><span class="n">ScriptDirectory</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="n">alembic_cfg</span><span class="p">)</span>
+            <span class="n">context</span> <span class="o">=</span> <span class="n">migration</span><span class="o">.</span><span class="n">MigrationContext</span><span class="o">.</span><span class="n">configure</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="p">)</span>
+
+            <span class="n">database_heads</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">context</span><span class="o">.</span><span class="n">get_current_heads</span><span class="p">())</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">database_heads</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Database is not initialized yet&quot;</span><span class="p">)</span>
+
+            <span class="n">revision_heads</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">directory</span><span class="o">.</span><span class="n">get_heads</span><span class="p">())</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Current library revision heads: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">revision_heads</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Current database heads: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">database_heads</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">revision_heads</span> <span class="o">==</span> <span class="n">revision_heads</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.normalize_python_package_name"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.normalize_python_package_name">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -502,18 +542,20 @@
 
         <span class="k">return</span> <span class="n">query</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span> <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span></div>
 
-    <span class="k">def</span> <span class="nf">_construct_unsolved_python_packages_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">_construct_unsolved_python_packages_query</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Construct query for retrieving unsolved Python packages, the query is not executed.&quot;&quot;&quot;</span>
-        <span class="n">solver_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_python_solver_name</span><span class="p">(</span><span class="n">solver_name</span><span class="p">)</span>
-        <span class="n">subquery</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span> <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">os_name</span> <span class="o">==</span> <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;os_name&quot;</span><span class="p">])</span>
-            <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">os_version</span> <span class="o">==</span> <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;os_version&quot;</span><span class="p">])</span>
-            <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">python_version</span> <span class="o">==</span> <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">])</span>
-            <span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
-            <span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
-        <span class="p">)</span>
+        <span class="n">subquery</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span> <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span><span class="p">)</span>
 
+        <span class="k">if</span> <span class="n">solver_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">solver_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_python_solver_name</span><span class="p">(</span><span class="n">solver_name</span><span class="p">)</span>
+            <span class="n">subquery</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">subquery</span>
+                <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">os_name</span> <span class="o">==</span> <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;os_name&quot;</span><span class="p">])</span>
+                <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">os_version</span> <span class="o">==</span> <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;os_version&quot;</span><span class="p">])</span>
+                <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">python_version</span> <span class="o">==</span> <span class="n">solver_info</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">])</span>
+            <span class="p">)</span>
+
+        <span class="n">subquery</span> <span class="o">=</span> <span class="n">subquery</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
         <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
             <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
@@ -527,7 +569,11 @@
 
         <span class="k">return</span> <span class="n">query</span>
 
-<div class="viewcode-block" id="GraphDatabase.retrieve_unsolved_python_packages"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.retrieve_unsolved_python_packages">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_unsolved_python_packages</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">randomize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+<div class="viewcode-block" id="GraphDatabase.retrieve_unsolved_python_packages"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.retrieve_unsolved_python_packages">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_unsolved_python_packages</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">randomize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve a list of tuples (package name, package version) of dependencies which were not yet resolved.</span>
 
 <span class="sd">        Using solver_name argument the query narrows down to packages that were not resolved by the given solver.</span>
@@ -539,7 +585,7 @@
 
         <span class="k">return</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="GraphDatabase.retrieve_unsolved_python_packages_count"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.retrieve_unsolved_python_packages_count">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_unsolved_python_packages_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<div class="viewcode-block" id="GraphDatabase.retrieve_unsolved_python_packages_count"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.retrieve_unsolved_python_packages_count">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_unsolved_python_packages_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve number of unsolved Python packages for the given solver.&quot;&quot;&quot;</span>
         <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_unsolved_python_packages_query</span><span class="p">(</span><span class="n">solver_name</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">query</span><span class="o">.</span><span class="n">count</span><span class="p">()</span></div>
