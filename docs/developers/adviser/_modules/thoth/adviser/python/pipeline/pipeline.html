@@ -96,6 +96,7 @@
 <span class="kn">from</span> <span class="nn">.stride_context</span> <span class="k">import</span> <span class="n">StrideContext</span>
 <span class="kn">from</span> <span class="nn">.stack_candidates</span> <span class="k">import</span> <span class="n">StackCandidates</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">StrideRemoveStack</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">NotResolvedError</span>
 <span class="kn">from</span> <span class="nn">.product</span> <span class="k">import</span> <span class="n">PipelineProduct</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
@@ -268,10 +269,38 @@
         <span class="c1"># based on for example semver sort which have same score.</span>
         <span class="n">paths</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">scored_package_tuple_pairs</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">)))</span>
         <span class="c1"># The actual score is not required. Also, make sure direct dependencies are passed sorted based on the score.</span>
-        <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="p">[</span><span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span> <span class="k">if</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">]</span>
-        <span class="n">paths</span> <span class="o">=</span> <span class="p">[</span><span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span> <span class="k">if</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">walker_paths</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">paths</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="c1"># This is direct dependency, add it.</span>
+                <span class="n">direct_dependency</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+
+                <span class="k">if</span> <span class="n">direct_dependency</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">direct_dependency</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">NotResolvedError</span><span class="p">(</span>
+                        <span class="n">f</span><span class="s2">&quot;Direct dependency </span><span class="si">{direct_dependency!r}</span><span class="s2"> is not resolved, &quot;</span>
+                        <span class="s2">&quot;cannot use it in dependency graph traversals&quot;</span>
+                    <span class="p">)</span>
+
+                <span class="n">direct_dependencies</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">direct_dependency</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">package</span><span class="p">,</span> <span class="n">dependency</span> <span class="o">=</span> <span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">package</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">NotResolvedError</span><span class="p">(</span>
+                    <span class="n">f</span><span class="s2">&quot;Package </span><span class="si">{package!r}</span><span class="s2"> is not resolved, cannot use it in dependency graph traversals&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">dependency</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">dependency</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">NotResolvedError</span><span class="p">(</span>
+                    <span class="n">f</span><span class="s2">&quot;Package </span><span class="si">{dependency!r}</span><span class="s2"> is not resolved, cannot use it in dependency graph traversals&quot;</span>
+                <span class="p">)</span>
+
+            <span class="n">walker_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">path</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
         <span class="n">dependency_graph</span> <span class="o">=</span> <span class="n">DependencyGraphWalker</span><span class="p">(</span>
-            <span class="n">direct_dependencies</span><span class="o">=</span><span class="n">direct_dependencies</span><span class="p">,</span> <span class="n">paths</span><span class="o">=</span><span class="n">paths</span>
+            <span class="n">direct_dependencies</span><span class="o">=</span><span class="n">direct_dependencies</span><span class="p">,</span> <span class="n">paths</span><span class="o">=</span><span class="n">walker_paths</span>
         <span class="p">)</span>
 
         <span class="n">estimated</span> <span class="o">=</span> <span class="n">dependency_graph</span><span class="o">.</span><span class="n">stacks_estimated</span>
