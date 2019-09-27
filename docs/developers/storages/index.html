@@ -273,13 +273,35 @@ environment variable to <code class="docutils literal notranslate"><span class="
 </div>
 <div class="section" id="creating-backups-from-thoth-deployment">
 <h2>Creating backups from Thoth deployment<a class="headerlink" href="#creating-backups-from-thoth-deployment" title="Permalink to this headline">¶</a></h2>
-<p>You can use <cite>pg_dump</cite> and <cite>pg_restore</cite> utilities to create dumps and restore
+<p>You can use <cite>pg_dump</cite> and <cite>psql</cite> utilities to create dumps and restore
 the database content from dumps. This tool is pre-installed in the container image
 which is running PostgreSQL so the only thing you need to do is execute
 <cite>pg_dump</cite> in Thoth’s deployment in a PostgreSQL container to create a dump, use
 <cite>oc cp</cite> to retrieve dump (or directly use <cite>oc exec</cite> and create the dump from the
-cluster) and subsequently <cite>pg_restore</cite> to restore the database content. The
+cluster) and subsequently <cite>psql</cite> to restore the database content. The
 prerequisite for this is to have access to the running container (edit rights).</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">#</span> Execute the following commands from the root of this Git repo:
+<span class="gp">#</span> List PostgreSQL pods running:
+<span class="gp">$</span> oc get pod -l <span class="nv">name</span><span class="o">=</span>postgresql
+<span class="go">NAME                 READY     STATUS    RESTARTS   AGE</span>
+<span class="go">postgresql-1-glwnr   1/1       Running   0          3d</span>
+<span class="gp">#</span> Open remote shell to the running container in the PostgreSQL pod:
+<span class="gp">$</span> oc rsh -t postgresql-1-glwnr bash
+<span class="gp">#</span> Perform dump of the database:
+<span class="gp">(cluster-postgres) $</span> pg_dump &gt; pg_dump-<span class="k">$(</span>date +<span class="s2">&quot;%s&quot;</span><span class="k">)</span>.sql
+<span class="gp">(cluster-postgres) $</span> ls pg_dump-*.sql   <span class="c1"># Remember the current dump name</span>
+<span class="go">(cluster-postgres) pg_dump-1569491024.sql</span>
+<span class="gp">(cluster-postgres) $</span> <span class="nb">exit</span>
+<span class="gp">#</span> Copy the dump to the current dir:
+<span class="gp">$</span> oc cp thoth-test-core/postgresql-1-glwnr:/opt/app-root/src/pg_dump-1569491024.sql  .
+<span class="gp">#</span> Start <span class="nb">local</span> PostgreSQL instance:
+<span class="gp">$</span> podman-compose up --detach
+<span class="go">&lt;logs will show up&gt;</span>
+<span class="gp">$</span> psql -h localhost -p <span class="m">5432</span> --username<span class="o">=</span>postgres &lt; pg_dump-1569491024.sql
+<span class="go">password: &lt;type password &quot;postgres&quot; here&gt;</span>
+<span class="go">&lt;logs will show up&gt;</span>
+</pre></div>
+</div>
 </div>
 <div class="section" id="graph-database-schema">
 <h2>Graph Database Schema<a class="headerlink" href="#graph-database-schema" title="Permalink to this headline">¶</a></h2>
@@ -337,7 +359,7 @@ to export changes made to schema diagram to the PNG file in the same directory.<
 </ul>
 </div>
 <p>This documentation corresponds to implementation in version 0.19.7,
-documentation was generated on Sep 26, 2019.</p>
+documentation was generated on Sep 27, 2019.</p>
 </div>
 </div>
 
