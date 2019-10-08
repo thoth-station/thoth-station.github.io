@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>Thoth Solver &#8212; Thoth Solver 1.2.2 documentation</title>
+    <title>Thoth Solver &#8212; Thoth Solver 1.3.0 documentation</title>
     <link rel="stylesheet" href="_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     
@@ -36,7 +36,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="#">Thoth Solver 1.2.2 documentation</a> &#187;</li> 
+        <li><a href="#">Thoth Solver 1.3.0 documentation</a> &#187;</li> 
       </ul>
     </div>
     
@@ -53,18 +53,242 @@
 <div class="section" id="project-scope">
 <h2>Project Scope<a class="headerlink" href="#project-scope" title="Permalink to this headline">¶</a></h2>
 <p>The aim of this project is to answer a simple question - what packages will be
-installed (resolved by pip) for the provided stack?</p>
+installed (resolved by pip or any Python compliant dependency resolver) for the
+provided stack?</p>
 <p>Imagine you have an application that has one dependency:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> cat requirements.txt
 <span class="go">tensorflow</span>
 </pre></div>
 </div>
-<p>This project will tell you how dependencies could be resolved:</p>
+<p>Tool provided by this project will tell you how dependencies could be resolved:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">thoth-solver -vvv pypi -r requirements.txt</span>
 </pre></div>
 </div>
-<p>The output can be found at <a class="reference external" href="https://github.com/thoth-station/misc/blob/master/examples/runtime-environment/resolved.json">here</a>.</p>
-<p>You can optionally also specify a list of indexes which should be checked for each package.</p>
+<p>The output of this solver is a dependency analysis for the given software stack
+- in the example above, package <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> in any release with analysis of
+its all dependencies (direct and indirect ones) with additional information
+from Python ecosystem needed for a Python resolver to perform the actual
+<code class="docutils literal notranslate"><span class="pre">TensorFlow</span></code> installation.</p>
+<p>The tool also allows specifying custom Python package indexes which conform to
+<a class="reference external" href="https://www.python.org/dev/peps/pep-0503/">PEP-503</a> - see the <code class="docutils literal notranslate"><span class="pre">--index</span></code>
+option for analyzing your custom Python packages provided by your repositories.</p>
+</div>
+<div class="section" id="produced-output">
+<h2>Produced output<a class="headerlink" href="#produced-output" title="Permalink to this headline">¶</a></h2>
+<p>This tool (unless <code class="docutils literal notranslate"><span class="pre">--no-transitive</span></code> is specified) analyzes recursively all the
+dependencies of the desired project. Dependencies to be analyzed can be defined
+in similar to <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> file or as a string in a form of:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;package-name&gt;&lt;version-cmp&gt;&lt;version-identifier&gt;</span>
+</pre></div>
+</div>
+<p>Where <code class="docutils literal notranslate"><span class="pre">&lt;package-name&gt;</span></code> is the analyzed package name (as present on PyPI for
+example), part <code class="docutils literal notranslate"><span class="pre">&lt;version-cmp&gt;&lt;version-identifier&gt;</span></code> is optional and creates
+version specifier for the given package (if not specified, all versions are
+considered). As the solver analysis the project, other parts (such as extras)
+are not supported.</p>
+<p>An example output shown bellow can be reproduced by running the tool with the following
+arguments (with an example of produced log):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> thoth-solver python --requirements <span class="s1">&#39;tensorflow==2.0.0&#39;</span> --index https://pypi.org/simple --no-transitive
+<span class="go">2019-10-01 14:01:02,756 [31432] INFO     root:128: Logging to a Sentry instance is turned off</span>
+<span class="go">2019-10-01 14:01:02,756 [31432] INFO     root:150: Logging to rsyslog endpoint is turned off</span>
+<span class="go">2019-10-01 14:01:06,838 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;tensorflow==2.0.0&#39;</span>
+<span class="go">2019-10-01 14:01:07,003 [31432] INFO     thoth.solver.python.python:356: Using index &#39;https://pypi.org/simple&#39; to discover package &#39;tensorflow&#39; in version &#39;2.0.0&#39;</span>
+<span class="go">2019-10-01 14:01:40,568 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;absl-py&#39; with range &#39;&gt;=0.7.0&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:40,568 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;absl-py&gt;=0.7.0&#39;</span>
+<span class="go">2019-10-01 14:01:40,689 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;astor&#39; with range &#39;&gt;=0.6.0&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:40,689 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;astor&gt;=0.6.0&#39;</span>
+<span class="go">2019-10-01 14:01:40,841 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;gast&#39; with range &#39;==0.2.2&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:40,841 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;gast==0.2.2&#39;</span>
+<span class="go">2019-10-01 14:01:40,984 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;google-pasta&#39; with range &#39;&gt;=0.1.6&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:40,985 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;google-pasta&gt;=0.1.6&#39;</span>
+<span class="go">2019-10-01 14:01:41,104 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;keras-applications&#39; with range &#39;&gt;=1.0.8&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:41,104 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;keras-applications&gt;=1.0.8&#39;</span>
+<span class="go">2019-10-01 14:01:41,273 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;keras-preprocessing&#39; with range &#39;&gt;=1.0.5&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:41,274 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;keras-preprocessing&gt;=1.0.5&#39;</span>
+<span class="go">2019-10-01 14:01:41,443 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;numpy&#39; with range &#39;&lt;2.0,&gt;=1.16.0&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:41,443 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;numpy&lt;2.0,&gt;=1.16.0&#39;</span>
+<span class="go">2019-10-01 14:01:41,723 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;opt-einsum&#39; with range &#39;&gt;=2.3.2&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:41,723 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;opt-einsum&gt;=2.3.2&#39;</span>
+<span class="go">2019-10-01 14:01:41,828 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;six&#39; with range &#39;&gt;=1.10.0&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:41,828 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;six&gt;=1.10.0&#39;</span>
+<span class="go">2019-10-01 14:01:41,942 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;protobuf&#39; with range &#39;&gt;=3.6.1&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:41,943 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;protobuf&gt;=3.6.1&#39;</span>
+<span class="go">2019-10-01 14:01:42,095 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;tensorboard&#39; with range &#39;&lt;2.1.0,&gt;=2.0.0&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:42,095 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;tensorboard&lt;2.1.0,&gt;=2.0.0&#39;</span>
+<span class="go">2019-10-01 14:01:42,286 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;tensorflow-estimator&#39; with range &#39;&lt;2.1.0,&gt;=2.0.0&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:42,287 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;tensorflow-estimator&lt;2.1.0,&gt;=2.0.0&#39;</span>
+<span class="go">2019-10-01 14:01:42,411 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;termcolor&#39; with range &#39;&gt;=1.1.0&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:42,411 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;termcolor&gt;=1.1.0&#39;</span>
+<span class="go">2019-10-01 14:01:42,580 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;wrapt&#39; with range &#39;&gt;=1.11.1&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:42,581 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;wrapt&gt;=1.11.1&#39;</span>
+<span class="go">2019-10-01 14:01:42,693 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;grpcio&#39; with range &#39;&gt;=1.8.6&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:42,693 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;grpcio&gt;=1.8.6&#39;</span>
+<span class="go">2019-10-01 14:01:43,007 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;wheel&#39; with range &#39;&gt;=0.26&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:43,008 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;wheel&gt;=0.26&#39;</span>
+<span class="go">2019-10-01 14:01:43,116 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;backports-weakref&#39; with range &#39;&gt;=1.0rc1&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:43,117 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;backports-weakref&gt;=1.0rc1&#39;</span>
+<span class="go">2019-10-01 14:01:43,262 [31432] INFO     thoth.solver.python.python:405: Resolving dependency versions for &#39;enum34&#39; with range &#39;&gt;=1.1.6&#39; from &#39;https://pypi.org/simple&#39;</span>
+<span class="go">2019-10-01 14:01:43,262 [31432] INFO     thoth.solver.python.python_solver:113: Parsing dependency &#39;enum34&gt;=1.1.6&#39;</span>
+</pre></div>
+</div>
+<p>An the output can be pretty verbose, the following section describes some most
+interesting parts of the output using JSONPath:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">.metadata</span></code> - metadata assigned to the solver run - these metadata are especially useful within project Thoth, where analyzer is run in a cluster, the purpose of metadata is to capture information which could be beneficial when debugging issues which arise in the cluster due to different container environment (e.g. Python version)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result</span></code> - the actual result as produced by this tool</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.unparsed</span></code> - a list of requirements that failed to be parsed (wrong dependency specification not conforming to Python standards)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.unresolved</span></code> - a list of requirements that failed to be resolved - a reason behind failure can be for example non-existing package or its version on the given Python package index, or for example incompatibility of package distribution with the solver’s software environment (Python version, environment markers, …), or bogus distribution (e.g. forgotten <cite>requirements.txt</cite> in the distribution required by <cite>setup.py</cite> on package build).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree</span></code> - the actual serialized dependency tree (broken dependency graph as cyclic dependencies are possible in Python ecosystem)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].package_name</span></code> - name of the analyzed package</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].package_version</span></code> - version of the analyzed package</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].sha256</span></code> - sha256 digests of artifacts present on the given Python package index</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].importlib_metadata</span></code> - metadata associated with the given package, these metadata are obtained using <a class="reference external" href="https://pypi.org/project/importlib-metadata/">importlib-metadata</a>, fallback to standard <a class="reference external" href="https://docs.python.org/3.9/library/importlib.metadata.html">importlib.metadata</a> on Python3.9+</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].importlib_metadata.metadata</span></code> - package metadata</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].importlib_metadata.requires</span></code> - raw strings which declare the given Python package requirements as obtained by <code class="docutils literal notranslate"><span class="pre">importlib_metadata.requires</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].importlib_metadata.version</span></code> - version as obtained by <code class="docutils literal notranslate"><span class="pre">importlib_metadata.requires</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].importlib_metadata.files</span></code> - file information about the given package (additionally parsed to provide digest, file size and path) as obtained by <code class="docutils literal notranslate"><span class="pre">importlib_metadata.files</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].importlib_metadata.entry_points</span></code> - entry points as obtained by <code class="docutils literal notranslate"><span class="pre">importlib_metadata.entry_points</span></code> (additionally parsed to provide entry point name, group and value)</p></li>
+</ul>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;entry_points&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;group&quot;</span><span class="p">:</span> <span class="s2">&quot;console_scripts&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;saved_model_cli&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;tensorflow.python.tools.saved_model_cli:main&quot;</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;group&quot;</span><span class="p">:</span> <span class="s2">&quot;console_scripts&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;tensorboard&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;tensorboard.main:run_main&quot;</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;group&quot;</span><span class="p">:</span> <span class="s2">&quot;console_scripts&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;tf_upgrade_v2&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;tensorflow.tools.compatibility.tf_upgrade_v2_main:main&quot;</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;group&quot;</span><span class="p">:</span> <span class="s2">&quot;console_scripts&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;tflite_convert&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;tensorflow.lite.python.tflite_convert:main&quot;</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;group&quot;</span><span class="p">:</span> <span class="s2">&quot;console_scripts&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;toco&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;tensorflow.lite.python.tflite_convert:main&quot;</span>
+    <span class="p">},</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;group&quot;</span><span class="p">:</span> <span class="s2">&quot;console_scripts&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;toco_from_protos&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;tensorflow.lite.toco.python.toco_from_protos:main&quot;</span>
+    <span class="p">}</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;files&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;hash&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;mode&quot;</span><span class="p">:</span> <span class="s2">&quot;sha256&quot;</span><span class="p">,</span>
+        <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU&quot;</span>
+      <span class="p">},</span>
+      <span class="nt">&quot;path&quot;</span><span class="p">:</span> <span class="s2">&quot;tensorflow_core/tools/pip_package/__init__.py&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;size&quot;</span><span class="p">:</span> <span class="mi">0</span>
+    <span class="p">}</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;Author&quot;</span><span class="p">:</span> <span class="s2">&quot;Google Inc.&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Author-email&quot;</span><span class="p">:</span> <span class="s2">&quot;packages@tensorflow.org&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Classifier&quot;</span><span class="p">:</span> <span class="s2">&quot;Topic :: Software Development :: Libraries :: Python Modules&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Download-URL&quot;</span><span class="p">:</span> <span class="s2">&quot;https://github.com/tensorflow/tensorflow/tags&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Home-page&quot;</span><span class="p">:</span> <span class="s2">&quot;https://www.tensorflow.org/&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Keywords&quot;</span><span class="p">:</span> <span class="s2">&quot;tensorflow tensor machine learning&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;License&quot;</span><span class="p">:</span> <span class="s2">&quot;Apache 2.0&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Metadata-Version&quot;</span><span class="p">:</span> <span class="s2">&quot;2.1&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Name&quot;</span><span class="p">:</span> <span class="s2">&quot;tensorflow&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Platform&quot;</span><span class="p">:</span> <span class="s2">&quot;UNKNOWN&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Requires-Dist&quot;</span><span class="p">:</span> <span class="s2">&quot;enum34 (&gt;=1.1.6) ; python_version &lt; \&quot;3.4\&quot;&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Summary&quot;</span><span class="p">:</span> <span class="s2">&quot;TensorFlow is an open source machine learning framework for everyone.&quot;</span><span class="p">,</span>
+    <span class="nt">&quot;Version&quot;</span><span class="p">:</span> <span class="s2">&quot;2.0.0&quot;</span>
+  <span class="p">},</span>
+  <span class="nt">&quot;requires&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="s2">&quot;absl-py (&gt;=0.7.0)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;astor (&gt;=0.6.0)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;gast (==0.2.2)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;google-pasta (&gt;=0.1.6)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;keras-applications (&gt;=1.0.8)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;keras-preprocessing (&gt;=1.0.5)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;numpy (&lt;2.0,&gt;=1.16.0)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;opt-einsum (&gt;=2.3.2)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;six (&gt;=1.10.0)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;protobuf (&gt;=3.6.1)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;tensorboard (&lt;2.1.0,&gt;=2.0.0)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;tensorflow-estimator (&lt;2.1.0,&gt;=2.0.0)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;termcolor (&gt;=1.1.0)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;wrapt (&gt;=1.11.1)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;grpcio (&gt;=1.8.6)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;wheel (&gt;=0.26)&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;backports.weakref (&gt;=1.0rc1) ; python_version &lt; \&quot;3.4\&quot;&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;enum34 (&gt;=1.1.6) ; python_version &lt; \&quot;3.4\&quot;&quot;</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;version&quot;</span><span class="p">:</span> <span class="s2">&quot;2.0.0&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The example above shows data associated with <code class="docutils literal notranslate"><span class="pre">tensorflow==2.0.0</span></code>. The <code class="docutils literal notranslate"><span class="pre">files</span></code>
+section is intentionally snipped, the file digest is signed as described in
+<a class="reference external" href="https://www.python.org/dev/peps/pep-0427/#id16">PEP-427</a>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies</span></code> - a list of dependencies which can be resolved given requirements specification of the analyzed package</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies[*].extras</span></code> - name of extras signalizing the given package should be installed with extras as specified in <a class="reference external" href="https://www.python.org/dev/peps/pep-0508/#extras">PEP-508</a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies[*].extra</span></code> - name of extra which should be required to take into account this dependency as specified <a class="reference external" href="https://www.python.org/dev/peps/pep-0508/#extras">PEP-508</a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies[*].marker</span></code> - a full specification of the environment marker as described in <a class="reference external" href="https://www.python.org/dev/peps/pep-0508/#environment-markers">PEP-508</a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies[*].marker_evaluation_error</span></code> - a string capturing error information when marker evaluation failed in the run software environment, otherwise <code class="docutils literal notranslate"><span class="pre">null</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies[*].marker_evaluated</span></code> - marker defined by the package, but additionally adjusted for evaluation for the current environment (see notes bellow).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies[*].marker_evaluation_result</span></code> - a boolean representing if the given marker evaluation was evaluated as <code class="docutils literal notranslate"><span class="pre">true</span></code> (the given environment accepts marker) or <code class="docutils literal notranslate"><span class="pre">false</span></code> (marker not accepted), a special value of <cite>null</cite> signalizes marker evaluation error (see <code class="docutils literal notranslate"><span class="pre">marker_evaluation_error</span></code> for more info)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies[*].normalized_package_name</span></code> - a string representing normalized package name as described in <a class="reference external" href="https://www.python.org/dev/peps/pep-0503/#normalized-names">PEP-503</a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies[*].specifier</span></code> - a version range specifier which was declared by package which depends on the given dependency conforming to <a class="reference external" href="https://www.python.org/dev/peps/pep-0440/">PEP-440</a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies[*].resolved_versions</span></code> - a list of versions which were resolved given the version range specifier and specified Python package indexes (passed <code class="docutils literal notranslate"><span class="pre">--index</span></code> option can specify multiple indexes which causes package discovery on each of them)</p></li>
+</ul>
+<p>An example of a dependency entry (an entry from one of <code class="docutils literal notranslate"><span class="pre">.result.tree[*].dependencies</span></code>:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;extras&quot;</span><span class="p">:</span> <span class="p">[],</span>
+  <span class="nt">&quot;extra&quot;</span><span class="p">:</span> <span class="p">[],</span>
+  <span class="nt">&quot;marker&quot;</span><span class="p">:</span> <span class="s2">&quot;python_version &lt; \&quot;3.4\&quot;&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;marker_evaluated&quot;</span><span class="p">:</span> <span class="s2">&quot;python_version &lt; \&quot;3.4\&quot;&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;marker_evaluation_error&quot;</span><span class="p">:</span> <span class="kc">null</span><span class="p">,</span>
+  <span class="nt">&quot;marker_evaluation_result&quot;</span><span class="p">:</span> <span class="kc">false</span><span class="p">,</span>
+  <span class="nt">&quot;normalized_package_name&quot;</span><span class="p">:</span> <span class="s2">&quot;backports-weakref&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;package_name&quot;</span><span class="p">:</span> <span class="s2">&quot;backports.weakref&quot;</span><span class="p">,</span>
+  <span class="nt">&quot;parsed_markers&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;op&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;value&quot;</span><span class="p">:</span> <span class="s2">&quot;3.4&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;variable&quot;</span><span class="p">:</span> <span class="s2">&quot;python_version&quot;</span>
+    <span class="p">}</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;resolved_versions&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nt">&quot;index&quot;</span><span class="p">:</span> <span class="s2">&quot;https://pypi.org/simple&quot;</span><span class="p">,</span>
+      <span class="nt">&quot;versions&quot;</span><span class="p">:</span> <span class="p">[</span>
+        <span class="s2">&quot;1.0rc1&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;1.0.post1&quot;</span>
+      <span class="p">]</span>
+    <span class="p">}</span>
+  <span class="p">],</span>
+  <span class="nt">&quot;specifier&quot;</span><span class="p">:</span> <span class="s2">&quot;&gt;=1.0rc1&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>To evaluate environment markers inside solver environment, there was a need to
+adjust marker so that it can be evaluated in the solver environment - see
+<a class="reference external" href="https://www.python.org/dev/peps/pep-0508/#environment-markers">PEP-508</a>
+specification, specifically the following section:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">The</span> <span class="s2">&quot;extra&quot;</span> <span class="n">variable</span> <span class="ow">is</span> <span class="n">special</span><span class="o">.</span> <span class="n">It</span> <span class="ow">is</span> <span class="n">used</span> <span class="n">by</span> <span class="n">wheels</span> <span class="n">to</span> <span class="n">signal</span> <span class="n">which</span>
+<span class="n">specifications</span> <span class="n">apply</span> <span class="n">to</span> <span class="n">a</span> <span class="n">given</span> <span class="n">extra</span> <span class="ow">in</span> <span class="n">the</span> <span class="n">wheel</span> <span class="n">METADATA</span> <span class="n">file</span><span class="p">,</span> <span class="n">but</span> <span class="n">since</span>
+<span class="n">the</span> <span class="n">METADATA</span> <span class="n">file</span> <span class="ow">is</span> <span class="n">based</span> <span class="n">on</span> <span class="n">a</span> <span class="n">draft</span> <span class="n">version</span> <span class="n">of</span> <span class="n">PEP</span><span class="o">-</span><span class="mi">426</span><span class="p">,</span> <span class="n">there</span> <span class="ow">is</span> <span class="n">no</span> <span class="n">current</span>
+<span class="n">specification</span> <span class="k">for</span> <span class="n">this</span><span class="o">.</span> <span class="n">Regardless</span><span class="p">,</span> <span class="n">outside</span> <span class="n">of</span> <span class="n">a</span> <span class="n">context</span> <span class="n">where</span> <span class="n">this</span> <span class="n">special</span>
+<span class="n">handling</span> <span class="ow">is</span> <span class="n">taking</span> <span class="n">place</span><span class="p">,</span> <span class="n">the</span> <span class="s2">&quot;extra&quot;</span> <span class="n">variable</span> <span class="n">should</span> <span class="n">result</span> <span class="ow">in</span> <span class="n">an</span> <span class="n">error</span> <span class="n">like</span>
+<span class="nb">all</span> <span class="n">other</span> <span class="n">unknown</span> <span class="n">variables</span><span class="o">.</span>
+</pre></div>
+</div>
 </div>
 <div class="section" id="installation-and-deployment">
 <h2>Installation and Deployment<a class="headerlink" href="#installation-and-deployment" title="Permalink to this headline">¶</a></h2>
@@ -79,11 +303,10 @@ installed via pip or <a class="reference external" href="https://pipenv.readthed
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pipenv install thoth-solver</span>
 </pre></div>
 </div>
-<p>Solver is run in Thoth to gather information about package dependencies. You
-can find deployment templates in the <cite>openshift/</cite> directory present in the
-root of <a class="reference external" href="https://github.com/thoth-station/solver">solver’s Git repository</a>. The
-actual deployment is done using Ansible playbooks available in the
-<a class="reference external" href="https://github.com/thoth-station/core">Thoth’s core repository</a>.</p>
+<p>Solver is run in <a class="reference external" href="https://thoth-station.ninja">project Thoth</a> to gather
+information about package dependencies. You can find deployment templates in
+the <code class="docutils literal notranslate"><span class="pre">openshift/</span></code> directory present in the root of <a class="reference external" href="https://github.com/thoth-station/solver">solver’s Git repository</a>. The actual deployment is done
+using Ansible playbooks available in the <a class="reference external" href="https://github.com/thoth-station/core">Thoth’s core repository</a>.</p>
 </div>
 <div class="section" id="crossroad">
 <h2>Crossroad<a class="headerlink" href="#crossroad" title="Permalink to this headline">¶</a></h2>
@@ -108,8 +331,8 @@ actual deployment is done using Ansible playbooks available in the
 </li>
 </ul>
 </div>
-<p>This documentation corresponds to implementation in version 1.2.2,
-documentation was generated on Oct 07, 2019.</p>
+<p>This documentation corresponds to implementation in version 1.3.0,
+documentation was generated on Oct 08, 2019.</p>
 </div>
 </div>
 
@@ -126,6 +349,7 @@ documentation was generated on Oct 07, 2019.</p>
   <ul>
 <li><a class="reference internal" href="#">Thoth Solver</a><ul>
 <li><a class="reference internal" href="#project-scope">Project Scope</a></li>
+<li><a class="reference internal" href="#produced-output">Produced output</a></li>
 <li><a class="reference internal" href="#installation-and-deployment">Installation and Deployment</a></li>
 <li><a class="reference internal" href="#crossroad">Crossroad</a></li>
 </ul>
