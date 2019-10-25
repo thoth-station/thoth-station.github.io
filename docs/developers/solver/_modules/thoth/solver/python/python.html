@@ -372,7 +372,7 @@
                 <span class="n">package_name</span> <span class="o">=</span> <span class="n">find_distribution_name</span><span class="p">(</span><span class="n">python_bin</span><span class="p">,</span> <span class="n">package_name</span><span class="p">)</span>
                 <span class="n">package_metadata</span> <span class="o">=</span> <span class="n">get_package_metadata</span><span class="p">(</span><span class="n">python_bin</span><span class="p">,</span> <span class="n">package_name</span><span class="p">)</span>
                 <span class="n">extracted_metadata</span> <span class="o">=</span> <span class="n">extract_metadata</span><span class="p">(</span><span class="n">package_metadata</span><span class="p">,</span> <span class="n">index_url</span><span class="p">)</span>
-        <span class="k">except</span> <span class="n">CommandError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">except</span> <span class="p">(</span><span class="n">CommandError</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                 <span class="s2">&quot;There was an error during package </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> discovery from </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
                 <span class="n">package_name</span><span class="p">,</span>
@@ -380,13 +380,22 @@
                 <span class="n">index_url</span><span class="p">,</span>
                 <span class="n">exc</span><span class="p">,</span>
             <span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="n">CommandError</span><span class="p">):</span>
+                <span class="c1"># Report any error happening during metadata aggregation so we know if there is a programming error.</span>
+                <span class="c1"># An example reported message:</span>
+                <span class="c1">#  https://github.com/thoth-station/solver/issues/342</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;An exception occurred during package metadata gathering&quot;</span><span class="p">)</span>
+                <span class="n">details</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;message&#39;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)}</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">details</span> <span class="o">=</span> <span class="n">exc</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
             <span class="n">errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                 <span class="p">{</span>
                     <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_name</span><span class="p">,</span>
                     <span class="s2">&quot;index_url&quot;</span><span class="p">:</span> <span class="n">index_url</span><span class="p">,</span>
                     <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="p">,</span>
                     <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;command_error&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;details&quot;</span><span class="p">:</span> <span class="n">exc</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+                    <span class="s2">&quot;details&quot;</span><span class="p">:</span> <span class="n">details</span><span class="p">,</span>
                     <span class="s2">&quot;is_provided&quot;</span><span class="p">:</span> <span class="n">source</span><span class="o">.</span><span class="n">provides_package_version</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span><span class="p">),</span>
                 <span class="p">}</span>
             <span class="p">)</span>
