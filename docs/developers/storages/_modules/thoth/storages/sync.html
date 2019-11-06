@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.sync &#8212; Thoth Storages 0.19.15 documentation</title>
+    <title>thoth.storages.sync &#8212; Thoth Storages 0.19.16 documentation</title>
     <link rel="stylesheet" href="../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../index.html">Thoth Storages 0.19.15 documentation</a> &#187;</li>
+        <li><a href="../../../index.html">Thoth Storages 0.19.16 documentation</a> &#187;</li>
           <li><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -68,8 +68,12 @@
 <span class="sd">&quot;&quot;&quot;Routines for syncing data from Ceph into graph database.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="k">import</span> <span class="n">Path</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
 
 <span class="kn">from</span> <span class="nn">amun</span> <span class="k">import</span> <span class="n">get_inspection_build_log</span>
 <span class="kn">from</span> <span class="nn">amun</span> <span class="k">import</span> <span class="n">get_inspection_job_log</span>
@@ -91,15 +95,25 @@
 
 
 <div class="viewcode-block" id="sync_adviser_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_adviser_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_adviser_documents</span><span class="p">(</span>
-    <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">document_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">GraphDatabase</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Sync adviser documents into graph.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">is_local</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">document_ids</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot sync documents from local directory without explicitly specifying a list of documents to be synced&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
         <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
         <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
-    <span class="n">adviser_store</span> <span class="o">=</span> <span class="n">AdvisersResultsStore</span><span class="p">()</span>
-    <span class="n">adviser_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_local</span><span class="p">:</span>
+        <span class="n">adviser_store</span> <span class="o">=</span> <span class="n">AdvisersResultsStore</span><span class="p">()</span>
+        <span class="n">adviser_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">adviser_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
@@ -111,7 +125,13 @@
             <span class="p">)</span>
 
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">document</span> <span class="o">=</span> <span class="n">adviser_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">adviser_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_adviser_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
                 <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
             <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
@@ -128,15 +148,25 @@
 
 
 <div class="viewcode-block" id="sync_solver_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_solver_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_solver_documents</span><span class="p">(</span>
-    <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">document_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">GraphDatabase</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Sync solver documents into graph.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">is_local</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">document_ids</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot sync documents from local directory without explicitly specifying a list of documents to be synced&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
         <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
         <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
-    <span class="n">solver_store</span> <span class="o">=</span> <span class="n">SolverResultsStore</span><span class="p">()</span>
-    <span class="n">solver_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_local</span><span class="p">:</span>
+        <span class="n">solver_store</span> <span class="o">=</span> <span class="n">SolverResultsStore</span><span class="p">()</span>
+        <span class="n">solver_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
@@ -145,7 +175,13 @@
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Syncing solver document from </span><span class="si">{solver_store.ceph.host}</span><span class="s2"> &quot;</span> <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph&quot;</span><span class="p">)</span>
 
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">document</span> <span class="o">=</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_solver_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
                 <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
             <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
@@ -162,15 +198,25 @@
 
 
 <div class="viewcode-block" id="sync_analysis_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_analysis_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_analysis_documents</span><span class="p">(</span>
-    <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">document_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">GraphDatabase</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Sync image analysis documents into graph.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">is_local</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">document_ids</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot sync documents from local directory without explicitly specifying a list of documents to be synced&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
         <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
         <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
-    <span class="n">analysis_store</span> <span class="o">=</span> <span class="n">AnalysisResultsStore</span><span class="p">()</span>
-    <span class="n">analysis_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_local</span><span class="p">:</span>
+        <span class="n">analysis_store</span> <span class="o">=</span> <span class="n">AnalysisResultsStore</span><span class="p">()</span>
+        <span class="n">analysis_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">analysis_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
@@ -182,7 +228,13 @@
             <span class="p">)</span>
 
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">document</span> <span class="o">=</span> <span class="n">analysis_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">analysis_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_analysis_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
                 <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
             <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
@@ -199,15 +251,25 @@
 
 
 <div class="viewcode-block" id="sync_package_analysis_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_package_analysis_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_package_analysis_documents</span><span class="p">(</span>
-    <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">document_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">GraphDatabase</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Sync package analysis documents into graph.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">is_local</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">document_ids</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot sync documents from local directory without explicitly specifying a list of documents to be synced&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
         <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
         <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
-    <span class="n">package_analysis_store</span> <span class="o">=</span> <span class="n">PackageAnalysisResultsStore</span><span class="p">()</span>
-    <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_local</span><span class="p">:</span>
+        <span class="n">package_analysis_store</span> <span class="o">=</span> <span class="n">PackageAnalysisResultsStore</span><span class="p">()</span>
+        <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
@@ -220,7 +282,13 @@
             <span class="p">)</span>
 
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">document</span> <span class="o">=</span> <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_package_analysis_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
                 <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
             <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
@@ -237,15 +305,25 @@
 
 
 <div class="viewcode-block" id="sync_provenance_checker_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_provenance_checker_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_provenance_checker_documents</span><span class="p">(</span>
-    <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">document_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">GraphDatabase</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Sync provenance check documents into graph.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">is_local</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">document_ids</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot sync documents from local directory without explicitly specifying a list of documents to be synced&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
         <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
         <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
-    <span class="n">provenance_check_store</span> <span class="o">=</span> <span class="n">ProvenanceResultsStore</span><span class="p">()</span>
-    <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_local</span><span class="p">:</span>
+        <span class="n">provenance_check_store</span> <span class="o">=</span> <span class="n">ProvenanceResultsStore</span><span class="p">()</span>
+        <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
@@ -258,7 +336,13 @@
             <span class="p">)</span>
 
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">document</span> <span class="o">=</span> <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_provenance_checker_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
                 <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
             <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
@@ -275,15 +359,25 @@
 
 
 <div class="viewcode-block" id="sync_dependency_monkey_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_dependency_monkey_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_dependency_monkey_documents</span><span class="p">(</span>
-    <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">document_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">GraphDatabase</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Sync dependency monkey reports into graph database.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">is_local</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">document_ids</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot sync documents from local directory without explicitly specifying a list of documents to be synced&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="ow">not</span> <span class="n">graph</span><span class="p">:</span>
         <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
         <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
-    <span class="n">dependency_monkey_reports_store</span> <span class="o">=</span> <span class="n">DependencyMonkeyReportsStore</span><span class="p">()</span>
-    <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_local</span><span class="p">:</span>
+        <span class="n">dependency_monkey_reports_store</span> <span class="o">=</span> <span class="n">DependencyMonkeyReportsStore</span><span class="p">()</span>
+        <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
@@ -296,7 +390,13 @@
             <span class="p">)</span>
 
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">document</span> <span class="o">=</span> <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">document</span> <span class="o">=</span> <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_dependency_monkey_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
                 <span class="n">synced</span> <span class="o">+=</span> <span class="mi">1</span>
             <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
@@ -313,16 +413,22 @@
 
 
 <div class="viewcode-block" id="sync_inspection_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_inspection_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_inspection_documents</span><span class="p">(</span>
-    <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">document_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
-    <span class="n">amun_api_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">GraphDatabase</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">amun_api_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">only_ceph_sync</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">only_graph_sync</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Sync observations made on Amun into graph database.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot sync inspection documents from a local file&quot;</span>
+        <span class="p">)</span>
+
     <span class="k">if</span> <span class="n">only_graph_sync</span> <span class="ow">and</span> <span class="n">only_ceph_sync</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;At least one of Ceph or Graph should be performed&quot;</span><span class="p">)</span>
 
@@ -405,14 +511,15 @@
 
 
 <div class="viewcode-block" id="sync_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_documents</span><span class="p">(</span>
-    <span class="n">document_ids</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">document_ids</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
-    <span class="n">amun_api_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">amun_api_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">graph</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">GraphDatabase</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">inspection_only_graph_sync</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">inspection_only_ceph_sync</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
     <span class="sd">&quot;&quot;&quot;Sync documents based on document type.</span>
 
@@ -446,6 +553,7 @@
                         <span class="n">graph</span><span class="o">=</span><span class="n">graph</span><span class="p">,</span>
                         <span class="n">only_ceph_sync</span><span class="o">=</span><span class="n">inspection_only_ceph_sync</span><span class="p">,</span>
                         <span class="n">only_graph_sync</span><span class="o">=</span><span class="n">inspection_only_graph_sync</span><span class="p">,</span>
+                        <span class="n">is_local</span><span class="o">=</span><span class="n">is_local</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">stats_change</span> <span class="o">=</span> <span class="n">handler</span><span class="p">(</span><span class="n">to_sync_document_id</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span> <span class="n">graceful</span><span class="o">=</span><span class="n">graceful</span><span class="p">,</span> <span class="n">graph</span><span class="o">=</span><span class="n">graph</span><span class="p">)</span>
