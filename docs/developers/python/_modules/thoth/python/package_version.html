@@ -66,8 +66,9 @@
 <span class="kn">from</span> <span class="nn">copy</span> <span class="k">import</span> <span class="n">copy</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
-<span class="kn">import</span> <span class="nn">semantic_version</span> <span class="k">as</span> <span class="nn">semver</span>
 <span class="kn">from</span> <span class="nn">packaging.version</span> <span class="k">import</span> <span class="n">parse</span> <span class="k">as</span> <span class="n">parse_version</span>
+<span class="kn">from</span> <span class="nn">packaging.version</span> <span class="k">import</span> <span class="n">Version</span>
+<span class="kn">from</span> <span class="nn">packaging.version</span> <span class="k">import</span> <span class="n">LegacyVersion</span>
 <span class="kn">from</span> <span class="nn">packaging.utils</span> <span class="k">import</span> <span class="n">canonicalize_name</span>
 
 
@@ -105,7 +106,7 @@
     <span class="n">hashes</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
     <span class="n">markers</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">)</span>
     <span class="n">extras</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
-    <span class="n">_semantic_version</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">semver</span><span class="o">.</span><span class="n">Version</span><span class="p">)</span>
+    <span class="n">_semantic_version</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="n">LegacyVersion</span><span class="p">,</span> <span class="n">Version</span><span class="p">])</span>
 
 <div class="viewcode-block" id="PackageVersion.to_dict"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.package_version.PackageVersion.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Create a dictionary representation of parameters (useful for later constructor calls).&quot;&quot;&quot;</span>
@@ -198,7 +199,7 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">version</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;==&quot;</span><span class="p">):]</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">semantic_version</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">semver</span><span class="o">.</span><span class="n">Version</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">semantic_version</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="n">Version</span><span class="p">,</span> <span class="n">LegacyVersion</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Get semantic version respecting version specified - package has to be locked to a specific version.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_semantic_version</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_locked</span><span class="p">():</span>
@@ -206,35 +207,14 @@
                     <span class="n">f</span><span class="s2">&quot;Cannot get semantic version for not-locked package </span><span class="si">{self.name}</span><span class="s2"> in version </span><span class="si">{self.version}</span><span class="s2">&quot;</span>
                 <span class="p">)</span>
 
-        <span class="k">try</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_semantic_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_semantic_version</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span> <span class="n">_package_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-            <span class="c1"># A simple workaround for leading zeros when parsing semver - e.g. 3.01.2.</span>
-            <span class="n">parts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">locked_version</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)</span>
-            <span class="n">version</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="nb">map</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">parts</span><span class="p">)))</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_semantic_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_semantic_version</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_semantic_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_semantic_version</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">locked_version</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_semantic_version</span>
 
 <div class="viewcode-block" id="PackageVersion.parse_semantic_version"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.package_version.PackageVersion.parse_semantic_version">[docs]</a>    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">parse_semantic_version</span><span class="p">(</span><span class="n">version_identifier</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">_package_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">semver</span><span class="o">.</span><span class="n">Version</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">parse_semantic_version</span><span class="p">(</span><span class="n">version_identifier</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="n">Version</span><span class="p">,</span> <span class="n">LegacyVersion</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Parse the given version identifier into a semver representation.&quot;&quot;&quot;</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">semantic_version</span> <span class="o">=</span> <span class="n">semver</span><span class="o">.</span><span class="n">Version</span><span class="p">(</span><span class="n">version_identifier</span><span class="p">)</span>
-        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-            <span class="n">semantic_version</span> <span class="o">=</span> <span class="n">semver</span><span class="o">.</span><span class="n">Version</span><span class="o">.</span><span class="n">coerce</span><span class="p">(</span><span class="n">version_identifier</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">_package_name</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="n">f</span><span class="s2">&quot;Cannot determine semantic version </span><span class="si">{version_identifier}</span><span class="s2">, &quot;</span>
-                    <span class="n">f</span><span class="s2">&quot;approximated version is </span><span class="si">{semantic_version}</span><span class="s2">: {str(exc)}&quot;</span>
-                <span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="n">f</span><span class="s2">&quot;Cannot determine semantic version </span><span class="si">{version_identifier}</span><span class="s2"> of package </span><span class="si">{_package_name}</span><span class="s2">, &quot;</span>
-                    <span class="n">f</span><span class="s2">&quot;approximated version is </span><span class="si">{semantic_version}</span><span class="s2">: {str(exc)}&quot;</span>
-                <span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">semantic_version</span></div>
+        <span class="k">return</span> <span class="n">parse_version</span><span class="p">(</span><span class="n">version_identifier</span><span class="p">)</span></div>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">_get_index_from_meta</span><span class="p">(</span>
