@@ -77,12 +77,16 @@
 
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Generator</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">TYPE_CHECKING</span>
 
+<span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">from</span> <span class="nn">packaging.requirements</span> <span class="k">import</span> <span class="n">Requirement</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="k">import</span> <span class="n">RuntimeEnvironment</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">PackageVersion</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Source</span>
+<span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
 <span class="kn">from</span> <span class="nn">thoth.solver.python.base</span> <span class="k">import</span> <span class="n">DependencyParser</span>
 <span class="kn">from</span> <span class="nn">thoth.solver.python.base</span> <span class="k">import</span> <span class="n">ReleasesFetcher</span>
 <span class="kn">from</span> <span class="nn">thoth.solver.python.base</span> <span class="k">import</span> <span class="n">Solver</span>
@@ -94,33 +98,14 @@
     <span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
 
 
-<div class="viewcode-block" id="GraphReleasesFetcher"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.GraphReleasesFetcher">[docs]</a><span class="k">class</span> <span class="nc">GraphReleasesFetcher</span><span class="p">(</span><span class="n">ReleasesFetcher</span><span class="p">):</span>
+<div class="viewcode-block" id="GraphReleasesFetcher"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.GraphReleasesFetcher">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">GraphReleasesFetcher</span><span class="p">(</span><span class="n">ReleasesFetcher</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Fetch releases for packages from the graph database.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="o">*</span><span class="p">,</span>
-        <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">RuntimeEnvironment</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">graph_db</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="s2">&quot;GraphDatabase&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Initialize graph release fetcher.&quot;&quot;&quot;</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_graph_db</span> <span class="o">=</span> <span class="n">graph_db</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">runtime_environment</span> <span class="o">=</span> <span class="n">runtime_environment</span> <span class="ow">or</span> <span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span>
-            <span class="p">{}</span>
-        <span class="p">)</span>
-
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">graph_db</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;GraphDatabase&quot;</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get instance of graph database adapter, lazily.&quot;&quot;&quot;</span>
-        <span class="c1"># Place the import statement here to simplify mocks in the testsuite.</span>
-        <span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph_db</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_graph_db</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_graph_db</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
-
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_graph_db</span>
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">GraphDatabase</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">runtime_environment</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">RuntimeEnvironment</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">from_dict</span><span class="p">)</span>
+    <span class="p">)</span>
 
 <div class="viewcode-block" id="GraphReleasesFetcher.fetch_releases"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.GraphReleasesFetcher.fetch_releases">[docs]</a>    <span class="k">def</span> <span class="nf">fetch_releases</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Fetch releases for the given package name.&quot;&quot;&quot;</span>
@@ -131,13 +116,13 @@
         <span class="n">start_offset</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="n">result</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-            <span class="n">query_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_db</span><span class="o">.</span><span class="n">get_solved_python_package_versions_all</span><span class="p">(</span>
+            <span class="n">query_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_solved_python_package_versions_all</span><span class="p">(</span>
                 <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
                 <span class="n">os_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
                 <span class="n">os_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
                 <span class="n">python_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
                 <span class="n">start_offset</span><span class="o">=</span><span class="n">start_offset</span><span class="p">,</span>
-                <span class="n">count</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">graph_db</span><span class="o">.</span><span class="n">DEFAULT_COUNT</span><span class="p">,</span>
+                <span class="n">count</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">DEFAULT_COUNT</span><span class="p">,</span>
                 <span class="n">distinct</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
             <span class="p">)</span>
 
@@ -145,16 +130,19 @@
             <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">query_result</span><span class="p">)</span>
 
             <span class="c1"># We have reached end of pagination or no versions were found.</span>
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">query_result</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph_db</span><span class="o">.</span><span class="n">DEFAULT_COUNT</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">query_result</span><span class="p">)</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">DEFAULT_COUNT</span><span class="p">:</span>
                 <span class="k">break</span>
 
         <span class="k">return</span> <span class="n">package_name</span><span class="p">,</span> <span class="p">[(</span><span class="n">version</span><span class="p">,</span> <span class="n">index_url</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span> <span class="ow">in</span> <span class="n">result</span><span class="p">]</span></div></div>
 
 
-<div class="viewcode-block" id="PackageVersionDependencyParser"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.PackageVersionDependencyParser">[docs]</a><span class="k">class</span> <span class="nc">PackageVersionDependencyParser</span><span class="p">(</span><span class="n">DependencyParser</span><span class="p">):</span>
+<div class="viewcode-block" id="PackageVersionDependencyParser"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.PackageVersionDependencyParser">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">PackageVersionDependencyParser</span><span class="p">(</span><span class="n">DependencyParser</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Parse an instance of PackageVersion to Dependency object needed by solver.&quot;&quot;&quot;</span>
 
-<div class="viewcode-block" id="PackageVersionDependencyParser.parse"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.PackageVersionDependencyParser.parse">[docs]</a>    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]):</span>
+<div class="viewcode-block" id="PackageVersionDependencyParser.parse"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.PackageVersionDependencyParser.parse">[docs]</a>    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Requirement</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Parse the given list of PackageVersion objects.&quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="p">:</span>
             <span class="n">version</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">version</span> <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">version</span> <span class="o">!=</span> <span class="s2">&quot;*&quot;</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
@@ -164,86 +152,65 @@
             <span class="k">yield</span> <span class="n">dependency</span></div></div>
 
 
-<div class="viewcode-block" id="PythonGraphSolver"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.PythonGraphSolver">[docs]</a><span class="k">class</span> <span class="nc">PythonGraphSolver</span><span class="p">(</span><span class="n">Solver</span><span class="p">):</span>
+<div class="viewcode-block" id="PythonGraphSolver"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.PythonGraphSolver">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">PythonGraphSolver</span><span class="p">(</span><span class="n">Solver</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Solve Python dependencies based on data available in the graph database.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="o">*</span><span class="p">,</span>
-        <span class="n">parser_kwargs</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">graph_db</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">runtime_environment</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-        <span class="n">solver_kwargs</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Initialize instance.&quot;&quot;&quot;</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
-            <span class="n">PackageVersionDependencyParser</span><span class="p">(</span><span class="o">**</span><span class="p">(</span><span class="n">parser_kwargs</span> <span class="ow">or</span> <span class="p">{})),</span>
-            <span class="n">GraphReleasesFetcher</span><span class="p">(</span>
-                <span class="n">graph_db</span><span class="o">=</span><span class="n">graph_db</span><span class="p">,</span> <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span>
-            <span class="p">),</span>
-            <span class="o">**</span><span class="p">(</span><span class="n">solver_kwargs</span> <span class="ow">or</span> <span class="p">{}),</span>
-        <span class="p">)</span></div>
+    <span class="n">dependency_parser</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">PackageVersionDependencyParser</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">releases_fetcher</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">GraphReleasesFetcher</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
 
 
-<div class="viewcode-block" id="PythonPackageGraphSolver"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.PythonPackageGraphSolver">[docs]</a><span class="k">class</span> <span class="nc">PythonPackageGraphSolver</span><span class="p">:</span>
+<div class="viewcode-block" id="PythonPackageGraphSolver"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.PythonPackageGraphSolver">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">PythonPackageGraphSolver</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;A wrapper to manipulate with Python packages using pure PackageVersion object interface.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="o">*</span><span class="p">,</span>
-        <span class="n">parser_kwargs</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">graph_db</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">solver_kwargs</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">RuntimeEnvironment</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Get instance of the graph solver.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span> <span class="o">=</span> <span class="n">PythonGraphSolver</span><span class="p">(</span>
-            <span class="n">parser_kwargs</span><span class="o">=</span><span class="n">parser_kwargs</span><span class="p">,</span>
-            <span class="n">graph_db</span><span class="o">=</span><span class="n">graph_db</span><span class="p">,</span>
-            <span class="n">solver_kwargs</span><span class="o">=</span><span class="n">solver_kwargs</span><span class="p">,</span>
-            <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="c1"># Do not instantiate multiple objects for same python package tuple to optimize memory usage.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_package_versions</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="c1"># Have just one instance of Source object per python package source index url.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">GraphDatabase</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">runtime_environment</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">RuntimeEnvironment</span><span class="p">,</span>
+        <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">from_dict</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="c1"># Do not instantiate multiple objects for same python package tuple to optimize memory usage.</span>
+    <span class="n">_package_versions</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">PackageVersion</span><span class="p">],</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span>
+        <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="c1"># Have just one instance of Source object per python package source index url.</span>
+    <span class="n">_sources</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Source</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_solver</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">PythonGraphSolver</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<div class="viewcode-block" id="PythonPackageGraphSolver.solve"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.PythonPackageGraphSolver.solve">[docs]</a>    <span class="k">def</span> <span class="nf">solve</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">dependencies</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">],</span>
-        <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="n">all_versions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]]:</span>
-        <span class="sd">&quot;&quot;&quot;Solve the given dependencies and return object representation of packages.&quot;&quot;&quot;</span>
-        <span class="c1"># A fast path - if there is only one package we can directly rely on solving.</span>
-        <span class="c1"># If there are multiple packages to be solved, construct a dictionary to optimize to</span>
-        <span class="c1"># O(1) for PackageVersion construction.</span>
-        <span class="c1">#</span>
-        <span class="c1"># Note changes in interface of solver - if there is all_versions passed, the</span>
-        <span class="c1"># resulting values is a list, otherwise string directly.</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dependencies</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="n">resolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
-                <span class="n">dependencies</span><span class="p">,</span> <span class="n">graceful</span><span class="o">=</span><span class="n">graceful</span><span class="p">,</span> <span class="n">all_versions</span><span class="o">=</span><span class="n">all_versions</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve solver instance resolving using graph database.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span> <span class="o">=</span> <span class="n">PythonGraphSolver</span><span class="p">(</span>
+                <span class="n">dependency_parser</span><span class="o">=</span><span class="n">PackageVersionDependencyParser</span><span class="p">(),</span>
+                <span class="n">releases_fetcher</span><span class="o">=</span><span class="n">GraphReleasesFetcher</span><span class="p">(</span>
+                    <span class="n">graph</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span> <span class="n">runtime_environment</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_environment</span>
+                <span class="p">),</span>
             <span class="p">)</span>
 
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">resolved</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">resolved</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span>
 
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">resolved</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
-                <span class="c1"># It&#39;s ok, len(resolved) == 0 should be handled in the if above.</span>
-                <span class="k">raise</span> <span class="n">SolverException</span><span class="p">(</span>
-                    <span class="n">f</span><span class="s2">&quot;Multiple packages resolved for one dependency </span><span class="si">{dependencies[0]!r}</span><span class="s2">: </span><span class="si">{resolved!r}</span><span class="s2">&quot;</span>
-                <span class="p">)</span>
+<div class="viewcode-block" id="PythonPackageGraphSolver.solve"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.solver.PythonPackageGraphSolver.solve">[docs]</a>    <span class="k">def</span> <span class="nf">solve</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">],</span> <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Solve the given dependencies and return object representation of packages.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="c1"># First, construct the map for checking packages.</span>
+        <span class="n">dependencies_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">dependency</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">dependency</span> <span class="k">for</span> <span class="n">dependency</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="p">}</span>
 
-            <span class="k">if</span> <span class="n">all_versions</span><span class="p">:</span>
-                <span class="n">result</span><span class="p">[</span><span class="n">dependencies</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">resolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">dependencies</span><span class="p">,</span> <span class="n">graceful</span><span class="o">=</span><span class="n">graceful</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">resolved</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">resolved</span>
 
-            <span class="k">for</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span> <span class="ow">in</span> <span class="p">(</span>
-                <span class="nb">list</span><span class="p">(</span><span class="n">resolved</span><span class="o">.</span><span class="n">values</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">all_versions</span> <span class="k">else</span> <span class="n">resolved</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
-            <span class="p">):</span>
-                <span class="c1"># We only change version attribute that will be the resolved one.</span>
-                <span class="n">package_tuple</span> <span class="o">=</span> <span class="p">(</span><span class="n">dependencies</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">package_name</span><span class="p">,</span> <span class="n">versions</span> <span class="ow">in</span> <span class="n">resolved</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># If this pop fails, it means that the package name has changed over the resolution.</span>
+            <span class="n">original_package</span> <span class="o">=</span> <span class="n">dependencies_map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
+            <span class="n">result_versions</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span> <span class="ow">in</span> <span class="n">versions</span><span class="p">:</span>
+                <span class="n">package_tuple</span> <span class="o">=</span> <span class="p">(</span><span class="n">original_package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span><span class="p">)</span>
                 <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_package_versions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="p">:</span>
                     <span class="n">source</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
@@ -252,52 +219,15 @@
                         <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span> <span class="o">=</span> <span class="n">source</span>
 
                     <span class="n">package_version</span> <span class="o">=</span> <span class="n">PackageVersion</span><span class="p">(</span>
-                        <span class="n">name</span><span class="o">=</span><span class="n">dependencies</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="n">name</span><span class="o">=</span><span class="n">original_package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
                         <span class="n">version</span><span class="o">=</span><span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">version</span><span class="p">,</span>
                         <span class="n">index</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
-                        <span class="n">develop</span><span class="o">=</span><span class="n">dependencies</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">develop</span><span class="p">,</span>
+                        <span class="n">develop</span><span class="o">=</span><span class="n">original_package</span><span class="o">.</span><span class="n">develop</span><span class="p">,</span>
                     <span class="p">)</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_package_versions</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
 
-                <span class="k">if</span> <span class="n">all_versions</span><span class="p">:</span>
-                    <span class="n">result</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">result</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">package_version</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="c1"># First, construct the map for checking packages.</span>
-            <span class="n">dependencies_map</span> <span class="o">=</span> <span class="p">{</span>
-                <span class="n">dependency</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">dependency</span> <span class="k">for</span> <span class="n">dependency</span> <span class="ow">in</span> <span class="n">dependencies</span>
-            <span class="p">}</span>
+                <span class="n">result_versions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
 
-            <span class="n">resolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span>
-                <span class="n">dependencies</span><span class="p">,</span> <span class="n">graceful</span><span class="o">=</span><span class="n">graceful</span><span class="p">,</span> <span class="n">all_versions</span><span class="o">=</span><span class="n">all_versions</span>
-            <span class="p">)</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">resolved</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">resolved</span>
-
-            <span class="k">for</span> <span class="n">package_name</span><span class="p">,</span> <span class="n">versions</span> <span class="ow">in</span> <span class="n">resolved</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="c1"># If this pop fails, it means that the package name has changed over the resolution.</span>
-                <span class="n">original_package</span> <span class="o">=</span> <span class="n">dependencies_map</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
-                <span class="n">result_versions</span> <span class="o">=</span> <span class="p">[]</span>
-                <span class="k">for</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span> <span class="ow">in</span> <span class="n">versions</span> <span class="k">if</span> <span class="n">all_versions</span> <span class="k">else</span> <span class="p">[</span><span class="n">versions</span><span class="p">]:</span>
-                    <span class="n">package_tuple</span> <span class="o">=</span> <span class="p">(</span><span class="n">original_package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="n">index_url</span><span class="p">)</span>
-                    <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_package_versions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="p">:</span>
-                        <span class="n">source</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
-                        <span class="k">if</span> <span class="ow">not</span> <span class="n">source</span><span class="p">:</span>
-                            <span class="n">source</span> <span class="o">=</span> <span class="n">Source</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">_sources</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span> <span class="o">=</span> <span class="n">source</span>
-
-                        <span class="n">package_version</span> <span class="o">=</span> <span class="n">PackageVersion</span><span class="p">(</span>
-                            <span class="n">name</span><span class="o">=</span><span class="n">original_package</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                            <span class="n">version</span><span class="o">=</span><span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">version</span><span class="p">,</span>
-                            <span class="n">index</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
-                            <span class="n">develop</span><span class="o">=</span><span class="n">original_package</span><span class="o">.</span><span class="n">develop</span><span class="p">,</span>
-                        <span class="p">)</span>
-
-                    <span class="n">result_versions</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
-
-                <span class="n">result</span><span class="p">[</span><span class="n">original_package</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">result_versions</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">original_package</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">result_versions</span>
 
         <span class="k">return</span> <span class="n">result</span></div></div>
 </pre></div>
