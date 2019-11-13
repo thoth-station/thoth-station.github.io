@@ -1126,9 +1126,9 @@
 <span class="sd">          :class:`.SchemaItem` derived constructs which will be applied</span>
 <span class="sd">          as options to the column.  These include instances of</span>
 <span class="sd">          :class:`.Constraint`, :class:`.ForeignKey`, :class:`.ColumnDefault`,</span>
-<span class="sd">          and :class:`.Sequence`.  In some cases an equivalent keyword</span>
-<span class="sd">          argument is available such as ``server_default``, ``default``</span>
-<span class="sd">          and ``unique``.</span>
+<span class="sd">          :class:`.Sequence`, :class:`.Computed`.  In some cases an</span>
+<span class="sd">          equivalent keyword argument is available such as ``server_default``,</span>
+<span class="sd">          ``default`` and ``unique``.</span>
 
 <span class="sd">        :param autoincrement: Set up &quot;auto increment&quot; semantics for an integer</span>
 <span class="sd">          primary key column.  The default value is the string ``&quot;auto&quot;``</span>
@@ -1394,6 +1394,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">constraints</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">foreign_keys</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">comment</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;comment&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">computed</span> <span class="o">=</span> <span class="kc">None</span>
 
         <span class="c1"># check if this Column is proxying another column</span>
         <span class="k">if</span> <span class="s2">&quot;_proxies&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
@@ -1550,7 +1551,12 @@
                     <span class="s2">&quot;To create indexes with a specific name, create an &quot;</span>
                     <span class="s2">&quot;explicit Index object external to the Table.&quot;</span>
                 <span class="p">)</span>
-            <span class="n">Index</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="bp">self</span><span class="p">,</span> <span class="n">unique</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unique</span><span class="p">),</span> <span class="n">_column_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">append_constraint</span><span class="p">(</span>
+                <span class="n">Index</span><span class="p">(</span>
+                    <span class="kc">None</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">key</span><span class="p">,</span> <span class="n">unique</span><span class="o">=</span><span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unique</span><span class="p">),</span> <span class="n">_column_flag</span><span class="o">=</span><span class="kc">True</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">unique</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unique</span><span class="p">,</span> <span class="n">util</span><span class="o">.</span><span class="n">string_types</span><span class="p">):</span>
                 <span class="k">raise</span> <span class="n">exc</span><span class="o">.</span><span class="n">ArgumentError</span><span class="p">(</span>
@@ -1595,6 +1601,12 @@
             <span class="n">c</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">constraints</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">c</span><span class="o">.</span><span class="n">_type_bound</span>
         <span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">c</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="o">**</span><span class="n">kw</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">foreign_keys</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">c</span><span class="o">.</span><span class="n">constraint</span><span class="p">]</span>
 
+        <span class="n">server_default</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_default</span>
+        <span class="n">server_onupdate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">server_onupdate</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">server_default</span><span class="p">,</span> <span class="n">Computed</span><span class="p">):</span>
+            <span class="n">server_default</span> <span class="o">=</span> <span class="n">server_onupdate</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">server_default</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="o">**</span><span class="n">kw</span><span class="p">))</span>
+
         <span class="n">type_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">type_</span><span class="p">,</span> <span class="n">SchemaEventTarget</span><span class="p">):</span>
             <span class="n">type_</span> <span class="o">=</span> <span class="n">type_</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="o">**</span><span class="n">kw</span><span class="p">)</span>
@@ -1611,9 +1623,9 @@
             <span class="n">index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">,</span>
             <span class="n">autoincrement</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">autoincrement</span><span class="p">,</span>
             <span class="n">default</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
-            <span class="n">server_default</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">server_default</span><span class="p">,</span>
+            <span class="n">server_default</span><span class="o">=</span><span class="n">server_default</span><span class="p">,</span>
             <span class="n">onupdate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">onupdate</span><span class="p">,</span>
-            <span class="n">server_onupdate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">server_onupdate</span><span class="p">,</span>
+            <span class="n">server_onupdate</span><span class="o">=</span><span class="n">server_onupdate</span><span class="p">,</span>
             <span class="n">doc</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">doc</span><span class="p">,</span>
             <span class="n">comment</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">comment</span><span class="p">,</span>
             <span class="o">*</span><span class="n">args</span>
@@ -4499,6 +4511,92 @@
 
 <span class="n">_default_schema_map</span> <span class="o">=</span> <span class="n">_SchemaTranslateMap</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
 <span class="n">_schema_getter</span> <span class="o">=</span> <span class="n">_SchemaTranslateMap</span><span class="o">.</span><span class="n">_schema_getter</span>
+
+
+<span class="k">class</span> <span class="nc">Computed</span><span class="p">(</span><span class="n">FetchedValue</span><span class="p">,</span> <span class="n">SchemaItem</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Defines a generated column, i.e. &quot;GENERATED ALWAYS AS&quot; syntax.</span>
+
+<span class="sd">    The :class:`.Computed` construct is an inline construct added to the</span>
+<span class="sd">    argument list of a :class:`.Column` object::</span>
+
+<span class="sd">        from sqlalchemy import Computed</span>
+
+<span class="sd">        Table(&#39;square&#39;, meta,</span>
+<span class="sd">            Column(&#39;side&#39;, Float, nullable=False),</span>
+<span class="sd">            Column(&#39;area&#39;, Float, Computed(&#39;side * side&#39;))</span>
+<span class="sd">        )</span>
+
+<span class="sd">    See the linked documentation below for complete details.</span>
+
+<span class="sd">    .. versionadded:: 1.3.11</span>
+
+<span class="sd">    .. seealso::</span>
+
+<span class="sd">        :ref:`computed_ddl`</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">__visit_name__</span> <span class="o">=</span> <span class="s2">&quot;computed_column&quot;</span>
+
+    <span class="nd">@_document_text_coercion</span><span class="p">(</span>
+        <span class="s2">&quot;sqltext&quot;</span><span class="p">,</span> <span class="s2">&quot;:class:`.Computed`&quot;</span><span class="p">,</span> <span class="s2">&quot;:paramref:`.Computed.sqltext`&quot;</span>
+    <span class="p">)</span>
+    <span class="k">def</span> <span class="nf">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sqltext</span><span class="p">,</span> <span class="n">persisted</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Construct a GENERATED ALWAYS AS DDL construct to accompany a</span>
+<span class="sd">        :class:`.Column`.</span>
+
+<span class="sd">        :param sqltext:</span>
+<span class="sd">          A string containing the column generation expression, which will be</span>
+<span class="sd">          used verbatim, or a SQL expression construct, such as a :func:`.text`</span>
+<span class="sd">          object.   If given as a string, the object is converted to a</span>
+<span class="sd">          :func:`.text` object.</span>
+
+<span class="sd">        :param persisted:</span>
+<span class="sd">          Optional, controls how this column should be persisted by the</span>
+<span class="sd">          database.   Possible values are:</span>
+
+<span class="sd">          * None, the default, it will use the default persistence defined</span>
+<span class="sd">            by the database.</span>
+<span class="sd">          * True, will render ``GENERATED ALWAYS AS ... STORED``, or the</span>
+<span class="sd">            equivalent for the target database if supported</span>
+<span class="sd">          * False, will render ``GENERATED ALWAYS AS ... VIRTUAL``, or the</span>
+<span class="sd">            equivalent for the target database if supported.</span>
+
+<span class="sd">          Specifying ``True`` or ``False`` may raise an error when the DDL</span>
+<span class="sd">          is emitted to the target database if the databse does not support</span>
+<span class="sd">          that persistence option.   Leaving this parameter at its default</span>
+<span class="sd">          of ``None`` is guaranteed to succeed for all databases that support</span>
+<span class="sd">          ``GENERATED ALWAYS AS``.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sqltext</span> <span class="o">=</span> <span class="n">_literal_as_text</span><span class="p">(</span><span class="n">sqltext</span><span class="p">,</span> <span class="n">allow_coercion_to_text</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">persisted</span> <span class="o">=</span> <span class="n">persisted</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">column</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">_set_parent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span>
+            <span class="n">parent</span><span class="o">.</span><span class="n">server_default</span><span class="p">,</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span> <span class="n">Computed</span><span class="p">)</span>
+        <span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">parent</span><span class="o">.</span><span class="n">server_onupdate</span><span class="p">,</span> <span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span> <span class="n">Computed</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="n">exc</span><span class="o">.</span><span class="n">ArgumentError</span><span class="p">(</span>
+                <span class="s2">&quot;A generated column cannot specify a server_default or a &quot;</span>
+                <span class="s2">&quot;server_onupdate argument&quot;</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">column</span> <span class="o">=</span> <span class="n">parent</span>
+        <span class="n">parent</span><span class="o">.</span><span class="n">computed</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">column</span><span class="o">.</span><span class="n">server_onupdate</span> <span class="o">=</span> <span class="bp">self</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">column</span><span class="o">.</span><span class="n">server_default</span> <span class="o">=</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">_as_for_update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">for_update</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_table</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">target_table</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">sqltext</span> <span class="o">=</span> <span class="n">_copy_expression</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sqltext</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="p">,</span> <span class="n">target_table</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sqltext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sqltext</span>
+        <span class="n">g</span> <span class="o">=</span> <span class="n">Computed</span><span class="p">(</span><span class="n">sqltext</span><span class="p">,</span> <span class="n">persisted</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">persisted</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema_item_copy</span><span class="p">(</span><span class="n">g</span><span class="p">)</span>
 </pre></div>
 
           </div>
