@@ -75,11 +75,14 @@
 
 <span class="kn">import</span> <span class="nn">attr</span>
 
-<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="k">import</span> <span class="n">RuntimeEnvironment</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">PackageVersion</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Source</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Project</span>
+<span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
 
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="k">import</span> <span class="n">NotFound</span>
+<span class="kn">from</span> <span class="nn">.enums</span> <span class="k">import</span> <span class="n">RecommendationType</span>
+<span class="kn">from</span> <span class="nn">.enums</span> <span class="k">import</span> <span class="n">DecisionType</span>
 
 
 <div class="viewcode-block" id="Context"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.context.Context">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -90,39 +93,39 @@
 <span class="sd">    needed - for example for parsing version strings (this is lazily pre-cached in PackageVersion).</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
+    <span class="n">project</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Project</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">GraphDatabase</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">library_usage</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">limit</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">recommendation_type</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">RecommendationType</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">)</span>
+    <span class="n">decision_type</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">DecisionType</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
     <span class="n">package_versions</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
         <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">PackageVersion</span><span class="p">],</span>
         <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span>
     <span class="p">)</span>
     <span class="n">sources</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Source</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>
-    <span class="c1"># TODO: move to state?</span>
-    <span class="n">advised_runtime_environment</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">RuntimeEnvironment</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span>
-    <span class="p">)</span>
+    <span class="n">iteration</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">stack_info</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
         <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
     <span class="p">)</span>
-    <span class="n">_accepted_final_states_count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-    <span class="n">_discarded_final_states_count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">accepted_final_states_count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">discarded_final_states_count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">accepted_final_states_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Return number of accepted final states as produced by the pipeline.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_accepted_final_states_count</span>
+    <span class="k">def</span> <span class="nf">__attrs_post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Verify we have only adviser or dependency monkey specific context.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Cannot instantiate context for adviser and dependency monkey at the same time&quot;</span>
+            <span class="p">)</span>
 
-    <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">discarded_final_states_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Return number of discarded final states (discarded by strides) during the pipeline run.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_final_states_count</span>
-
-<div class="viewcode-block" id="Context.inc_accepted_final_states_count"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.context.Context.inc_accepted_final_states_count">[docs]</a>    <span class="k">def</span> <span class="nf">inc_accepted_final_states_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Increment counter of accepted final states count.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_accepted_final_states_count</span> <span class="o">+=</span> <span class="mi">1</span></div>
-
-<div class="viewcode-block" id="Context.inc_discarded_final_states_count"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.context.Context.inc_discarded_final_states_count">[docs]</a>    <span class="k">def</span> <span class="nf">inc_discarded_final_states_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Increment counter of discarded final states count.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_discarded_final_states_count</span> <span class="o">+=</span> <span class="mi">1</span></div>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_type</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Cannot instantiate context not specific to adviser nor dependency monkey&quot;</span>
+            <span class="p">)</span>
 
 <div class="viewcode-block" id="Context.get_package_version"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.context.Context.get_package_version">[docs]</a>    <span class="k">def</span> <span class="nf">get_package_version</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
@@ -179,7 +182,15 @@
             <span class="n">develop</span><span class="o">=</span><span class="n">develop</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">package_versions</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
-        <span class="k">return</span> <span class="n">package_version</span></div></div>
+        <span class="k">return</span> <span class="n">package_version</span></div>
+
+<div class="viewcode-block" id="Context.is_dependency_monkey"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.context.Context.is_dependency_monkey">[docs]</a>    <span class="k">def</span> <span class="nf">is_dependency_monkey</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if the current context refers to a dependency monkey run.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="ow">is</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="Context.is_adviser"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.context.Context.is_adviser">[docs]</a>    <span class="k">def</span> <span class="nf">is_adviser</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if the current context refers to a dependency monkey run.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_type</span> <span class="ow">is</span> <span class="kc">None</span></div></div>
 </pre></div>
 
           </div>

@@ -69,13 +69,15 @@
 
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 
-<span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="k">import</span> <span class="n">RuntimeEnvironment</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Project</span>
+<span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="k">import</span> <span class="n">GraphDatabase</span>
 
 <span class="kn">from</span> <span class="nn">.context</span> <span class="k">import</span> <span class="n">Context</span>
 <span class="kn">from</span> <span class="nn">.state</span> <span class="k">import</span> <span class="n">State</span>
@@ -91,26 +93,34 @@
     <span class="n">project</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Project</span><span class="p">)</span>
     <span class="n">score</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
     <span class="n">justification</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]])</span>
+    <span class="n">advised_runtime_environment</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">RuntimeEnvironment</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span>
+    <span class="p">)</span>
 
 <div class="viewcode-block" id="Product.from_final_state"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.product.Product.from_final_state">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">from_final_state</span><span class="p">(</span>
         <span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span><span class="p">,</span> <span class="n">project</span><span class="p">:</span> <span class="n">Project</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Product&quot;</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Instantiate advised stack from final state produced by adviser&#39;s pipeline.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">state</span><span class="o">.</span><span class="n">is_final</span><span class="p">(),</span> <span class="s2">&quot;Instantiating product from a non-final state&quot;</span>
+
         <span class="n">package_versions_locked</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="n">package_version</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">get_package_version</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
 
             <span class="c1"># Fill package hashes before instantiating the final product.</span>
-            <span class="n">package_version</span><span class="o">.</span><span class="n">hashes</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">get_python_package_hashes_sha256</span><span class="p">(</span>
-                <span class="o">*</span><span class="n">package_tuple</span>
-            <span class="p">)</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">hashes</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No hashes found for package </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
+                <span class="c1"># We can re-use already existing package-version - in that case it already keeps hashes from</span>
+                <span class="c1"># a previous product instantiation.</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">hashes</span> <span class="o">=</span> <span class="n">graph</span><span class="o">.</span><span class="n">get_python_package_hashes_sha256</span><span class="p">(</span>
+                    <span class="o">*</span><span class="n">package_tuple</span>
+                <span class="p">)</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">hashes</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No hashes found for package </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
 
             <span class="n">package_versions_locked</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
 
-        <span class="c1"># TODO: advised runtime environment</span>
         <span class="n">advised_project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">(</span>
             <span class="n">packages</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">project</span><span class="o">.</span><span class="n">iter_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
             <span class="n">packages_locked</span><span class="o">=</span><span class="n">package_versions_locked</span><span class="p">,</span>
@@ -120,6 +130,7 @@
             <span class="n">project</span><span class="o">=</span><span class="n">advised_project</span><span class="p">,</span>
             <span class="n">score</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
             <span class="n">justification</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">justification</span><span class="p">,</span>
+            <span class="n">advised_runtime_environment</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">advised_runtime_environment</span><span class="p">,</span>
         <span class="p">)</span></div>
 
     <span class="k">def</span> <span class="nf">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;Product&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
@@ -128,10 +139,15 @@
 
 <div class="viewcode-block" id="Product.to_dict"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.product.Product.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Convert this instance into a dictionary.&quot;&quot;&quot;</span>
+        <span class="n">advised_runtime_environment</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">advised_runtime_environment</span><span class="p">:</span>
+            <span class="n">advised_runtime_environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">advised_runtime_environment</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;project&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
             <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
             <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">justification</span><span class="p">,</span>
+            <span class="s2">&quot;advised_runtime_environment&quot;</span><span class="p">:</span> <span class="n">advised_runtime_environment</span><span class="p">,</span>
         <span class="p">}</span></div></div>
 </pre></div>
 

@@ -74,63 +74,26 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Optional</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">List</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">functools</span> <span class="k">import</span> <span class="n">partial</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
-<span class="kn">import</span> <span class="nn">matplotlib</span>
-<span class="kn">from</span> <span class="nn">amun</span> <span class="k">import</span> <span class="n">inspect</span> <span class="k">as</span> <span class="n">amun_inspect</span>
+<span class="kn">import</span> <span class="nn">amun</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Project</span>
 
-<span class="kn">from</span> <span class="nn">.anneal</span> <span class="k">import</span> <span class="n">AdaptiveSimulatedAnnealing</span>
+<span class="kn">from</span> <span class="nn">.dm_report</span> <span class="k">import</span> <span class="n">DependencyMonkeyReport</span>
+<span class="kn">from</span> <span class="nn">.predictor</span> <span class="k">import</span> <span class="n">Predictor</span>
+<span class="kn">from</span> <span class="nn">.resolver</span> <span class="k">import</span> <span class="n">Resolver</span>
 <span class="kn">from</span> <span class="nn">.enums</span> <span class="k">import</span> <span class="n">DecisionType</span>
-<span class="kn">from</span> <span class="nn">.plot</span> <span class="k">import</span> <span class="n">plot_history</span>
 
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
-
-
-<div class="viewcode-block" id="DependencyMonkeyReport"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.dependency_monkey.DependencyMonkeyReport">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">DependencyMonkeyReport</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Report produced by a Dependency Monkey run.&quot;&quot;&quot;</span>
-
-    <span class="n">_skipped</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-    <span class="n">_responses</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
-    <span class="n">_temperature_history</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]],</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span>
-    <span class="p">)</span>
-
-<div class="viewcode-block" id="DependencyMonkeyReport.inc_skipped"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.dependency_monkey.DependencyMonkeyReport.inc_skipped">[docs]</a>    <span class="k">def</span> <span class="nf">inc_skipped</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Increment skipped stacks (e.g. due to API unavailability errors).&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_skipped</span> <span class="o">+=</span> <span class="mi">1</span></div>
-
-<div class="viewcode-block" id="DependencyMonkeyReport.set_temperature_history"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.dependency_monkey.DependencyMonkeyReport.set_temperature_history">[docs]</a>    <span class="k">def</span> <span class="nf">set_temperature_history</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">temperature_history</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Mark the temperature history during annealing.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_temperature_history</span> <span class="o">=</span> <span class="n">temperature_history</span></div>
-
-<div class="viewcode-block" id="DependencyMonkeyReport.add_response"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.dependency_monkey.DependencyMonkeyReport.add_response">[docs]</a>    <span class="k">def</span> <span class="nf">add_response</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">response</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Add a new response to response listing.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_responses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">response</span><span class="p">)</span></div>
-
-<div class="viewcode-block" id="DependencyMonkeyReport.to_dict"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.dependency_monkey.DependencyMonkeyReport.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Convert report to a dict representation suitable for serialization.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;skipped&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_skipped</span><span class="p">,</span> <span class="s2">&quot;responses&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_responses</span><span class="p">}</span></div>
-
-<div class="viewcode-block" id="DependencyMonkeyReport.plot_history"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.dependency_monkey.DependencyMonkeyReport.plot_history">[docs]</a>    <span class="k">def</span> <span class="nf">plot_history</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">output_file</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">matplotlib</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">Figure</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Plot history of temperature function.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">plot_history</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_temperature_history</span><span class="p">,</span> <span class="n">output_file</span><span class="p">)</span></div></div>
 
 
 <div class="viewcode-block" id="DependencyMonkey"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.dependency_monkey.DependencyMonkey">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">DependencyMonkey</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Dependency monkey creates stacks based on the configuration using ASA.&quot;&quot;&quot;</span>
 
-    <span class="n">asa</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">AdaptiveSimulatedAnnealing</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">resolver</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Resolver</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">stack_output</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
     <span class="n">context</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
         <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span>
@@ -138,7 +101,12 @@
     <span class="n">dry_run</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">decision_type</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">DecisionType</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">DecisionType</span><span class="o">.</span><span class="n">ALL</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<div class="viewcode-block" id="DependencyMonkey.anneal"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.dependency_monkey.DependencyMonkey.anneal">[docs]</a>    <span class="k">def</span> <span class="nf">anneal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependencyMonkeyReport</span><span class="p">:</span>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">predictor</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Predictor</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get predictor for the current dependency monkey configuration.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolver</span><span class="o">.</span><span class="n">predictor</span>
+
+<div class="viewcode-block" id="DependencyMonkey.resolve"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.dependency_monkey.DependencyMonkey.resolve">[docs]</a>    <span class="k">def</span> <span class="nf">resolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DependencyMonkeyReport</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Perform simulated annealing and run dependency monkey on products.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stack_output</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
@@ -164,7 +132,7 @@
 
         <span class="n">report</span> <span class="o">=</span> <span class="n">DependencyMonkeyReport</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">count</span><span class="p">,</span> <span class="n">product</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">asa</span><span class="o">.</span><span class="n">anneal_products</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">resolver</span><span class="o">.</span><span class="n">resolve_products</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)</span>
         <span class="p">):</span>
             <span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
@@ -178,14 +146,16 @@
                 <span class="n">response</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">output_func</span><span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="n">product</span><span class="o">.</span><span class="n">project</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to submit produced project: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
-                <span class="n">report</span><span class="o">.</span><span class="n">inc_skipped</span><span class="p">()</span>
+                <span class="n">report</span><span class="o">.</span><span class="n">skipped</span> <span class="o">+=</span> <span class="mi">1</span>
                 <span class="k">continue</span>
 
             <span class="k">if</span> <span class="n">response</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Submitted results to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="p">)</span>
-                <span class="n">report</span><span class="o">.</span><span class="n">add_response</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+                <span class="n">report</span><span class="o">.</span><span class="n">add_response</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">product</span><span class="p">)</span>
 
-        <span class="n">report</span><span class="o">.</span><span class="n">set_temperature_history</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">asa</span><span class="o">.</span><span class="n">get_temperature_history</span><span class="p">())</span>
+        <span class="c1"># Call post-run report function with the report once all is done as we used lower</span>
+        <span class="c1"># level resolver method `resolve_products&#39; and this object maintains report.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resolver</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">call_post_run_report</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">report</span></div>
 
     <span class="nd">@staticmethod</span>
@@ -195,7 +165,7 @@
         <span class="sd">&quot;&quot;&quot;A wrapper around Amun inspection call.&quot;&quot;&quot;</span>
         <span class="n">context</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
         <span class="n">context</span><span class="p">[</span><span class="s2">&quot;python&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">generated_project</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-        <span class="n">response</span> <span class="o">=</span> <span class="n">amun_inspect</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">amun</span><span class="o">.</span><span class="n">inspect</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="o">**</span><span class="n">context</span><span class="p">)</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">&quot;Submitted Amun inspection #</span><span class="si">%d</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">count</span><span class="p">,</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;inspection_id&quot;</span><span class="p">]</span>
         <span class="p">)</span>
