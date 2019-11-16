@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.19.19 documentation</title>
+    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.19.20 documentation</title>
     <link rel="stylesheet" href="../../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../../index.html">Thoth Storages 0.19.19 documentation</a> &#187;</li>
+        <li><a href="../../../../index.html">Thoth Storages 0.19.20 documentation</a> &#187;</li>
           <li><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -91,7 +91,6 @@
 <span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="k">import</span> <span class="n">Query</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="k">import</span> <span class="n">sessionmaker</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy.dialects.postgresql</span> <span class="k">import</span> <span class="n">insert</span>
-<span class="kn">from</span> <span class="nn">sqlalchemy.pool</span> <span class="k">import</span> <span class="n">NullPool</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy.dialects</span> <span class="k">import</span> <span class="n">postgresql</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy_utils.functions</span> <span class="k">import</span> <span class="n">create_database</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy_utils.functions</span> <span class="k">import</span> <span class="n">database_exists</span>
@@ -239,8 +238,22 @@
 
         <span class="n">echo</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_STORAGES_DEBUG_QUERIES&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
         <span class="c1"># We do not use connection pool, but directly talk to the database.</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">construct_connection_string</span><span class="p">(),</span> <span class="n">echo</span><span class="o">=</span><span class="n">echo</span><span class="p">,</span> <span class="n">poolclass</span><span class="o">=</span><span class="n">NullPool</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">construct_connection_string</span><span class="p">(),</span> <span class="n">echo</span><span class="o">=</span><span class="n">echo</span><span class="p">,</span> <span class="n">pool_pre_ping</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">sessionmaker</span><span class="p">(</span><span class="n">bind</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="p">)()</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">construct_connection_string</span><span class="p">(),</span> <span class="n">echo</span><span class="o">=</span><span class="n">echo</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">sessionmaker</span><span class="p">(</span><span class="n">bind</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="p">)()</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="c1"># Drop engine and session in case of any connection issues so is_connected behaves correctly.</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">dispose</span><span class="p">()</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Failed to dispose engine: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+                    <span class="k">pass</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">raise</span>
 
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_schema_up2date</span><span class="p">():</span>
@@ -298,7 +311,7 @@
 
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Current library revision heads: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">revision_heads</span><span class="p">)</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Current database heads: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">database_heads</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">revision_heads</span> <span class="o">==</span> <span class="n">revision_heads</span></div>
+            <span class="k">return</span> <span class="n">database_heads</span> <span class="o">==</span> <span class="n">revision_heads</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.normalize_python_package_name"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.normalize_python_package_name">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -994,12 +1007,8 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Construct solved query to retrive unsolved packages, the query is not executed.&quot;&quot;&quot;</span>
         <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
-                <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span>
-                <span class="p">)</span>
-            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
-            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">))</span>
 
         <span class="k">if</span> <span class="n">index_url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">)</span>
@@ -1022,105 +1031,6 @@
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">python_version</span> <span class="o">==</span> <span class="n">python_version</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">query</span>
-
-    <span class="k">def</span> <span class="nf">_get_unsolved_python_package_versions_count_edge_cases</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="o">*</span><span class="p">,</span>
-        <span class="n">distinct</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-        <span class="n">count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_COUNT</span><span class="p">,</span>
-        <span class="n">is_count</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]]]:</span>
-        <span class="sd">&quot;&quot;&quot;Retrieve unsolved packages in edge cases.</span>
-
-<span class="sd">        Edge cases:</span>
-<span class="sd">        CASE 1: (&#39;package_name&#39;, None, &#39;index_url&#39;)</span>
-
-<span class="sd">        CASE 2: (&#39;package_name&#39;, &#39;package_version&#39;, None)</span>
-
-<span class="sd">        CASE 3: (&#39;package_name&#39;, None, None)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">case_2</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="o">.</span><span class="n">isnot</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="o">.</span><span class="n">is_</span><span class="p">(</span><span class="kc">None</span><span class="p">))</span>
-            <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="p">,</span>
-                <span class="n">func</span><span class="o">.</span><span class="n">count</span><span class="p">(</span>
-                    <span class="n">tuple_</span><span class="p">(</span>
-                        <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                        <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
-                        <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="p">)</span>
-                        <span class="p">))</span>
-            <span class="o">.</span><span class="n">group_by</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="p">)</span>
-        <span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">package_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
-            <span class="n">case_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">package_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
-            <span class="n">case_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span> <span class="o">==</span> <span class="n">package_version</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">distinct</span><span class="p">:</span>
-            <span class="n">case_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
-
-        <span class="k">if</span> <span class="n">is_count</span><span class="p">:</span>
-            <span class="n">result_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">case_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">limit</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
-            <span class="n">result_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
-
-        <span class="n">case_3</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="o">.</span><span class="n">is_</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="o">.</span><span class="n">is_</span><span class="p">(</span><span class="kc">None</span><span class="p">))</span>
-            <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="p">,</span>
-                <span class="n">func</span><span class="o">.</span><span class="n">count</span><span class="p">(</span>
-                    <span class="n">tuple_</span><span class="p">(</span>
-                        <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                        <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
-                        <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="p">)</span>
-                        <span class="p">))</span>
-            <span class="o">.</span><span class="n">group_by</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="p">)</span>
-        <span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">package_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
-            <span class="n">case_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">package_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
-            <span class="n">case_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span> <span class="o">==</span> <span class="n">package_version</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">distinct</span><span class="p">:</span>
-            <span class="n">case_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
-
-        <span class="k">if</span> <span class="n">is_count</span><span class="p">:</span>
-            <span class="n">result_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result_2</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">count</span><span class="p">:</span>
-                <span class="n">case_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">limit</span><span class="p">(</span><span class="n">count</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">result_2</span><span class="p">))</span>
-                <span class="n">result_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">result_2</span>
-
-        <span class="k">return</span> <span class="n">result_2</span> <span class="o">+</span> <span class="n">result_3</span>
 
 <div class="viewcode-block" id="GraphDatabase.get_unsolved_python_packages_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_unsolved_python_packages_all">[docs]</a>    <span class="k">def</span> <span class="nf">get_unsolved_python_packages_all</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1146,18 +1056,16 @@
             <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span>
         <span class="p">)</span>
 
-        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
+        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">entity_id</span><span class="p">)</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
         <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
             <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
                 <span class="n">tuple_</span><span class="p">(</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">)</span>
+                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">notin_</span><span class="p">(</span>
                     <span class="n">subquery</span>
                 <span class="p">)</span>
-            <span class="p">)</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
             <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span> <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
         <span class="p">)</span>
 
@@ -1167,13 +1075,6 @@
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
 
         <span class="n">result</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
-
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">count</span><span class="p">:</span>
-
-            <span class="n">unsolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_unsolved_python_package_versions_count_edge_cases</span><span class="p">(</span><span class="n">count</span><span class="o">=</span><span class="n">count</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
-
-            <span class="k">for</span> <span class="n">unsolved_tuple</span> <span class="ow">in</span> <span class="n">unsolved</span><span class="p">:</span>
-                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">unsolved_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">unsolved_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
 
         <span class="k">return</span> <span class="n">result</span></div>
 
@@ -1191,19 +1092,17 @@
             <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span>
         <span class="p">)</span>
 
-        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
+        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">entity_id</span><span class="p">)</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
 
         <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
             <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
                 <span class="n">tuple_</span><span class="p">(</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">)</span>
+                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">notin_</span><span class="p">(</span>
                     <span class="n">subquery</span>
                 <span class="p">)</span>
-            <span class="p">)</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
             <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
                 <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
                 <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
@@ -1236,11 +1135,7 @@
 
         <span class="n">result</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
 
-        <span class="n">unsolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_unsolved_python_package_versions_count_edge_cases</span><span class="p">(</span><span class="n">is_count</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-
-        <span class="n">total_count</span> <span class="o">=</span> <span class="n">result</span> <span class="o">+</span> <span class="n">unsolved</span>
-
-        <span class="k">return</span> <span class="n">total_count</span></div>
+        <span class="k">return</span> <span class="n">result</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.get_unsolved_python_packages_all_versions"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_unsolved_python_packages_all_versions">[docs]</a>    <span class="k">def</span> <span class="nf">get_unsolved_python_packages_all_versions</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1275,11 +1170,7 @@
 
         <span class="n">query_result</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="n">unsolved</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">count</span><span class="p">:</span>
-            <span class="n">unsolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_unsolved_python_package_versions_count_edge_cases</span><span class="p">(</span><span class="n">count</span><span class="o">=</span><span class="n">count</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
-
-        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span> <span class="o">+</span> <span class="n">unsolved</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">query_result</span><span class="p">:</span>
                 <span class="n">query_result</span><span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
             <span class="n">query_result</span><span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="mi">2</span><span class="p">]))</span>
@@ -1310,19 +1201,17 @@
             <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span>
         <span class="p">)</span>
 
-        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
+        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">entity_id</span><span class="p">)</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
 
         <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
             <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
                 <span class="n">tuple_</span><span class="p">(</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">)</span>
+                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">notin_</span><span class="p">(</span>
                     <span class="n">subquery</span>
                 <span class="p">)</span>
-            <span class="p">)</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
             <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
                 <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
                 <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
@@ -1346,13 +1235,9 @@
 
         <span class="n">result</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
 
-        <span class="n">unsolved</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">count</span><span class="p">:</span>
-            <span class="n">unsolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_unsolved_python_package_versions_count_edge_cases</span><span class="p">(</span><span class="n">count</span><span class="o">=</span><span class="n">count</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
-
         <span class="n">query_result</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">unsolved</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
             <span class="k">if</span> <span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">query_result</span><span class="p">:</span>
                 <span class="n">query_result</span><span class="p">[(</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="mi">2</span><span class="p">])]</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
             <span class="k">else</span><span class="p">:</span>
@@ -1386,20 +1271,19 @@
             <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span>
         <span class="p">)</span>
 
-        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
+        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">entity_id</span><span class="p">)</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
 
         <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
             <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
                 <span class="n">tuple_</span><span class="p">(</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">)</span>
+                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">notin_</span><span class="p">(</span>
                     <span class="n">subquery</span>
                 <span class="p">)</span>
             <span class="p">)</span>
+            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">)</span>
             <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
                 <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
                 <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
@@ -1416,9 +1300,6 @@
                 <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
             <span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">index_url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">)</span>
-
         <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">offset</span><span class="p">(</span><span class="n">start_offset</span><span class="p">)</span><span class="o">.</span><span class="n">limit</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">distinct</span><span class="p">:</span>
@@ -1426,14 +1307,10 @@
 
         <span class="n">result</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
 
-        <span class="n">unsolved</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">count</span><span class="p">:</span>
-            <span class="n">unsolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_unsolved_python_package_versions_count_edge_cases</span><span class="p">(</span><span class="n">count</span><span class="o">=</span><span class="n">count</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
-
         <span class="n">query_result</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">query_result</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">unsolved</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">:</span>
                 <span class="k">if</span> <span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">query_result</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
                     <span class="n">query_result</span><span class="p">[</span><span class="n">index_url</span><span class="p">][(</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
@@ -1468,20 +1345,22 @@
             <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span>
         <span class="p">)</span>
 
-        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
+        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">entity_id</span><span class="p">)</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">package_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
 
         <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
             <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
                 <span class="n">tuple_</span><span class="p">(</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">)</span>
+                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">notin_</span><span class="p">(</span>
                     <span class="n">subquery</span>
                 <span class="p">)</span>
             <span class="p">)</span>
+            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">)</span>
             <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
                 <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
                 <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
@@ -1498,10 +1377,6 @@
                 <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
             <span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">package_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
-            <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">)</span>
-
         <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">offset</span><span class="p">(</span><span class="n">start_offset</span><span class="p">)</span><span class="o">.</span><span class="n">limit</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">distinct</span><span class="p">:</span>
@@ -1509,13 +1384,9 @@
 
         <span class="n">result</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
 
-        <span class="n">unsolved</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">count</span><span class="p">:</span>
-            <span class="n">unsolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_unsolved_python_package_versions_count_edge_cases</span><span class="p">(</span><span class="n">count</span><span class="o">=</span><span class="n">count</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
-
         <span class="n">query_result</span> <span class="o">=</span> <span class="p">{}</span>
 
-        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">unsolved</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">query_result</span><span class="p">:</span>
                 <span class="n">query_result</span><span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
                 <span class="n">query_result</span><span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]][</span><span class="n">item</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
@@ -1547,114 +1418,19 @@
             <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span>
         <span class="p">)</span>
 
-        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
+        <span class="n">subquery</span> <span class="o">=</span> <span class="n">solved</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">entity_id</span><span class="p">)</span><span class="o">.</span><span class="n">subquery</span><span class="p">()</span>
+
         <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
             <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
                 <span class="n">tuple_</span><span class="p">(</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">)</span>
+                    <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">notin_</span><span class="p">(</span>
                     <span class="n">subquery</span>
                 <span class="p">)</span>
-            <span class="p">)</span>
-            <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
-                <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
-        <span class="p">)</span>
+            <span class="p">))</span>
 
         <span class="k">return</span> <span class="n">query</span>
-
-    <span class="k">def</span> <span class="nf">_get_unsolved_python_package_versions_edge_cases</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="o">*</span><span class="p">,</span>
-        <span class="n">distinct</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-        <span class="n">count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_COUNT</span><span class="p">,</span>
-        <span class="n">is_count</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-        <span class="n">randomize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]]],</span> <span class="nb">int</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Retrieve unsolved packages in edge cases.</span>
-
-<span class="sd">        Edge cases:</span>
-<span class="sd">        CASE 1: (&#39;package_name&#39;, None, &#39;index_url&#39;) (ALREADY INCLUDED in general function)</span>
-
-<span class="sd">        CASE 2: (&#39;package_name&#39;, &#39;package_version&#39;, None)</span>
-
-<span class="sd">        CASE 3: (&#39;package_name&#39;, None, None)</span>
-
-<span class="sd">        If is_count is set to true, this method returns non-negative integer representing number</span>
-<span class="sd">        of packages - the count and randomize parameters have no effect in that case.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">case_2</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="o">.</span><span class="n">isnot</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="o">.</span><span class="n">is_</span><span class="p">(</span><span class="kc">None</span><span class="p">))</span>
-            <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="p">)</span>
-        <span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">package_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
-            <span class="n">case_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">package_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
-            <span class="n">case_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span> <span class="o">==</span> <span class="n">package_version</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">distinct</span><span class="p">:</span>
-            <span class="n">case_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
-
-        <span class="k">if</span> <span class="n">is_count</span><span class="p">:</span>
-            <span class="n">result_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">randomize</span><span class="p">:</span>
-                <span class="n">case_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">random</span><span class="p">())</span>
-
-            <span class="n">case_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">limit</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
-            <span class="n">result_2</span> <span class="o">=</span> <span class="n">case_2</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
-
-        <span class="n">case_3</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="o">.</span><span class="n">is_</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="o">.</span><span class="n">is_</span><span class="p">(</span><span class="kc">None</span><span class="p">))</span>
-            <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
-                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">python_package_index_id</span><span class="p">)</span>
-        <span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">package_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
-            <span class="n">case_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">package_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
-            <span class="n">case_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span> <span class="o">==</span> <span class="n">package_version</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">distinct</span><span class="p">:</span>
-            <span class="n">case_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
-
-        <span class="k">if</span> <span class="n">is_count</span><span class="p">:</span>
-            <span class="n">result_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result_2</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">count</span><span class="p">:</span>
-                <span class="n">case_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">limit</span><span class="p">(</span><span class="n">count</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">result_2</span><span class="p">))</span>
-                <span class="k">if</span> <span class="n">randomize</span><span class="p">:</span>
-                    <span class="n">case_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">random</span><span class="p">())</span>
-
-                <span class="n">result_3</span> <span class="o">=</span> <span class="n">case_3</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="k">return</span> <span class="n">result_2</span>
-
-        <span class="k">return</span> <span class="n">result_2</span> <span class="o">+</span> <span class="n">result_3</span>
 
 <div class="viewcode-block" id="GraphDatabase.get_unsolved_python_package_versions_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_unsolved_python_package_versions_all">[docs]</a>    <span class="k">def</span> <span class="nf">get_unsolved_python_package_versions_all</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1687,6 +1463,11 @@
             <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span>
             <span class="p">)</span>
 
+        <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
+                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
+                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
+                <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
+
         <span class="k">if</span> <span class="n">index_url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">)</span>
 
@@ -1707,17 +1488,6 @@
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
 
         <span class="n">result</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
-
-        <span class="n">unsolved</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">count</span><span class="p">:</span>
-            <span class="n">unsolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_unsolved_python_package_versions_edge_cases</span><span class="p">(</span>
-                <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">package_version</span><span class="o">=</span><span class="n">package_version</span><span class="p">,</span>
-                <span class="n">count</span><span class="o">=</span><span class="n">count</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">),</span>
-                <span class="n">randomize</span><span class="o">=</span><span class="n">randomize</span><span class="p">,</span>
-            <span class="p">)</span>
-
-        <span class="n">result</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">unsolved</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">result</span></div>
 
@@ -1742,6 +1512,11 @@
             <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span>
             <span class="p">)</span>
 
+        <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
+                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
+                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
+                <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
+
         <span class="k">if</span> <span class="n">index_url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">)</span>
 
@@ -1758,15 +1533,7 @@
 
         <span class="n">result</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
 
-        <span class="c1"># Sum with unsolved edge cases.</span>
-        <span class="n">unsolved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_unsolved_python_package_versions_edge_cases</span><span class="p">(</span>
-            <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
-            <span class="n">package_version</span><span class="o">=</span><span class="n">package_version</span><span class="p">,</span>
-            <span class="n">distinct</span><span class="o">=</span><span class="n">distinct</span><span class="p">,</span>
-            <span class="n">is_count</span><span class="o">=</span><span class="kc">True</span>
-        <span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">result</span> <span class="o">+</span> <span class="n">unsolved</span></div>
+        <span class="k">return</span> <span class="n">result</span></div>
 
     <span class="c1"># Analyzed packages</span>
 
@@ -5333,7 +5100,7 @@
 
             <span class="n">result</span> <span class="o">=</span> <span class="n">result</span> <span class="o">+</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
 
-        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">result</span><span class="p">))</span></div>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">([</span><span class="n">r</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">result</span><span class="p">]))</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.stats"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.stats">[docs]</a>    <span class="k">def</span> <span class="nf">stats</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get statistics for this adapter.&quot;&quot;&quot;</span>
