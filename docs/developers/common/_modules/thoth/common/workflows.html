@@ -219,6 +219,60 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">openshift</span> <span class="o">=</span> <span class="n">ocp_client</span> <span class="ow">or</span> <span class="n">OpenShift</span><span class="p">(</span><span class="o">**</span><span class="n">ocp_config</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">api</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">V1alpha1Api</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">ApiClient</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">configuration</span><span class="p">))</span>
 
+<div class="viewcode-block" id="WorkflowManager.submit_inspection_workflow"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.workflows.WorkflowManager.submit_inspection_workflow">[docs]</a>    <span class="k">def</span> <span class="nf">submit_inspection_workflow</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">inspection_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">template_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">workflow_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Submit the Inspection Workflow.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">amun_infra_namespace</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
+                <span class="s2">&quot;Unable to create inspection workflow.&quot;</span>
+                <span class="s2">&quot;Amun infra and inspection namespaces were not provided.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">template_parameters</span> <span class="o">=</span> <span class="n">template_parameters</span> <span class="ow">or</span> <span class="p">{}</span>
+        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="n">workflow_parameters</span> <span class="ow">or</span> <span class="p">{}</span>
+
+        <span class="n">template_parameters</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;AMUN_INSPECTION_ID&quot;</span><span class="p">:</span> <span class="n">inspection_id</span><span class="p">})</span>
+
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_inspection_workflow_template</span><span class="p">(</span>
+            <span class="n">use_hw_template</span><span class="o">=</span><span class="n">use_hw_template</span><span class="p">,</span> <span class="n">parameters</span><span class="o">=</span><span class="n">template_parameters</span>
+        <span class="p">)</span>
+
+        <span class="n">workflow_object</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">workflow</span><span class="p">:</span> <span class="n">Workflow</span> <span class="o">=</span> <span class="n">Workflow</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">workflow_object</span><span class="p">,</span> <span class="n">validate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_submit_workflow</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">,</span> <span class="n">workflow</span><span class="p">,</span> <span class="n">parameters</span><span class="o">=</span><span class="n">workflow_parameters</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="WorkflowManager.get_inspection_workflow_template"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.workflows.WorkflowManager.get_inspection_workflow_template">[docs]</a>    <span class="k">def</span> <span class="nf">get_inspection_workflow_template</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get Inspection Workflow template.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span><span class="s2">&quot;Infra namespace was not provided.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span><span class="s2">&quot;Inspection namespace was not provided.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">use_hw_template</span><span class="p">:</span>
+            <span class="n">label_selector</span> <span class="o">=</span> <span class="s2">&quot;template=amun-inspection-workflow-with-cpu&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">label_selector</span> <span class="o">=</span> <span class="s2">&quot;template=amun-inspection-workflow&quot;</span>
+
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span>
+            <span class="n">label_selector</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">amun_infra_namespace</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">set_template_parameters</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="o">**</span><span class="n">parameters</span><span class="p">)</span>
+
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">oc_process</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">openshift</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">template</span></div>
+
     <span class="k">def</span> <span class="nf">_submit_workflow</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -226,8 +280,11 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">validate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Submit an Argo Workflow to a given namespace.&quot;&quot;&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Submit an Argo Workflow to a given namespace.</span>
+
+<span class="sd">        :returns: Workflow ID</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">parameters</span> <span class="o">=</span> <span class="n">parameters</span> <span class="ow">or</span> <span class="p">{}</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">wf</span><span class="p">,</span> <span class="n">Workflow</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">wf</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
@@ -241,33 +298,32 @@
             <span class="n">new_parameters</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">param</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">wf</span><span class="o">.</span><span class="n">spec</span><span class="p">,</span> <span class="s2">&quot;arguments&quot;</span><span class="p">):</span>
-            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">wf</span><span class="o">.</span><span class="n">spec</span><span class="o">.</span><span class="n">arguments</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;parameters&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">wf</span><span class="o">.</span><span class="n">spec</span><span class="o">.</span><span class="n">arguments</span><span class="p">,</span> <span class="s2">&quot;parameters&quot;</span><span class="p">,</span> <span class="p">[]):</span>
                 <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">parameters</span><span class="p">:</span>
                     <span class="k">continue</span>  <span class="c1"># overridden</span>
-                <span class="k">elif</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">value</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">default</span><span class="p">:</span>
+                <span class="k">elif</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">):</span>
                     <span class="k">raise</span> <span class="n">WorkflowError</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Missing required workflow parameter </span><span class="si">{p.name}</span><span class="s2">&quot;</span><span class="p">)</span>
 
                 <span class="n">new_parameters</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">p</span><span class="p">)</span>
 
             <span class="n">wf</span><span class="o">.</span><span class="n">spec</span><span class="o">.</span><span class="n">arguments</span><span class="o">.</span><span class="n">parameters</span> <span class="o">=</span> <span class="n">new_parameters</span>
 
-        <span class="c1"># Set the ID so that we can track it easily later on</span>
-        <span class="n">wf</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">id</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">id</span>
+        <span class="c1"># Set the ID to the name that we can track it easily later on</span>
+        <span class="n">wf</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">id</span>
 
-        <span class="n">body</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">wf</span><span class="p">,</span> <span class="s2">&quot;validated&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                <span class="s2">&quot;The Workflow has not been previously validated. Sanitizing for serialization.&quot;</span><span class="p">,</span> <span class="n">wf</span><span class="p">,</span>
-            <span class="p">)</span>
-            <span class="n">body</span> <span class="o">=</span> <span class="n">to_camel_case</span><span class="p">(</span><span class="n">wf</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;The Workflow has not been previously validated.&quot;</span> <span class="s2">&quot;Sanitizing for serialization.&quot;</span><span class="p">)</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="n">to_camel_case</span><span class="p">(</span><span class="n">wf</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">api_client</span><span class="o">.</span><span class="n">sanitize_for_serialization</span><span class="p">(</span><span class="n">wf</span><span class="p">)</span>
 
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Submitting workflow: &quot;</span><span class="p">,</span> <span class="n">wf</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Submitting workflow: </span><span class="si">{body}</span><span class="s2">&quot;</span><span class="p">)</span>
 
         <span class="c1"># submit the workflow</span>
         <span class="n">created</span><span class="p">:</span> <span class="n">models</span><span class="o">.</span><span class="n">V1alpha1Workflow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">api</span><span class="o">.</span><span class="n">create_namespaced_workflow</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="n">body</span><span class="p">)</span>
 
         <span class="c1"># return the computed Workflow ID</span>
-        <span class="k">return</span> <span class="n">wf</span><span class="o">.</span><span class="n">id</span></div>
+        <span class="k">return</span> <span class="n">wf</span><span class="o">.</span><span class="n">name</span></div>
 </pre></div>
 
           </div>
