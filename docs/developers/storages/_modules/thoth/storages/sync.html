@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.sync &#8212; Thoth Storages 0.19.23 documentation</title>
+    <title>thoth.storages.sync &#8212; Thoth Storages 0.19.24 documentation</title>
     <link rel="stylesheet" href="../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../index.html">Thoth Storages 0.19.23 documentation</a> &#187;</li>
+        <li><a href="../../../index.html">Thoth Storages 0.19.24 documentation</a> &#187;</li>
           <li><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -69,6 +69,7 @@
 
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="k">import</span> <span class="n">Path</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="k">import</span> <span class="n">Tuple</span>
@@ -119,17 +120,17 @@
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">adviser_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
 
-        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">adviser_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="n">f</span><span class="s2">&quot;Syncing adviser document from </span><span class="si">{adviser_store.ceph.host}</span><span class="s2"> &quot;</span> <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph&quot;</span>
-            <span class="p">)</span>
-
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">adviser_document_id_exist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;Syncing adviser document from </span><span class="si">%r</span><span class="s2"> with id </span><span class="si">%r</span><span class="s2"> to graph&quot;</span><span class="p">,</span>
+                        <span class="n">adviser_store</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+                        <span class="n">document_id</span>
+                    <span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">adviser_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
 
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_adviser_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
@@ -171,15 +172,17 @@
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
-        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">solver_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">f</span><span class="s2">&quot;Syncing solver document from </span><span class="si">{solver_store.ceph.host}</span><span class="s2"> &quot;</span> <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph&quot;</span><span class="p">)</span>
-
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">solver_document_id_exist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;Syncing solver document from </span><span class="si">%r</span><span class="s2"> with id </span><span class="si">%r</span><span class="s2"> to graph&quot;</span><span class="p">,</span>
+                        <span class="n">solver_store</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+                        <span class="n">document_id</span>
+                    <span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
 
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_solver_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
@@ -222,17 +225,17 @@
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">analysis_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
 
-        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">analysis_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="n">f</span><span class="s2">&quot;Syncing analysis document from </span><span class="si">{analysis_store.ceph.host}</span><span class="s2"> &quot;</span> <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph&quot;</span>
-            <span class="p">)</span>
-
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">analysis_document_id_exist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;Syncing analysis document from </span><span class="si">%r</span><span class="s2"> with id </span><span class="si">%r</span><span class="s2"> to graph&quot;</span><span class="p">,</span>
+                        <span class="n">analysis_store</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+                        <span class="n">document_id</span><span class="p">,</span>
+                    <span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">analysis_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
 
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_analysis_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
@@ -275,18 +278,17 @@
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
 
-        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">package_analysis_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="n">f</span><span class="s2">&quot;Syncing package analysis document from </span><span class="si">{package_analysis_store.ceph.host}</span><span class="s2"> &quot;</span>
-                <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph&quot;</span>
-            <span class="p">)</span>
-
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">package_analysis_document_id_exist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;Syncing package analysis document from </span><span class="si">%r</span><span class="s2"> with id </span><span class="si">%r</span><span class="s2"> to graph&quot;</span><span class="p">,</span>
+                        <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+                        <span class="n">document_id</span><span class="p">,</span>
+                    <span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">package_analysis_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
 
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_package_analysis_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
@@ -329,18 +331,17 @@
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
 
-        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">provenance_checker_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="n">f</span><span class="s2">&quot;Syncing provenance-checker document from </span><span class="si">{provenance_check_store.ceph.host}</span><span class="s2"> &quot;</span>
-                <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph&quot;</span>
-            <span class="p">)</span>
-
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">provenance_checker_document_id_exist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;Syncing provenance-checker document from </span><span class="si">%r</span><span class="s2"> with id </span><span class="si">%r</span><span class="s2"> to graph&quot;</span><span class="p">,</span>
+                        <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+                        <span class="n">document_id</span><span class="p">,</span>
+                    <span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
 
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_provenance_checker_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
@@ -383,18 +384,17 @@
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
 
-        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">dependency_monkey_document_id_exist</span><span class="p">(</span><span class="n">document_id</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="n">f</span><span class="s2">&quot;Syncing dependency monkey report document from </span><span class="si">{dependency_monkey_reports_store.ceph.host}</span><span class="s2"> &quot;</span>
-                <span class="n">f</span><span class="s2">&quot;with id </span><span class="si">{document_id!r}</span><span class="s2"> to graph&quot;</span>
-            <span class="p">)</span>
-
+        <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">dependency_monkey_document_id_exist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a local file: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading document from a remote Ceph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="n">f</span><span class="s2">&quot;Syncing dependency monkey report document from </span><span class="si">%r</span><span class="s2"> with id </span><span class="si">%r</span><span class="s2"> to graph&quot;</span><span class="p">,</span>
+                        <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+                        <span class="n">document_id</span><span class="p">,</span>
+                    <span class="p">)</span>
                     <span class="n">document</span> <span class="o">=</span> <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
 
                 <span class="n">graph</span><span class="o">.</span><span class="n">sync_dependency_monkey_result</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
@@ -534,7 +534,8 @@
 
     <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">_HANDLERS_MAPPING</span><span class="p">):</span>
         <span class="k">for</span> <span class="n">document_prefix</span><span class="p">,</span> <span class="n">handler</span> <span class="ow">in</span> <span class="n">_HANDLERS_MAPPING</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="k">if</span> <span class="n">document_id</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">document_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">document_prefix</span><span class="p">):</span>
+            <span class="c1"># Basename for local syncs, document_id should not have slash otherwise.</span>
+            <span class="k">if</span> <span class="n">document_id</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">document_prefix</span><span class="p">):</span>
                 <span class="n">to_sync_document_id</span> <span class="o">=</span> <span class="p">[</span><span class="n">document_id</span><span class="p">]</span> <span class="k">if</span> <span class="n">document_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
                 <span class="k">if</span> <span class="n">handler</span> <span class="o">==</span> <span class="n">sync_inspection_documents</span><span class="p">:</span>
                     <span class="c1"># A special case with additional arguments to obtain results from Amun API.</span>
