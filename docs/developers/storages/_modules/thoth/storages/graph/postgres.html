@@ -100,7 +100,6 @@
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">Pipfile</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="k">import</span> <span class="n">PipfileLock</span>
 <span class="kn">from</span> <span class="nn">thoth.common.helpers</span> <span class="k">import</span> <span class="n">format_datetime</span>
-<span class="kn">from</span> <span class="nn">thoth.common.helpers</span> <span class="k">import</span> <span class="n">cwd</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="k">import</span> <span class="n">OpenShift</span>
 
 <span class="kn">from</span> <span class="nn">.models</span> <span class="k">import</span> <span class="n">AdviserRun</span>
@@ -177,10 +176,12 @@
 
 <span class="kn">from</span> <span class="nn">.sql_base</span> <span class="k">import</span> <span class="n">SQLBase</span>
 <span class="kn">from</span> <span class="nn">.models_base</span> <span class="k">import</span> <span class="n">Base</span>
+<span class="kn">from</span> <span class="nn">.query_result_base</span> <span class="k">import</span> <span class="n">QueryResult</span>
 <span class="kn">from</span> <span class="nn">.enums</span> <span class="k">import</span> <span class="n">EnvironmentTypeEnum</span>
 <span class="kn">from</span> <span class="nn">.enums</span> <span class="k">import</span> <span class="n">SoftwareStackTypeEnum</span>
 <span class="kn">from</span> <span class="nn">.enums</span> <span class="k">import</span> <span class="n">InspectionSyncStateEnum</span>
 <span class="kn">from</span> <span class="nn">.enums</span> <span class="k">import</span> <span class="n">MetadataDistutilsTypeEnum</span>
+<span class="kn">from</span> <span class="nn">.enums</span> <span class="k">import</span> <span class="n">QuerySortTypeEnum</span>
 
 <span class="kn">from</span> <span class="nn">..analyses</span> <span class="k">import</span> <span class="n">AnalysisResultsStore</span>
 <span class="kn">from</span> <span class="nn">..dependency_monkey_reports</span> <span class="k">import</span> <span class="n">DependencyMonkeyReportsStore</span>
@@ -199,6 +200,7 @@
 <span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">DatabaseNotInitialized</span>
 <span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">SolverNameParseError</span>
 <span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">DistutilsKeyNotKnown</span>
+<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="k">import</span> <span class="n">SortTypeQueryError</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -287,12 +289,15 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">database_exists</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">url</span><span class="p">):</span>
             <span class="n">create_database</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">url</span><span class="p">)</span>
 
-        <span class="c1"># Change directory to data dir as that&#39;s where alembic configuration sits in and refers revisions.</span>
-        <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">storages</span><span class="o">.</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;data&quot;</span><span class="p">)):</span>
-            <span class="n">alembic_cfg</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;alembic.ini&quot;</span><span class="p">)</span>
-            <span class="c1"># Overwrite URL based on deployment configuration.</span>
-            <span class="n">alembic_cfg</span><span class="o">.</span><span class="n">set_main_option</span><span class="p">(</span><span class="s1">&#39;sqlalchemy.url&#39;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">construct_connection_string</span><span class="p">())</span>
-            <span class="n">command</span><span class="o">.</span><span class="n">upgrade</span><span class="p">(</span><span class="n">alembic_cfg</span><span class="p">,</span> <span class="s2">&quot;head&quot;</span><span class="p">)</span></div>
+        <span class="n">alembic_cfg</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">storages</span><span class="o">.</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="s2">&quot;alembic.ini&quot;</span><span class="p">))</span>
+        <span class="c1"># Overwrite URL based on deployment configuration.</span>
+        <span class="n">alembic_cfg</span><span class="o">.</span><span class="n">set_main_option</span><span class="p">(</span><span class="s2">&quot;sqlalchemy.url&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">construct_connection_string</span><span class="p">())</span>
+        <span class="n">alembic_cfg</span><span class="o">.</span><span class="n">set_section_option</span><span class="p">(</span>
+            <span class="s1">&#39;alembic&#39;</span><span class="p">,</span>
+            <span class="s1">&#39;script_location&#39;</span><span class="p">,</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">storages</span><span class="o">.</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="s2">&quot;alembic&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">command</span><span class="o">.</span><span class="n">upgrade</span><span class="p">(</span><span class="n">alembic_cfg</span><span class="p">,</span> <span class="s2">&quot;head&quot;</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.drop_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.drop_all">[docs]</a>    <span class="k">def</span> <span class="nf">drop_all</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;Drop all content stored in the database.&quot;&quot;&quot;</span>
@@ -310,21 +315,20 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_connected</span><span class="p">():</span>
             <span class="k">raise</span> <span class="n">NotConnected</span><span class="p">(</span><span class="s2">&quot;Cannot check schema: the adapter is not connected yet&quot;</span><span class="p">)</span>
 
-        <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">storages</span><span class="o">.</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;data&quot;</span><span class="p">)):</span>
-            <span class="n">alembic_cfg</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="s2">&quot;alembic.ini&quot;</span><span class="p">)</span>
-            <span class="n">directory</span> <span class="o">=</span> <span class="n">script</span><span class="o">.</span><span class="n">ScriptDirectory</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="n">alembic_cfg</span><span class="p">)</span>
-            <span class="n">connection</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
-            <span class="n">context</span> <span class="o">=</span> <span class="n">migration</span><span class="o">.</span><span class="n">MigrationContext</span><span class="o">.</span><span class="n">configure</span><span class="p">(</span><span class="n">connection</span><span class="p">)</span>
+        <span class="n">alembic_cfg</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">Config</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">storages</span><span class="o">.</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;data&quot;</span><span class="p">,</span> <span class="s2">&quot;alembic.ini&quot;</span><span class="p">))</span>
+        <span class="n">directory</span> <span class="o">=</span> <span class="n">script</span><span class="o">.</span><span class="n">ScriptDirectory</span><span class="o">.</span><span class="n">from_config</span><span class="p">(</span><span class="n">alembic_cfg</span><span class="p">)</span>
+        <span class="n">connection</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_engine</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+        <span class="n">context</span> <span class="o">=</span> <span class="n">migration</span><span class="o">.</span><span class="n">MigrationContext</span><span class="o">.</span><span class="n">configure</span><span class="p">(</span><span class="n">connection</span><span class="p">)</span>
 
-            <span class="n">database_heads</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">context</span><span class="o">.</span><span class="n">get_current_heads</span><span class="p">())</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">database_heads</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="n">DatabaseNotInitialized</span><span class="p">(</span><span class="s2">&quot;Database is not initialized yet&quot;</span><span class="p">)</span>
+        <span class="n">database_heads</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">context</span><span class="o">.</span><span class="n">get_current_heads</span><span class="p">())</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">database_heads</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">DatabaseNotInitialized</span><span class="p">(</span><span class="s2">&quot;Database is not initialized yet&quot;</span><span class="p">)</span>
 
-            <span class="n">revision_heads</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">directory</span><span class="o">.</span><span class="n">get_heads</span><span class="p">())</span>
+        <span class="n">revision_heads</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">directory</span><span class="o">.</span><span class="n">get_heads</span><span class="p">())</span>
 
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Current library revision heads: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">revision_heads</span><span class="p">)</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Current database heads: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">database_heads</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">database_heads</span> <span class="o">==</span> <span class="n">revision_heads</span></div>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Current library revision heads: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">revision_heads</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Current database heads: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">database_heads</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">database_heads</span> <span class="o">==</span> <span class="n">revision_heads</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.normalize_python_package_name"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.normalize_python_package_name">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -3337,7 +3341,8 @@
         <span class="n">os_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">python_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">distinct</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+        <span class="n">sort_by</span><span class="p">:</span> <span class="n">QuerySortTypeEnum</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QueryResult</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve number of versions per Python package name in Thoth Database.</span>
 
 <span class="sd">        Examples:</span>
@@ -3368,13 +3373,24 @@
             <span class="k">if</span> <span class="n">python_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">python_version</span> <span class="o">==</span> <span class="n">python_version</span><span class="p">)</span>
 
+            <span class="k">if</span> <span class="n">sort_by</span> <span class="ow">and</span> <span class="n">sort_by</span> <span class="o">==</span> <span class="n">QuerySortTypeEnum</span><span class="o">.</span><span class="n">PACKAGE_NAME</span><span class="p">:</span>
+                <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_name</span><span class="p">)</span>
+
+            <span class="n">group_count</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">offset</span><span class="p">(</span><span class="n">start_offset</span><span class="p">)</span><span class="o">.</span><span class="n">limit</span><span class="p">(</span><span class="n">count</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">distinct</span><span class="p">:</span>
                 <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
 
             <span class="n">result</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
-            <span class="k">return</span> <span class="p">{</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">}</span></div>
+
+            <span class="k">if</span> <span class="n">sort_by</span> <span class="ow">and</span> <span class="n">sort_by</span> <span class="o">==</span> <span class="n">QuerySortTypeEnum</span><span class="o">.</span><span class="n">PACKAGE_VERSION</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">SortTypeQueryError</span><span class="p">(</span><span class="s2">&quot;To be implemented.&quot;</span><span class="p">)</span>  <span class="c1"># TODO: To be implemented</span>
+
+            <span class="n">output</span> <span class="o">=</span> <span class="n">QueryResult</span><span class="p">(</span><span class="n">result</span><span class="o">=</span><span class="p">{</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">},</span> <span class="n">count</span><span class="o">=</span><span class="n">group_count</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">output</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.get_python_package_versions_count_per_index"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_python_package_versions_count_per_index">[docs]</a>    <span class="k">def</span> <span class="nf">get_python_package_versions_count_per_index</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -4223,8 +4239,8 @@
                     <span class="n">versioned_symbol_id</span><span class="o">=</span><span class="n">versioned_symbol</span><span class="o">.</span><span class="n">id</span>
                 <span class="p">)</span>
 
-    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">_python_sync_analysis_result</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
         <span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">,</span>
         <span class="n">package_extract_run</span><span class="p">:</span> <span class="n">PackageExtractRun</span><span class="p">,</span>
         <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
@@ -4667,7 +4683,7 @@
 
                 <span class="k">if</span> <span class="n">importlib_metadata</span><span class="p">:</span>
                     <span class="c1"># There can be raised PythonPackageMetadataAttributeMissing once all metadata gathered.</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                         <span class="s2">&quot;Cannot sync the whole solver result: &quot;</span>
                         <span class="n">f</span><span class="s2">&quot;No related columns for {list(importlib_metadata.keys())!r} &quot;</span>
                         <span class="s2">&quot;found in PythonPackageMetadata table, the error is not fatal&quot;</span>
@@ -5066,7 +5082,7 @@
 
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">performance_model</span> <span class="ow">in</span> <span class="n">ALL_PERFORMANCE_MODELS</span><span class="p">:</span>
-                <span class="n">result</span><span class="p">[</span><span class="n">performance_model</span><span class="o">.</span><span class="n">__tablename__</span><span class="p">]</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">performance_model</span><span class="p">)</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">performance_model</span><span class="o">.</span><span class="n">__tablename__</span><span class="p">]</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">performance_model</span><span class="o">.</span><span class="n">id</span><span class="p">))</span><span class="o">.</span><span class="n">scalar</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">result</span></div>
 
@@ -5076,7 +5092,7 @@
 
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">main_model</span> <span class="ow">in</span> <span class="n">ALL_MAIN_MODELS</span><span class="p">:</span>
-                <span class="n">result</span><span class="p">[</span><span class="n">main_model</span><span class="o">.</span><span class="n">__tablename__</span><span class="p">]</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">main_model</span><span class="p">)</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">main_model</span><span class="o">.</span><span class="n">__tablename__</span><span class="p">]</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">func</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">main_model</span><span class="o">.</span><span class="n">id</span><span class="p">))</span><span class="o">.</span><span class="n">scalar</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">result</span></div>
 
@@ -5086,7 +5102,7 @@
 
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">relation_model</span> <span class="ow">in</span> <span class="n">ALL_RELATION_MODELS</span><span class="p">:</span>
-                <span class="n">result</span><span class="p">[</span><span class="n">relation_model</span><span class="o">.</span><span class="n">__tablename__</span><span class="p">]</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">relation_model</span><span class="p">)</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">relation_model</span><span class="o">.</span><span class="n">__tablename__</span><span class="p">]</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">relation_model</span><span class="o">.</span><span class="n">id</span><span class="p">)</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="n">result</span></div>
 
