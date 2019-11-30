@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.result_base &#8212; Thoth Storages 0.19.24 documentation</title>
+    <title>thoth.storages.result_base &#8212; Thoth Storages 0.19.25 documentation</title>
     <link rel="stylesheet" href="../../../_static/pydoctheme.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     
@@ -35,7 +35,7 @@
       <h3>Navigation</h3>
       <ul>
         <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../index.html">Thoth Storages 0.19.24 documentation</a> &#187;</li>
+        <li><a href="../../../index.html">Thoth Storages 0.19.25 documentation</a> &#187;</li>
           <li><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>
@@ -74,6 +74,7 @@
 <span class="kn">from</span> <span class="nn">.ceph</span> <span class="kn">import</span> <span class="n">CephStore</span>
 <span class="kn">from</span> <span class="nn">.result_schema</span> <span class="kn">import</span> <span class="n">RESULT_SCHEMA</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">SchemaError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NoDocumentIdError</span>
 
 
 <div class="viewcode-block" id="ResultStorageBase"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase">[docs]</a><span class="k">class</span> <span class="nc">ResultStorageBase</span><span class="p">(</span><span class="n">StorageBase</span><span class="p">):</span>
@@ -119,7 +120,11 @@
         <span class="c1"># Note we need to return job id here - the last part delimited by dash</span>
         <span class="c1"># is used for specifying pod that runs for the given job. We need job</span>
         <span class="c1"># id to be returned (remove pod specific part).</span>
-        <span class="k">return</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;hostname&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span></div>
+        <span class="n">document_id</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;document_id&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">document_id</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NoDocumentIdError</span><span class="p">(</span><span class="s2">&quot;No document id is present in metadata&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">document_id</span></div>
 
 <div class="viewcode-block" id="ResultStorageBase.is_connected"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.is_connected">[docs]</a>    <span class="k">def</span> <span class="nf">is_connected</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Check if the given database adapter is in connected state.&quot;&quot;&quot;</span>
@@ -148,6 +153,11 @@
         <span class="n">document_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_document_id</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">store_document</span><span class="p">(</span><span class="n">document</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">document_id</span></div>
+
+<div class="viewcode-block" id="ResultStorageBase.store_file"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.store_file">[docs]</a>    <span class="k">def</span> <span class="nf">store_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backup_file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">backup_file_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Store the given file in Ceph.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">store_file</span><span class="p">(</span><span class="n">backup_file_path</span><span class="p">,</span> <span class="n">backup_file_id</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">backup_file_id</span></div>
 
 <div class="viewcode-block" id="ResultStorageBase.retrieve_document"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.retrieve_document">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_document</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve a document from Ceph by its id.&quot;&quot;&quot;</span>
