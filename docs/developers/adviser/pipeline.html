@@ -200,13 +200,13 @@ Python3+ is used as described above):</p>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
 <span class="kn">from</span> <span class="nn">thoth.storages.exceptions</span> <span class="kn">import</span> <span class="n">NotFoundError</span>
 
-<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="kn">import</span> <span class="n">NotAcceptable</span>
 <span class="kn">from</span> <span class="nn">..sieve</span> <span class="kn">import</span> <span class="n">Sieve</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
@@ -231,29 +231,33 @@ Python3+ is used as described above):</p>
 
         <span class="k">return</span> <span class="kc">None</span>
 
-    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_versions</span><span class="p">:</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Filter out packages based on build time/installation issues..&quot;&quot;&quot;</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">has_error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">has_python_solver_error</span><span class="p">(</span>
-                <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
-                <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
-                <span class="n">os_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                <span class="n">os_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
-                <span class="n">python_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
-            <span class="p">)</span>
-        <span class="k">except</span> <span class="n">NotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">NotAcceptable</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Removing package {package_version.to_tuple()!r} as it was not solved: {str(exc)!r}&quot;</span>
-            <span class="p">)</span>
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">has_error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">has_python_solver_error</span><span class="p">(</span>
+                    <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+                    <span class="n">os_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="n">os_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                    <span class="n">python_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="n">NotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Removing package </span><span class="si">%r</span><span class="s2"> as it was not solved: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">(),</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
 
-        <span class="k">if</span> <span class="n">has_error</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">configuration</span><span class="p">[</span><span class="s2">&quot;without_error&quot;</span><span class="p">]:</span>
-            <span class="k">raise</span> <span class="n">NotAcceptable</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Removing package {package_version.to_tuple()!r} due to build &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;time error on {self.context.project.runtime_environment.to_dict()!r}&quot;</span>
-            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">has_error</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">configuration</span><span class="p">[</span><span class="s2">&quot;without_error&quot;</span><span class="p">]:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Removing package </span><span class="si">%r</span><span class="s2"> due to build time error on </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">(),</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
 
-        <span class="k">return</span> <span class="kc">None</span>
+            <span class="k">yield</span> <span class="n">package_version</span>
 </pre></div>
 </div>
 <p>Another example of a sieve can be filtering packages that are pre-releases, but
@@ -264,12 +268,12 @@ pre-releases were disabled in <em>Pipenv</em> file:</p>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
 
-<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="kn">import</span> <span class="n">NotAcceptable</span>
 <span class="kn">from</span> <span class="nn">..sieve</span> <span class="kn">import</span> <span class="n">Sieve</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
@@ -292,18 +296,22 @@ pre-releases were disabled in <em>Pipenv</em> file:</p>
 
         <span class="k">return</span> <span class="kc">None</span>
 
-    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_versions</span><span class="p">:</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Cut-off pre-releases if project does not explicitly allows them.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">prereleases_allowed</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="s2">&quot;Project accepts pre-releases, skipping cutting pre-releases step&quot;</span>
-            <span class="p">)</span>
-            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">prereleases_allowed</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="s2">&quot;Project accepts pre-releases, skipping cutting pre-releases step&quot;</span>
+                <span class="p">)</span>
+                <span class="k">yield</span> <span class="n">package_version</span>
 
-        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span><span class="o">.</span><span class="n">is_prerelease</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">NotAcceptable</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Removing package {package_version.to_tuple()!r} - pre-releases are disabled&quot;</span>
-            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span><span class="o">.</span><span class="n">is_prerelease</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Removing package </span><span class="si">%s</span><span class="s2"> - pre-releases are disabled&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="k">yield</span> <span class="n">package_version</span>
 </pre></div>
 </div>
 <p>The parameter <cite>package_version</cite> is of type <cite>PackageVersion</cite> which is an

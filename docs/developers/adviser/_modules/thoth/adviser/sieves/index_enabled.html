@@ -71,7 +71,7 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
@@ -79,7 +79,6 @@
 <span class="kn">from</span> <span class="nn">thoth.storages.exceptions</span> <span class="kn">import</span> <span class="n">NotFoundError</span>
 
 <span class="kn">from</span> <span class="nn">..sieve</span> <span class="kn">import</span> <span class="n">Sieve</span>
-<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="kn">import</span> <span class="n">NotAcceptable</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">..pipeline_builder</span> <span class="kn">import</span> <span class="n">PipelineBuilderContext</span>
@@ -105,36 +104,34 @@
 
         <span class="k">return</span> <span class="kc">None</span></div>
 
-    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_evaluate_is_enabled</span><span class="p">(</span>
-        <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">is_enabled</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Evaluate the enabled flag.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">is_enabled</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">NotAcceptable</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Removing Python package version </span><span class="si">{package_tuple!r}</span><span class="s2"> as used index is not registered&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_enabled</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">NotAcceptable</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Removing Python package version </span><span class="si">{package_tuple!r}</span><span class="s2"> as used index is not enabled&quot;</span>
-            <span class="p">)</span>
-
-<div class="viewcode-block" id="PackageIndexSieve.run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.index_enabled.PackageIndexSieve.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="PackageIndexSieve.run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.index_enabled.PackageIndexSieve.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_versions</span><span class="p">:</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Filter out package versions based on disabled Python package index.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_records</span><span class="p">:</span>
-            <span class="n">is_enabled</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_records</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="n">is_enabled</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">is_python_package_index_enabled</span><span class="p">(</span>
-                    <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span>
-                <span class="p">)</span>
-            <span class="k">except</span> <span class="n">NotFoundError</span><span class="p">:</span>
-                <span class="c1"># A special value of None marks non-existing index in thoth&#39;s knowledge base.</span>
-                <span class="n">is_enabled</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_records</span><span class="p">:</span>
+                <span class="n">is_enabled</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cached_records</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">is_enabled</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">is_python_package_index_enabled</span><span class="p">(</span>
+                        <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span>
+                    <span class="p">)</span>
+                <span class="k">except</span> <span class="n">NotFoundError</span><span class="p">:</span>
+                    <span class="c1"># A special value of None marks non-existing index in thoth&#39;s knowledge base.</span>
+                    <span class="n">is_enabled</span> <span class="o">=</span> <span class="kc">None</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_cached_records</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">]</span> <span class="o">=</span> <span class="n">is_enabled</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_evaluate_is_enabled</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">(),</span> <span class="n">is_enabled</span><span class="p">)</span></div></div>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cached_records</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">]</span> <span class="o">=</span> <span class="n">is_enabled</span>
+            <span class="k">if</span> <span class="n">is_enabled</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Removing Python package version </span><span class="si">%r</span><span class="s2"> as used index is not registered&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">is_enabled</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Removing Python package version </span><span class="si">%r</span><span class="s2"> as used index is not enabled&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="k">yield</span> <span class="n">package_version</span></div></div>
 </pre></div>
 
           </div>

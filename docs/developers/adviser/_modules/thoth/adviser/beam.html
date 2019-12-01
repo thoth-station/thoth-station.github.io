@@ -67,14 +67,24 @@
 
 <span class="sd">&quot;&quot;&quot;Implementation of Beam for beam searching part of adviser.&quot;&quot;&quot;</span>
 
+<span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">heapq</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">import</span> <span class="nn">matplotlib</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">matplotlib.font_manager</span> <span class="kn">import</span> <span class="n">FontProperties</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NoHistoryKept</span>
 <span class="kn">from</span> <span class="nn">.state</span> <span class="kn">import</span> <span class="n">State</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="Beam"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -90,6 +100,11 @@
 
     <span class="n">width</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span>
     <span class="n">_states</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">State</span><span class="p">])</span>
+    <span class="n">_beam_history</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">float</span><span class="p">]],</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">),</span>
+        <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
 
     <span class="n">_WIDTH_VALIDATOR_ERR_MSG</span> <span class="o">=</span> <span class="s2">&quot;Beam width has to be None or positive integer, got </span><span class="si">{!r}</span><span class="s2">&quot;</span>
 
@@ -108,6 +123,88 @@
             <span class="k">return</span>
 
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_WIDTH_VALIDATOR_ERR_MSG</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+
+<div class="viewcode-block" id="Beam.new_iteration"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam.new_iteration">[docs]</a>    <span class="k">def</span> <span class="nf">new_iteration</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Called once a new iteration is done in resolver.</span>
+
+<span class="sd">        Used to keep track of beam history.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_NO_HISTORY&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))):</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_beam_history</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">top</span><span class="p">()</span><span class="o">.</span><span class="n">score</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span><span class="p">))</span></div>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_make_patch_spines_invisible</span><span class="p">(</span><span class="n">ax</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Make spines invisible.&quot;&quot;&quot;</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_frame_on</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">patch</span><span class="o">.</span><span class="n">set_visible</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">sp</span> <span class="ow">in</span> <span class="n">ax</span><span class="o">.</span><span class="n">spines</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">sp</span><span class="o">.</span><span class="n">set_visible</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Beam.plot"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam.plot">[docs]</a>    <span class="k">def</span> <span class="nf">plot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_file</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">matplotlib</span><span class="o">.</span><span class="n">figure</span><span class="o">.</span><span class="n">Figure</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Plot temperature history of adaptive simulated annealing.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_beam_history</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NoHistoryKept</span><span class="p">(</span><span class="s2">&quot;No history datapoints kept for beam&quot;</span><span class="p">)</span>
+
+        <span class="n">x</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_beam_history</span><span class="p">))]</span>
+        <span class="c1"># Beam size over time.</span>
+        <span class="n">y1</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_beam_history</span><span class="p">]</span>
+        <span class="c1"># Highest rated state history.</span>
+        <span class="n">y2</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_beam_history</span><span class="p">]</span>
+
+        <span class="n">fig</span><span class="p">,</span> <span class="n">host</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">()</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">subplots_adjust</span><span class="p">(</span><span class="n">right</span><span class="o">=</span><span class="mf">0.75</span><span class="p">)</span>
+
+        <span class="n">par1</span> <span class="o">=</span> <span class="n">host</span><span class="o">.</span><span class="n">twinx</span><span class="p">()</span>
+
+        <span class="n">par1</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">&quot;right&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">set_position</span><span class="p">((</span><span class="s2">&quot;axes&quot;</span><span class="p">,</span> <span class="mf">1.10</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_make_patch_spines_invisible</span><span class="p">(</span><span class="n">par1</span><span class="p">)</span>
+
+        <span class="n">par1</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">&quot;right&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">set_visible</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">host</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">&quot;right&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">set_visible</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="n">host</span><span class="o">.</span><span class="n">spines</span><span class="p">[</span><span class="s2">&quot;top&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">set_visible</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="n">p1</span><span class="p">,</span> <span class="o">=</span> <span class="n">host</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="s2">&quot;,g&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Beam size&quot;</span><span class="p">)</span>
+        <span class="n">p2</span><span class="p">,</span> <span class="o">=</span> <span class="n">par1</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span>
+            <span class="n">x</span><span class="p">,</span> <span class="n">y2</span><span class="p">,</span> <span class="s2">&quot;,b&quot;</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;Top rated state score&quot;</span>
+        <span class="p">)</span>
+
+        <span class="n">host</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">&quot;iteration&quot;</span><span class="p">)</span>
+        <span class="n">host</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;beam size&quot;</span><span class="p">)</span>
+        <span class="n">par1</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">&quot;score&quot;</span><span class="p">)</span>
+
+        <span class="n">host</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">label</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">p1</span><span class="o">.</span><span class="n">get_color</span><span class="p">())</span>
+        <span class="n">par1</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">label</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="n">p2</span><span class="o">.</span><span class="n">get_color</span><span class="p">())</span>
+
+        <span class="n">tkw</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mf">1.5</span><span class="p">)</span>
+        <span class="n">host</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="s2">&quot;black&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">tkw</span><span class="p">)</span>
+        <span class="n">host</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="o">**</span><span class="n">tkw</span><span class="p">)</span>
+        <span class="n">par1</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="n">p2</span><span class="o">.</span><span class="n">get_color</span><span class="p">(),</span> <span class="o">**</span><span class="n">tkw</span><span class="p">)</span>
+
+        <span class="n">font_prop</span> <span class="o">=</span> <span class="n">FontProperties</span><span class="p">()</span>
+        <span class="n">font_prop</span><span class="o">.</span><span class="n">set_size</span><span class="p">(</span><span class="s2">&quot;small&quot;</span><span class="p">)</span>
+        <span class="n">fig</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
+            <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper center&quot;</span><span class="p">,</span>
+            <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>
+            <span class="n">ncol</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="n">fancybox</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">shadow</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">prop</span><span class="o">=</span><span class="n">font_prop</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">host</span><span class="o">.</span><span class="n">yaxis</span><span class="o">.</span><span class="n">label</span><span class="o">.</span><span class="n">set_color</span><span class="p">(</span><span class="s2">&quot;black&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">output_file</span><span class="p">:</span>
+            <span class="n">parts</span> <span class="o">=</span> <span class="n">output_file</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Cannot determine plot format: no extension parsed from </span><span class="si">{output_file!r}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Saving figure to </span><span class="si">%r</span><span class="s2"> (format: </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">output_file</span><span class="p">,</span> <span class="n">parts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{parts[0]}</span><span class="s2">_beam.</span><span class="si">{parts[1]}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">parts</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">fig</span></div>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">states</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">State</span><span class="p">]:</span>
