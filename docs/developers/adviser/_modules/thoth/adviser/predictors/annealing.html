@@ -149,6 +149,11 @@
         <span class="k">if</span> <span class="n">neighbour_score</span> <span class="o">&gt;</span> <span class="n">top_score</span><span class="p">:</span>
             <span class="k">return</span> <span class="mf">1.0</span>
 
+        <span class="c1"># This should never occur based on resolver logic, but just to be sure...</span>
+        <span class="k">if</span> <span class="n">temperature</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Temperature dropped to </span><span class="si">%g</span><span class="s2">: temperature should be a positive number&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="mf">0.0</span>
+
         <span class="n">acceptance_probability</span> <span class="o">=</span> <span class="n">exp</span><span class="p">((</span><span class="n">neighbour_score</span> <span class="o">-</span> <span class="n">top_score</span><span class="p">)</span> <span class="o">/</span> <span class="n">temperature</span><span class="p">)</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
             <span class="s2">&quot;Acceptance probability for (top_score=</span><span class="si">%g</span><span class="s2">, neighbour_score=</span><span class="si">%g</span><span class="s2">, temperature=</span><span class="si">%g</span><span class="s2">) = </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span>
@@ -161,6 +166,11 @@
 
 <div class="viewcode-block" id="AdaptiveSimulatedAnnealing.run"><a class="viewcode-back" href="../../../../thoth.adviser.predictors.html#thoth.adviser.predictors.annealing.AdaptiveSimulatedAnnealing.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">,</span> <span class="n">beam</span><span class="p">:</span> <span class="n">Beam</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Run adaptive simulated annealing on top of beam.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">context</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="o">==</span> <span class="n">RecommendationType</span><span class="o">.</span><span class="n">LATEST</span><span class="p">:</span>
+            <span class="c1"># If we have latest recommendations, try to expand the most recent version, always.</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Expanding TOP rated state (hill climbing)&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="mi">0</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_exp</span><span class="p">(</span>
             <span class="n">context</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span><span class="p">,</span>
@@ -171,49 +181,39 @@
         <span class="c1"># Expand highest promising by default.</span>
         <span class="n">to_expand_state</span> <span class="o">=</span> <span class="n">beam</span><span class="o">.</span><span class="n">top</span><span class="p">()</span>
 
-        <span class="c1"># If we are recommending latest software stack, always perform hill climbing by</span>
-        <span class="c1"># default - expanding the highest rated stack.</span>
-        <span class="k">if</span> <span class="n">context</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="o">!=</span> <span class="n">RecommendationType</span><span class="o">.</span><span class="n">LATEST</span><span class="p">:</span>
-            <span class="c1"># Pick a random state to be expanded if accepted.</span>
-            <span class="n">probable_state_idx</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randrange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">beam</span><span class="o">.</span><span class="n">size</span><span class="p">)</span> <span class="k">if</span> <span class="n">beam</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">0</span>
-            <span class="n">probable_state</span> <span class="o">=</span> <span class="n">beam</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">probable_state_idx</span><span class="p">)</span>
-            <span class="n">acceptance_probability</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_acceptance_probability</span><span class="p">(</span>
-                <span class="n">to_expand_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="n">probable_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span>
+        <span class="c1"># Pick a random state to be expanded if accepted.</span>
+        <span class="n">probable_state_idx</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randrange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">beam</span><span class="o">.</span><span class="n">size</span><span class="p">)</span> <span class="k">if</span> <span class="n">beam</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">probable_state</span> <span class="o">=</span> <span class="n">beam</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">probable_state_idx</span><span class="p">)</span>
+        <span class="n">acceptance_probability</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_acceptance_probability</span><span class="p">(</span>
+            <span class="n">to_expand_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="n">probable_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">probable_state_idx</span> <span class="o">!=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">acceptance_probability</span> <span class="o">&gt;=</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span>
+            <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span>
+        <span class="p">):</span>
+            <span class="c1"># Skip to probable state, do not use the top rated state.</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Performing transition to neighbour state with score </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">probable_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">state_expansion_idx</span> <span class="o">=</span> <span class="n">probable_state_idx</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Expanding TOP rated state with score </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">to_expand_state</span><span class="o">.</span><span class="n">score</span>
+            <span class="p">)</span>
+            <span class="n">state_expansion_idx</span> <span class="o">=</span> <span class="mi">0</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">keep_temperature_history</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_temperature_history</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span><span class="p">,</span>
+                    <span class="n">state_expansion_idx</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="n">acceptance_probability</span><span class="p">,</span>
+                    <span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
+                <span class="p">)</span>
             <span class="p">)</span>
 
-            <span class="k">if</span> <span class="n">probable_state_idx</span> <span class="o">!=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">acceptance_probability</span> <span class="o">&gt;=</span> <span class="n">random</span><span class="o">.</span><span class="n">uniform</span><span class="p">(</span>
-                <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span>
-            <span class="p">):</span>
-                <span class="c1"># Skip to probable state, do not use the top rated state.</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="s2">&quot;Performing transition to neighbour state with score </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span>
-                    <span class="n">probable_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
-                <span class="p">)</span>
-                <span class="n">state_expansion_idx</span> <span class="o">=</span> <span class="n">probable_state_idx</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="s2">&quot;Expanding TOP rated state with score </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">to_expand_state</span><span class="o">.</span><span class="n">score</span>
-                <span class="p">)</span>
-                <span class="n">state_expansion_idx</span> <span class="o">=</span> <span class="mi">0</span>
-
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">keep_temperature_history</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_temperature_history</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-                    <span class="p">(</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span><span class="p">,</span>
-                        <span class="n">state_expansion_idx</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span>
-                        <span class="n">acceptance_probability</span><span class="p">,</span>
-                        <span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
-                    <span class="p">)</span>
-                <span class="p">)</span>
-
-            <span class="k">return</span> <span class="n">state_expansion_idx</span>
-
-        <span class="c1"># If we have latest recommendations, try to expand the most recent version, always.</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;Expanding TOP rated state with score </span><span class="si">%g</span><span class="s2"> (hill climbing)&quot;</span><span class="p">,</span>
-            <span class="n">to_expand_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="k">return</span> <span class="mi">0</span></div>
+        <span class="k">return</span> <span class="n">state_expansion_idx</span></div>
 
 <div class="viewcode-block" id="AdaptiveSimulatedAnnealing.pre_run"><a class="viewcode-back" href="../../../../thoth.adviser.predictors.html#thoth.adviser.predictors.annealing.AdaptiveSimulatedAnnealing.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Initialization before the actual annealing run.&quot;&quot;&quot;</span>

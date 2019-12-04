@@ -67,6 +67,7 @@
 
 <span class="sd">&quot;&quot;&quot;Implementation of pipeline builder - create pipeline configuration based on the project and its library usage.&quot;&quot;&quot;</span>
 
+<span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
@@ -80,10 +81,13 @@
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Project</span>
 <span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="kn">import</span> <span class="n">GraphDatabase</span>
+<span class="kn">import</span> <span class="nn">yaml</span>
 
 <span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">DecisionType</span>
 <span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">RecommendationType</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">InternalError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">UnknownPipelineUnitError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">PipelineConfigurationError</span>
 <span class="kn">from</span> <span class="nn">.pipeline_config</span> <span class="kn">import</span> <span class="n">PipelineConfig</span>
 <span class="kn">from</span> <span class="nn">.boot</span> <span class="kn">import</span> <span class="n">Boot</span>
 <span class="kn">from</span> <span class="nn">.sieve</span> <span class="kn">import</span> <span class="n">Sieve</span>
@@ -216,7 +220,7 @@
         <span class="k">raise</span> <span class="bp">NotImplemented</span><span class="p">(</span><span class="s2">&quot;Cannot instantiate pipeline builder&quot;</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_iter_units</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Boot</span><span class="p">,</span> <span class="n">Sieve</span><span class="p">,</span> <span class="n">Step</span><span class="p">,</span> <span class="n">Stride</span><span class="p">,</span> <span class="n">Wrap</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="k">def</span> <span class="nf">_iter_units</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="nb">type</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Iterate over pipeline units available in this implementation.&quot;&quot;&quot;</span>
         <span class="c1"># Imports placed here to simplify tests.</span>
         <span class="kn">import</span> <span class="nn">thoth.adviser.boots</span>
@@ -250,11 +254,11 @@
         <span class="k">while</span> <span class="n">change</span><span class="p">:</span>
             <span class="n">change</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="k">for</span> <span class="n">unit_class</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_iter_units</span><span class="p">():</span>
-                <span class="n">unit_configuration</span> <span class="o">=</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">should_include</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>
+                <span class="n">unit_configuration</span> <span class="o">=</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">should_include</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
                 <span class="k">if</span> <span class="n">unit_configuration</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                         <span class="s2">&quot;Pipeline unit </span><span class="si">%r</span><span class="s2"> will not be included in the pipeline configuration in this round&quot;</span><span class="p">,</span>
-                        <span class="n">unit_class</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                        <span class="n">unit_class</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
                     <span class="p">)</span>
                     <span class="k">continue</span>
 
@@ -262,13 +266,19 @@
 
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                     <span class="s2">&quot;Including pipeline unit </span><span class="si">%r</span><span class="s2"> in pipeline configuration with unit configuration </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                    <span class="n">unit_class</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                    <span class="n">unit_class</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
                     <span class="n">unit_configuration</span><span class="p">,</span>
                 <span class="p">)</span>
-                <span class="n">unit_instance</span> <span class="o">=</span> <span class="n">unit_class</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
+                <span class="n">unit_instance</span> <span class="o">=</span> <span class="n">unit_class</span><span class="p">()</span>
 
                 <span class="k">if</span> <span class="n">unit_configuration</span><span class="p">:</span>
-                    <span class="n">unit_instance</span><span class="o">.</span><span class="n">update_configuration</span><span class="p">(</span><span class="n">unit_configuration</span><span class="p">)</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">unit_instance</span><span class="o">.</span><span class="n">update_configuration</span><span class="p">(</span><span class="n">unit_configuration</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="n">PipelineConfigurationError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Filed to initialize pipeline unit configuration for </span><span class="si">{unit_class.__name__!r}</span><span class="s2"> &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;with configuration </span><span class="si">{unit_configuration!r}</span><span class="s2">: {str(exc)}&quot;</span>
+                        <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
 
                 <span class="n">ctx</span><span class="o">.</span><span class="n">add_unit</span><span class="p">(</span><span class="n">unit_instance</span><span class="p">)</span>
 
@@ -284,6 +294,96 @@
             <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">pipeline</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_do_instantiate_from_dict</span><span class="p">(</span>
+        <span class="n">module</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span> <span class="n">configuration_entry</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Unit</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Instantiate a pipeline unit from a dict representation.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">configuration_entry</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;No pipeline unit name provided in the configuration entry: </span><span class="si">{configuration_entry!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">unit_class</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">configuration_entry</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UnknownPipelineUnitError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Cannot import unit </span><span class="si">{configuration_entry[&#39;name&#39;]}</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+            <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="n">unit</span><span class="p">:</span> <span class="n">Unit</span> <span class="o">=</span> <span class="n">unit_class</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">configuration_entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;configuration&quot;</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">unit</span><span class="o">.</span><span class="n">update_configuration</span><span class="p">(</span><span class="n">configuration_entry</span><span class="p">[</span><span class="s2">&quot;configuration&quot;</span><span class="p">])</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">PipelineConfigurationError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Filed to initialize pipeline unit configuration for </span><span class="si">{unit_class.__name__!r}</span><span class="s2"> &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;with configuration </span><span class="si">{configuration_entry[&#39;configuration&#39;]!r}</span><span class="s2">: {str(exc)}&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="k">return</span> <span class="n">unit</span>
+
+<div class="viewcode-block" id="PipelineBuilder.from_dict"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilder.from_dict">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">dict_</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;PipelineConfig&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Instantiate pipeline configuration based on dictionary supplied.&quot;&quot;&quot;</span>
+        <span class="c1"># Imports placed here to simplify tests.</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.boots</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.sieves</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.steps</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.strides</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.wraps</span>
+
+        <span class="n">boots</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">boot_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;boots&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">boots</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">boots</span><span class="p">,</span> <span class="n">boot_entry</span><span class="p">))</span>
+
+        <span class="n">sieves</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">sieve_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;sieves&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">sieves</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">sieves</span><span class="p">,</span> <span class="n">sieve_entry</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="n">steps</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">step_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;steps&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">steps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">steps</span><span class="p">,</span> <span class="n">step_entry</span><span class="p">))</span>
+
+        <span class="n">strides</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">stride_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;strides&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">strides</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">strides</span><span class="p">,</span> <span class="n">stride_entry</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="n">wraps</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">wrap_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;wraps&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">wraps</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">wraps</span><span class="p">,</span> <span class="n">wrap_entry</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">dict_</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Unknown entry in pipeline configuration: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dict_</span><span class="p">)</span>
+
+        <span class="n">pipeline</span> <span class="o">=</span> <span class="n">PipelineConfig</span><span class="p">(</span>
+            <span class="n">boots</span><span class="o">=</span><span class="n">boots</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+            <span class="n">sieves</span><span class="o">=</span><span class="n">sieves</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+            <span class="n">steps</span><span class="o">=</span><span class="n">steps</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+            <span class="n">strides</span><span class="o">=</span><span class="n">strides</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+            <span class="n">wraps</span><span class="o">=</span><span class="n">wraps</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+        <span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Pipeline configuration creation ended, configuration:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">pipeline</span></div>
+
+<div class="viewcode-block" id="PipelineBuilder.load"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilder.load">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;PipelineConfig&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Load pipeline configuration from a file or a string.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading pipeline configuration from file </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
+                <span class="n">config</span> <span class="o">=</span> <span class="n">config_file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">config</span><span class="p">))</span></div>
 
 <div class="viewcode-block" id="PipelineBuilder.get_adviser_pipeline_config"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilder.get_adviser_pipeline_config">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">get_adviser_pipeline_config</span><span class="p">(</span>
