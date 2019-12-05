@@ -1,30 +1,26 @@
+
 <!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>Thoth’s offline resolver &#8212; Thoth Adviser 0.6.1 documentation</title>
-    <link rel="stylesheet" href="_static/pydoctheme.css" type="text/css" />
+    <title>Thoth’s resolver &#8212; Thoth Adviser 0.6.1 documentation</title>
+    <link rel="stylesheet" href="_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    
     <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="_static/language_data.js"></script>
-    
-    <script type="text/javascript" src="_static/sidebar.js"></script>
-    
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="thoth.adviser package" href="thoth.adviser.html" />
-    <link rel="prev" title="Provenance Checks" href="provenance_checks.html" />
+    <link rel="next" title="Predictor in Thoth’s adviser" href="predictor.html" />
+    <link rel="prev" title="State expansion pipeline" href="pipeline.html" />
 
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <link rel="shortcut icon" type="image/png" href="_static/favicon.png" />
-    <meta name="viewport" content="width=device-width,initial-scale=0.8">
-    
-    
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
 
 <script type="text/javascript">
   var _gaq = _gaq || [];
@@ -33,50 +29,88 @@
 </script>
 
   </head><body>
-    <div class="related">
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
       <ul>
-        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="index.html">Thoth Adviser 0.6.1 documentation</a> &#187;</li> 
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="predictor.html" title="Predictor in Thoth’s adviser"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="pipeline.html" title="State expansion pipeline"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.6.1 documentation</a> &#187;</li> 
       </ul>
-    </div>
-    
-  
+    </div>  
 
     <div class="document">
       <div class="documentwrapper">
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <div class="section" id="thoth-s-offline-resolver">
-<span id="resolver"></span><h1>Thoth’s offline resolver<a class="headerlink" href="#thoth-s-offline-resolver" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="thoth-s-resolver">
+<span id="resolver"></span><h1>Thoth’s resolver<a class="headerlink" href="#thoth-s-resolver" title="Permalink to this headline">¶</a></h1>
 <p>As Python is a dynamic programming language, the actual resolution of Python
-software stacks might take a time (you’ve probably <a class="reference external" href="https://github.com/pypa/pipenv/issues/2873">encountered this already</a>). One of the reasons behind it
+software stacks might take some time (you’ve probably <a class="reference external" href="https://github.com/pypa/pipenv/issues/2873">encountered this already</a>). One of the reasons behind it
 is the fact that all packages need to be downloaded and installed to verify
 version range satisfaction during the installation. This is also one of the
-reasons Thoth builds its knowledge base - Thoth pre-computes dependencies
-in the Python ecosystem so that resolving can be done offline without
-interacting with outside world.</p>
-<div class="section" id="a-note-to-thoth-s-python-resolver">
-<h2>A note to Thoth’s Python resolver<a class="headerlink" href="#a-note-to-thoth-s-python-resolver" title="Permalink to this headline">¶</a></h2>
-<p>Thoth stores pre-computed dependency graph in its knowledge base. Besides
-the graph structure kept, it also evaluates
-<a class="reference external" href="https://www.python.org/dev/peps/pep-0496/">environment markers</a> in the
-solver runs (hence solvers are based on software environments which are used
-from configuration entries and can be recommended as well)</p>
-<p>Software stacks returned by Thoth are fully compliant with Python’s packaging
-resolution algorithm as done by pip or Pipenv except for environment markers.
-If software environment in which the application runs is fully specified, Thoth
-can use pre-computed results of environment markers and the recommended
-software stack does not include sub-graphs which would normally be reported by
-pip/Pipenv when done a generic resolution (e.g. <a class="reference external" href="https://pypi.org/project/enum34/">enum34</a> is often included with environment marker
-<code class="docutils literal notranslate"><span class="pre">python_version&lt;&quot;3.4&quot;</span></code>. If Thoth is resolving software stacks for Python 3.6,
-it already knows enum34 will not be installed so any of its dependencies, if
-any, will not be installed as well). This helps to narrow down to software that
-is really used in the deployed environment.</p>
-<p>Environment markers applied on direct dependencies are not evaluated during
-resolution.</p>
+reasons Thoth builds its knowledge base - Thoth pre-computes dependencies in
+the Python ecosystem so that resolving can be done offline without interacting
+with outside world.</p>
+<p>Thoth’s resolver performs steps to resolve final states out of initial states
+by running pipeline <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieves</span></a> and <a class="reference internal" href="steps.html#steps"><span class="std std-ref">steps</span></a>.
+Internally, there are computed all the combinations that can occur and there
+are produced new states that are added to a pool of states, called beam.
+Resolver tightly cooperates with <a class="reference internal" href="predictor.html#predictor"><span class="std std-ref">predictor</span></a> that guides
+resolver to resolve desired software stacks.</p>
+<p><a class="reference internal" href="compatibility.html#compatibility"><span class="std std-ref">Resolver respects Python ecosystem</span></a> and resolution done
+by pip or Pipenv, but in a more clever way compatibility to also include
+observations about Python packages from Thoth’s knowledge base. Instead of
+implementing <a class="reference external" href="https://en.wikipedia.org/wiki/Boolean_satisfiability_problem">3SAT</a> the resolver
+operates directly on dependency graphs that are lazily expanded by expanding
+not-yet resolved dependencies in resolver states.</p>
+<p>Dependencies of not-yet resolved packages (unresolved dependencies) are
+resolved based on pre-computed dependency information stored in the Thoth’s
+knowledge base. This information is aggregated by Thoth’s <a class="reference external" href="https://github.com/thoth-station/solver">solvers</a> that are run for different software
+environments. An example can be a solver for Fedora:31 running Python3.7 or
+UBI:8 running Python3.6. These software environments can be then used as base
+software environments for running Python applications (container images, also
+suitable as base for OpenShift’s s2i build process - see <a class="reference external" href="https://github.com/thoth-station/s2i-thoth">s2i base images
+provided by Thoth</a> that are
+analyzed by Thoth itself and Thoth has information to drive recommendations for
+these container images used in an s2i build).</p>
+<p>The resolver has two main purposes:</p>
+<ul class="simple">
+<li><p>resolve software stacks for Dependency Monkey runs and verify generated software stacks on <a class="reference external" href="https://github.com/thoth-station/amun-api">Amun</a></p></li>
+<li><p>resolve software stacks for recommendations</p></li>
+</ul>
+<p>To instantiate a resolver, one can use two main functions:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Resolver.get_adviser_instance</span></code> - a resolver that produces software stacks for recommendations</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Resolver.get_dependency_monkey_instance</span></code> - a resolver that produces software stacks for <a class="reference internal" href="dependency_monkey.html#dependency-monkey"><span class="std std-ref">Dependency Monkey</span></a></p></li>
+</ul>
+<p>To resolve raw pipeline products, one can use <code class="docutils literal notranslate"><span class="pre">Resolver.resolve_products</span></code>
+method that yields raw products during pipeline run. Another method,
+<code class="docutils literal notranslate"><span class="pre">Resolver.resolve</span></code> creates a complete report of an adviser run together with
+some additional pipeline run information. See <a class="reference internal" href="pipeline.html#pipeline"><span class="std std-ref">pipeline section for code
+examples</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Pipeline unit methods <code class="docutils literal notranslate"><span class="pre">post_run_report</span></code> and predictor’s <code class="docutils literal notranslate"><span class="pre">post_run_report</span></code>
+are called only when <code class="docutils literal notranslate"><span class="pre">Resolver.resolve</span></code> method is used to resolve software
+stacks.</p>
 </div>
+<p>Resolver instance transparently runs <a class="reference internal" href="pipeline.html#pipeline"><span class="std std-ref">stack resolution pipeline</span></a> to produce scored software stacks.</p>
+<p>During the whole run, resolver keeps context that is updated during runs and is
+accessible in pipeline units as well as passed to <a class="reference internal" href="predictor.html#predictor"><span class="std std-ref">predictor’s run method</span></a> to guide resolver in next states to be resolve.</p>
 </div>
 
 
@@ -84,24 +118,13 @@ resolution.</p>
         </div>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper">
-    <a id="sidebar-anchor"></a>
-    
-
-  <h3><a href="index.html">Table of Contents</a></h3>
-  <ul>
-<li><a class="reference internal" href="#">Thoth’s offline resolver</a><ul>
-<li><a class="reference internal" href="#a-note-to-thoth-s-python-resolver">A note to Thoth’s Python resolver</a></li>
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation index</a><ul>
+      <li>Previous: <a href="pipeline.html" title="previous chapter">State expansion pipeline</a></li>
+      <li>Next: <a href="predictor.html" title="next chapter">Predictor in Thoth’s adviser</a></li>
+  </ul></li>
 </ul>
-</li>
-</ul>
-
-  <h4>Previous topic</h4>
-  <p class="topless"><a href="provenance_checks.html"
-                        title="previous chapter">Provenance Checks</a></p>
-  <h4>Next topic</h4>
-  <p class="topless"><a href="thoth.adviser.html"
-                        title="next chapter">thoth.adviser package</a></p>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
@@ -123,29 +146,8 @@ resolution.</p>
       </div>
       <div class="clearer"></div>
     </div>
-    <div class="related">
-      <h3>Navigation</h3>
-      <ul>
-        <li class="right" style="margin-right: 10px">
-          <a href="genindex.html" title="General Index"
-             accesskey="I">index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
-          <a href="thoth.adviser.html" title="thoth.adviser package"
-             accesskey="N">next</a> |</li>
-        <li class="right" >
-          <a href="provenance_checks.html" title="Provenance Checks"
-             accesskey="P">previous</a> |</li>
-      </ul>
-    </div>
 
-
-    <div class="footer" role="contentinfo">
-        &#169; Copyright 2019, Thoth team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
-    </div>
+  
 <script type="text/javascript">
   (function() {
     var ga = document.createElement('script');

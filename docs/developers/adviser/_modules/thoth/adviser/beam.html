@@ -1,28 +1,24 @@
+
 <!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
     <title>thoth.adviser.beam &#8212; Thoth Adviser 0.6.1 documentation</title>
-    <link rel="stylesheet" href="../../../_static/pydoctheme.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
-    
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
     <script type="text/javascript" src="../../../_static/jquery.js"></script>
     <script type="text/javascript" src="../../../_static/underscore.js"></script>
     <script type="text/javascript" src="../../../_static/doctools.js"></script>
     <script type="text/javascript" src="../../../_static/language_data.js"></script>
-    
-    <script type="text/javascript" src="../../../_static/sidebar.js"></script>
-    
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
 
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <link rel="shortcut icon" type="image/png" href="../../../_static/favicon.png" />
-    <meta name="viewport" content="width=device-width,initial-scale=0.8">
-    
-    
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
 
 <script type="text/javascript">
   var _gaq = _gaq || [];
@@ -31,16 +27,22 @@
 </script>
 
   </head><body>
-    <div class="related">
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
       <ul>
-        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="../../../index.html">Thoth Adviser 0.6.1 documentation</a> &#187;</li>
-          <li><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Adviser 0.6.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
-    </div>
-    
-  
+    </div>  
 
     <div class="document">
       <div class="documentwrapper">
@@ -68,11 +70,12 @@
 <span class="sd">&quot;&quot;&quot;Implementation of Beam for beam searching part of adviser.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">import</span> <span class="nn">heapq</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">import</span> <span class="nn">operator</span>
 <span class="kn">import</span> <span class="nn">logging</span>
@@ -93,17 +96,39 @@
 <span class="k">class</span> <span class="nc">Beam</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Beam implementation.</span>
 
-<span class="sd">    The implementation of beam respecting beam width:</span>
+<span class="sd">    The implementation of beam respecting beam width: https://en.wikipedia.org/wiki/Beam_search</span>
 
-<span class="sd">      https://en.wikipedia.org/wiki/Beam_search</span>
+<span class="sd">    Beam is internally implemented on top of a min-heap queue to optimize inserts and respect</span>
+<span class="sd">    beam width in O(log(N)).</span>
 
-<span class="sd">    Beam is internally implemented on top of heap queue to optimize inserts and respect beam width in O(log(N)).</span>
+<span class="sd">    The most frequent operation performed on the beam is not always the same - it depends</span>
+<span class="sd">    on the beam width and number of states generated. If number of states generated  is</span>
+<span class="sd">    more than the width of the beam, its reasonable to optimize insertions into the beam</span>
+<span class="sd">    with checks on beam width.</span>
+
+<span class="sd">    If number of states generated is smaller than the beam width, the beam could be optimized</span>
+<span class="sd">    for removal of states.</span>
+
+<span class="sd">    As the first scenario is seen in a real-world deployment, the beam uses min-heapq to keep</span>
+<span class="sd">    addition to the beam with beam_width checks in O(log(N)) and removals of the states in</span>
+<span class="sd">    O(log(N)). To satisfy removals in O(log(N)), the beam maintains a dictionary mapping a state</span>
+<span class="sd">    to its index in the beam.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="n">width</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span>
     <span class="n">_states</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
         <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">State</span><span class="p">]]</span>
     <span class="p">)</span>
+    <span class="c1"># Mapping id(state) -&gt; index in the heap to guarantee O(1) state index lookup and</span>
+    <span class="c1"># subsequent O(log(N)) state removal from the beam.</span>
+    <span class="n">_states_idx</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span> <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="c1"># Use ordered dict to preserve order of inserted states not to introduce</span>
+    <span class="c1"># randomness (that would be introduced using a set) across multiple runs.</span>
+    <span class="n">_last_added</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="n">OrderedDict</span><span class="p">)</span>
+    <span class="p">)</span>  <span class="c1"># type: OrderedDict[int, Tuple[Tuple[float, int], State]]</span>
     <span class="n">_counter</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
     <span class="n">_top_idx</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span>
     <span class="n">_beam_history</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
@@ -131,8 +156,10 @@
 <div class="viewcode-block" id="Beam.new_iteration"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam.new_iteration">[docs]</a>    <span class="k">def</span> <span class="nf">new_iteration</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Called once a new iteration is done in resolver.</span>
 
-<span class="sd">        Used to keep track of beam history.</span>
+<span class="sd">        Used to keep track of beam history and to keep track of states added.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_added</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">()</span>
+
         <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_NO_HISTORY&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))):</span>
             <span class="k">return</span>
 
@@ -187,7 +214,7 @@
         <span class="n">par1</span><span class="o">.</span><span class="n">tick_params</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="n">colors</span><span class="o">=</span><span class="n">p2</span><span class="o">.</span><span class="n">get_color</span><span class="p">(),</span> <span class="o">**</span><span class="n">tkw</span><span class="p">)</span>
 
         <span class="n">font_prop</span> <span class="o">=</span> <span class="n">FontProperties</span><span class="p">()</span>
-        <span class="n">font_prop</span><span class="o">.</span><span class="n">set_size</span><span class="p">(</span><span class="s2">&quot;small&quot;</span><span class="p">)</span>
+        <span class="n">font_prop</span><span class="o">.</span><span class="n">set_size</span><span class="p">(</span><span class="s2">&quot;medium&quot;</span><span class="p">)</span>
         <span class="n">fig</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
             <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper center&quot;</span><span class="p">,</span>
             <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>
@@ -232,6 +259,21 @@
             <span class="p">)</span>
         <span class="p">)</span></div>
 
+<div class="viewcode-block" id="Beam.iter_new_added_states"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam.iter_new_added_states">[docs]</a>    <span class="k">def</span> <span class="nf">iter_new_added_states</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">State</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Iterate over states added in the resolution round.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_last_added</span><span class="o">.</span><span class="n">values</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="Beam.iter_new_added_states_sorted"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam.iter_new_added_states_sorted">[docs]</a>    <span class="k">def</span> <span class="nf">iter_new_added_states_sorted</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">reverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">State</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Iterate over newly added states, sorted based on the score.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_last_added</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="n">reverse</span>
+            <span class="p">)</span>
+        <span class="p">)</span></div>
+
 <div class="viewcode-block" id="Beam.top"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam.top">[docs]</a>    <span class="k">def</span> <span class="nf">top</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">State</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Return the highest rated state as kept in the beam.</span>
 
@@ -252,6 +294,7 @@
             <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">&quot;Beam is empty&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_top_idx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Perform the operation in O(N/2) ~ O(N) time.</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_top_idx</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
             <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_top_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:]):</span>
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_top_idx</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">0</span><span class="p">]:</span>
@@ -259,42 +302,118 @@
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_top_idx</span></div>
 
+    <span class="k">def</span> <span class="nf">_heappushpop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">State</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">State</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Fast version of a heappush followed by a heappop.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">item</span><span class="p">:</span>
+            <span class="n">item</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">item</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_states_idx</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])]</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_states_idx</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_siftup</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">item</span>
+
+    <span class="k">def</span> <span class="nf">_heappush</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">State</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Push item onto heap, maintaining the heap invariant.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_states_idx</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_siftdown</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_siftup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Perform sift up operation on the states heap.&quot;&quot;&quot;</span>
+        <span class="n">endpos</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">)</span>
+        <span class="n">startpos</span> <span class="o">=</span> <span class="n">pos</span>
+        <span class="n">newitem</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span>
+        <span class="c1"># Bubble up the smaller child until hitting a leaf.</span>
+        <span class="n">childpos</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">pos</span> <span class="o">+</span> <span class="mi">1</span>  <span class="c1"># leftmost child position</span>
+        <span class="k">while</span> <span class="n">childpos</span> <span class="o">&lt;</span> <span class="n">endpos</span><span class="p">:</span>
+            <span class="c1"># Set childpos to index of smaller child.</span>
+            <span class="n">rightpos</span> <span class="o">=</span> <span class="n">childpos</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">rightpos</span> <span class="o">&lt;</span> <span class="n">endpos</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">childpos</span><span class="p">]</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">rightpos</span><span class="p">]:</span>
+                <span class="n">childpos</span> <span class="o">=</span> <span class="n">rightpos</span>
+            <span class="c1"># Move the smaller child up.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">childpos</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_states_idx</span><span class="p">[(</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">pos</span><span class="p">][</span><span class="mi">1</span><span class="p">]))]</span> <span class="o">=</span> <span class="n">pos</span>
+            <span class="n">pos</span> <span class="o">=</span> <span class="n">childpos</span>
+            <span class="n">childpos</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">pos</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="c1"># The leaf at pos is empty now.  Put newitem there, and bubble it up</span>
+        <span class="c1"># to its final resting place (by sifting its parents down).</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span> <span class="o">=</span> <span class="n">newitem</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_states_idx</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">newitem</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span> <span class="o">=</span> <span class="n">pos</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_siftdown</span><span class="p">(</span><span class="n">startpos</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_siftdown</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">startpos</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">pos</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Perform sift-down operation on the states heap.&quot;&quot;&quot;</span>
+        <span class="n">newitem</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span>
+        <span class="c1"># Follow the path to the root, moving parents down until finding a place</span>
+        <span class="c1"># newitem fits.</span>
+        <span class="k">while</span> <span class="n">pos</span> <span class="o">&gt;</span> <span class="n">startpos</span><span class="p">:</span>
+            <span class="n">parentpos</span> <span class="o">=</span> <span class="p">(</span><span class="n">pos</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&gt;&gt;</span> <span class="mi">1</span>
+            <span class="n">parent</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">parentpos</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">newitem</span> <span class="o">&lt;</span> <span class="n">parent</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_states_idx</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">parent</span><span class="p">[</span><span class="mi">1</span><span class="p">])]</span> <span class="o">=</span> <span class="n">pos</span>
+                <span class="n">pos</span> <span class="o">=</span> <span class="n">parentpos</span>
+                <span class="k">continue</span>
+            <span class="k">break</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">pos</span><span class="p">]</span> <span class="o">=</span> <span class="n">newitem</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_states_idx</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">pos</span><span class="p">][</span><span class="mi">1</span><span class="p">])]</span> <span class="o">=</span> <span class="n">pos</span>
+
 <div class="viewcode-block" id="Beam.add_state"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam.add_state">[docs]</a>    <span class="k">def</span> <span class="nf">add_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Add state to the internal state listing (do it in O(log(N)) time.&quot;&quot;&quot;</span>
         <span class="n">item</span> <span class="o">=</span> <span class="p">((</span><span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_counter</span><span class="p">),</span> <span class="n">state</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">width</span><span class="p">:</span>
-            <span class="n">heapq</span><span class="o">.</span><span class="n">heappushpop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+            <span class="n">popped</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_heappushpop</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_last_added</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="n">popped</span><span class="p">),</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">popped</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">item</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_last_added</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">item</span><span class="p">)]</span> <span class="o">=</span> <span class="n">item</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">heapq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_heappush</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_last_added</span><span class="p">[</span><span class="nb">id</span><span class="p">(</span><span class="n">item</span><span class="p">)]</span> <span class="o">=</span> <span class="n">item</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_top_idx</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_counter</span> <span class="o">-=</span> <span class="mi">1</span></div>
 
 <div class="viewcode-block" id="Beam.get"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam.get">[docs]</a>    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">State</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get i-th element from the beam (constant time), keep it in the beam.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Get i-th element from the beam (constant time), keep it in the beam.</span>
+
+<span class="sd">        This method is suitable for random state indexing in the beam (like in case of adaptive</span>
+<span class="sd">        simulated annealing). The actual index is not into a sorted array and has no special meaning</span>
+<span class="sd">        assigned - beam under the hood uses min-heapq (as of now), but the index used is not guaranteed to</span>
+<span class="sd">        point to a heap-like data structure.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="Beam.remove"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam.remove">[docs]</a>    <span class="k">def</span> <span class="nf">remove</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Remove the given state from beam.&quot;&quot;&quot;</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states_idx</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="n">state</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">idx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">&quot;The state requested for removal was not found in the beam&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Beam.pop"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.beam.Beam.pop">[docs]</a>    <span class="k">def</span> <span class="nf">pop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">State</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Pop i-th element from the beam and remove it from the beam (this is actually toppop).</span>
 
 <span class="sd">        If index is not provided, pop one of the largest elements kept in the beam.</span>
 
-<span class="sd">        If top_state is pre-cached, this operation is done in O(log(N)), O(N) otherwise.</span>
+<span class="sd">        If top_state is pre-cached or idx is explicitly set, this operation is done in O(log(N)), O(N) otherwise.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">idx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_top_idx</span><span class="p">()</span>
 
-        <span class="c1"># Do this operation in O(logN) on top of the internal heap queue:</span>
+        <span class="c1"># Do this operation in O(log(N)) on top of the internal heap queue:</span>
         <span class="c1">#   https://stackoverflow.com/questions/10162679/python-delete-element-from-heap</span>
         <span class="n">to_return</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">):</span>
-            <span class="n">heapq</span><span class="o">.</span><span class="n">_siftup</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
-            <span class="n">heapq</span><span class="o">.</span><span class="n">_siftdown</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_states</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_siftup</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_siftdown</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">idx</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_top_idx</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_last_added</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">to_return</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="kc">None</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
         <span class="k">return</span> <span class="n">to_return</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span></div></div>
 </pre></div>
 
@@ -302,10 +421,13 @@
         </div>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper">
-    <a id="sidebar-anchor"></a>
-    
-
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation index</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
 <div id="searchbox" style="display: none" role="search">
   <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
@@ -320,23 +442,8 @@
       </div>
       <div class="clearer"></div>
     </div>
-    <div class="related">
-      <h3>Navigation</h3>
-      <ul>
-        <li class="right" style="margin-right: 10px">
-          <a href="../../../genindex.html" title="General Index"
-             accesskey="I">index</a></li>
-        <li class="right" >
-          <a href="../../../py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-      </ul>
-    </div>
 
-
-    <div class="footer" role="contentinfo">
-        &#169; Copyright 2019, Thoth team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
-    </div>
+  
 <script type="text/javascript">
   (function() {
     var ga = document.createElement('script');

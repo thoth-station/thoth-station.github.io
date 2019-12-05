@@ -1,30 +1,26 @@
+
 <!DOCTYPE html>
 
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
     <title>thoth.adviser package &#8212; Thoth Adviser 0.6.1 documentation</title>
-    <link rel="stylesheet" href="_static/pydoctheme.css" type="text/css" />
+    <link rel="stylesheet" href="_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-    
     <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
     <script type="text/javascript" src="_static/jquery.js"></script>
     <script type="text/javascript" src="_static/underscore.js"></script>
     <script type="text/javascript" src="_static/doctools.js"></script>
     <script type="text/javascript" src="_static/language_data.js"></script>
-    
-    <script type="text/javascript" src="_static/sidebar.js"></script>
-    
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="thoth.adviser.boots package" href="thoth.adviser.boots.html" />
-    <link rel="prev" title="Thoth’s offline resolver" href="resolver.html" />
+    <link rel="prev" title="Performance indicators" href="performance.html" />
 
-    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <link rel="shortcut icon" type="image/png" href="_static/favicon.png" />
-    <meta name="viewport" content="width=device-width,initial-scale=0.8">
-    
-    
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
 
 <script type="text/javascript">
   var _gaq = _gaq || [];
@@ -33,15 +29,27 @@
 </script>
 
   </head><body>
-    <div class="related">
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
       <h3>Navigation</h3>
       <ul>
-        <li class="responsive-menu"><a href="#sidebar-anchor" title="Navigation">&#9776;</a></li>
-        <li><a href="index.html">Thoth Adviser 0.6.1 documentation</a> &#187;</li> 
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="thoth.adviser.boots.html" title="thoth.adviser.boots package"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="performance.html" title="Performance indicators"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.6.1 documentation</a> &#187;</li> 
       </ul>
-    </div>
-    
-  
+    </div>  
 
     <div class="document">
       <div class="documentwrapper">
@@ -99,14 +107,22 @@
 <p>Implementation of Beam for beam searching part of adviser.</p>
 <dl class="class">
 <dt id="thoth.adviser.beam.Beam">
-<em class="property">class </em><code class="sig-prename descclassname">thoth.adviser.beam.</code><code class="sig-name descname">Beam</code><span class="sig-paren">(</span><em class="sig-param">width: Optional[int] = None, states: List[Tuple[Tuple[float, int], thoth.adviser.state.State]] = NOTHING, counter: int = 0, top_idx: Optional[int] = None, *, beam_history: List[Tuple[int, Optional[float]]] = NOTHING</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.beam.Beam" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">thoth.adviser.beam.</code><code class="sig-name descname">Beam</code><span class="sig-paren">(</span><em class="sig-param">width: Optional[int] = None, states: List[Tuple[Tuple[float, int], thoth.adviser.state.State]] = NOTHING, states_idx: Dict[int, int] = NOTHING, last_added=NOTHING, counter: int = 0, top_idx: Optional[int] = None, *, beam_history: List[Tuple[int, Optional[float]]] = NOTHING</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.beam.Beam" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.8)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Beam implementation.</p>
-<p>The implementation of beam respecting beam width:</p>
-<blockquote>
-<div><p><a class="reference external" href="https://en.wikipedia.org/wiki/Beam_search">https://en.wikipedia.org/wiki/Beam_search</a></p>
-</div></blockquote>
-<p>Beam is internally implemented on top of heap queue to optimize inserts and respect beam width in O(log(N)).</p>
+<p>The implementation of beam respecting beam width: <a class="reference external" href="https://en.wikipedia.org/wiki/Beam_search">https://en.wikipedia.org/wiki/Beam_search</a></p>
+<p>Beam is internally implemented on top of a min-heap queue to optimize inserts and respect
+beam width in O(log(N)).</p>
+<p>The most frequent operation performed on the beam is not always the same - it depends
+on the beam width and number of states generated. If number of states generated  is
+more than the width of the beam, its reasonable to optimize insertions into the beam
+with checks on beam width.</p>
+<p>If number of states generated is smaller than the beam width, the beam could be optimized
+for removal of states.</p>
+<p>As the first scenario is seen in a real-world deployment, the beam uses min-heapq to keep
+addition to the beam with beam_width checks in O(log(N)) and removals of the states in
+O(log(N)). To satisfy removals in O(log(N)), the beam maintains a dictionary mapping a state
+to its index in the beam.</p>
 <dl class="method">
 <dt id="thoth.adviser.beam.Beam.add_state">
 <code class="sig-name descname">add_state</code><span class="sig-paren">(</span><em class="sig-param">state: thoth.adviser.state.State</em><span class="sig-paren">)</span> &#x2192; None<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.add_state"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.beam.Beam.add_state" title="Permalink to this definition">¶</a></dt>
@@ -117,6 +133,10 @@
 <dt id="thoth.adviser.beam.Beam.get">
 <code class="sig-name descname">get</code><span class="sig-paren">(</span><em class="sig-param">idx: int</em><span class="sig-paren">)</span> &#x2192; thoth.adviser.state.State<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.get"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.beam.Beam.get" title="Permalink to this definition">¶</a></dt>
 <dd><p>Get i-th element from the beam (constant time), keep it in the beam.</p>
+<p>This method is suitable for random state indexing in the beam (like in case of adaptive
+simulated annealing). The actual index is not into a sorted array and has no special meaning
+assigned - beam under the hood uses min-heapq (as of now), but the index used is not guaranteed to
+point to a heap-like data structure.</p>
 </dd></dl>
 
 <dl class="method">
@@ -124,6 +144,18 @@
 <code class="sig-name descname">get_top_idx</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; int<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.get_top_idx"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.beam.Beam.get_top_idx" title="Permalink to this definition">¶</a></dt>
 <dd><p>Get index of the highest rated state kept in the beam.</p>
 <p>This operation is done in O(N) time if top is not pre-cached, O(1) otherwise.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="thoth.adviser.beam.Beam.iter_new_added_states">
+<code class="sig-name descname">iter_new_added_states</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; Generator[[thoth.adviser.state.State, None], None]<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.iter_new_added_states"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.beam.Beam.iter_new_added_states" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate over states added in the resolution round.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="thoth.adviser.beam.Beam.iter_new_added_states_sorted">
+<code class="sig-name descname">iter_new_added_states_sorted</code><span class="sig-paren">(</span><em class="sig-param">reverse: bool = True</em><span class="sig-paren">)</span> &#x2192; Generator[[thoth.adviser.state.State, None], None]<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.iter_new_added_states_sorted"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.beam.Beam.iter_new_added_states_sorted" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate over newly added states, sorted based on the score.</p>
 </dd></dl>
 
 <dl class="method">
@@ -142,7 +174,7 @@
 <dt id="thoth.adviser.beam.Beam.new_iteration">
 <code class="sig-name descname">new_iteration</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; None<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.new_iteration"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.beam.Beam.new_iteration" title="Permalink to this definition">¶</a></dt>
 <dd><p>Called once a new iteration is done in resolver.</p>
-<p>Used to keep track of beam history.</p>
+<p>Used to keep track of beam history and to keep track of states added.</p>
 </dd></dl>
 
 <dl class="method">
@@ -156,7 +188,13 @@
 <code class="sig-name descname">pop</code><span class="sig-paren">(</span><em class="sig-param">idx: Optional[int] = None</em><span class="sig-paren">)</span> &#x2192; thoth.adviser.state.State<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.pop"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.beam.Beam.pop" title="Permalink to this definition">¶</a></dt>
 <dd><p>Pop i-th element from the beam and remove it from the beam (this is actually toppop).</p>
 <p>If index is not provided, pop one of the largest elements kept in the beam.</p>
-<p>If top_state is pre-cached, this operation is done in O(log(N)), O(N) otherwise.</p>
+<p>If top_state is pre-cached or idx is explicitly set, this operation is done in O(log(N)), O(N) otherwise.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="thoth.adviser.beam.Beam.remove">
+<code class="sig-name descname">remove</code><span class="sig-paren">(</span><em class="sig-param">state: thoth.adviser.state.State</em><span class="sig-paren">)</span> &#x2192; None<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.remove"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.beam.Beam.remove" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the given state from beam.</p>
 </dd></dl>
 
 <dl class="method">
@@ -533,6 +571,19 @@ needed - for example for parsing version strings (this is lazily pre-cached in P
 </dd></dl>
 
 <dl class="exception">
+<dt id="thoth.adviser.exceptions.AdviserRunException">
+<em class="property">exception </em><code class="sig-prename descclassname">thoth.adviser.exceptions.</code><code class="sig-name descname">AdviserRunException</code><a class="reference internal" href="_modules/thoth/adviser/exceptions.html#AdviserRunException"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.exceptions.AdviserRunException" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#thoth.adviser.exceptions.AdviserException" title="thoth.adviser.exceptions.AdviserException"><code class="xref py py-class docutils literal notranslate"><span class="pre">thoth.adviser.exceptions.AdviserException</span></code></a></p>
+<p>A base class for implementing exceptions occurred during an andviser run.</p>
+<dl class="method">
+<dt id="thoth.adviser.exceptions.AdviserRunException.to_dict">
+<code class="sig-name descname">to_dict</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; Optional[Dict[str, str]]<a class="reference internal" href="_modules/thoth/adviser/exceptions.html#AdviserRunException.to_dict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.exceptions.AdviserRunException.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert adviser exception to a dict representation which is shown to the user.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="exception">
 <dt id="thoth.adviser.exceptions.BootError">
 <em class="property">exception </em><code class="sig-prename descclassname">thoth.adviser.exceptions.</code><code class="sig-name descname">BootError</code><a class="reference internal" href="_modules/thoth/adviser/exceptions.html#BootError"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.exceptions.BootError" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference internal" href="#thoth.adviser.exceptions.PipelineUnitError" title="thoth.adviser.exceptions.PipelineUnitError"><code class="xref py py-class docutils literal notranslate"><span class="pre">thoth.adviser.exceptions.PipelineUnitError</span></code></a></p>
@@ -542,8 +593,14 @@ needed - for example for parsing version strings (this is lazily pre-cached in P
 <dl class="exception">
 <dt id="thoth.adviser.exceptions.CannotProduceStack">
 <em class="property">exception </em><code class="sig-prename descclassname">thoth.adviser.exceptions.</code><code class="sig-name descname">CannotProduceStack</code><a class="reference internal" href="_modules/thoth/adviser/exceptions.html#CannotProduceStack"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.exceptions.CannotProduceStack" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#thoth.adviser.exceptions.AdviserException" title="thoth.adviser.exceptions.AdviserException"><code class="xref py py-class docutils literal notranslate"><span class="pre">thoth.adviser.exceptions.AdviserException</span></code></a></p>
-<p>Raised if adviser or dependency monkey cannot produce stack.</p>
+<dd><p>Bases: <a class="reference internal" href="#thoth.adviser.exceptions.AdviserRunException" title="thoth.adviser.exceptions.AdviserRunException"><code class="xref py py-class docutils literal notranslate"><span class="pre">thoth.adviser.exceptions.AdviserRunException</span></code></a></p>
+<p>Raised if there was not produced any result.</p>
+<dl class="method">
+<dt id="thoth.adviser.exceptions.CannotProduceStack.to_dict">
+<code class="sig-name descname">to_dict</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; Optional[Dict[str, str]]<a class="reference internal" href="_modules/thoth/adviser/exceptions.html#CannotProduceStack.to_dict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.exceptions.CannotProduceStack.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert exception to a dict representation for a user.</p>
+</dd></dl>
+
 </dd></dl>
 
 <dl class="exception">
@@ -641,8 +698,14 @@ needed - for example for parsing version strings (this is lazily pre-cached in P
 <dl class="exception">
 <dt id="thoth.adviser.exceptions.UnresolvedDependencies">
 <em class="property">exception </em><code class="sig-prename descclassname">thoth.adviser.exceptions.</code><code class="sig-name descname">UnresolvedDependencies</code><span class="sig-paren">(</span><em class="sig-param">*args: Any, unresolved: List[str]</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thoth/adviser/exceptions.html#UnresolvedDependencies"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.exceptions.UnresolvedDependencies" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <a class="reference internal" href="#thoth.adviser.exceptions.AdviserException" title="thoth.adviser.exceptions.AdviserException"><code class="xref py py-class docutils literal notranslate"><span class="pre">thoth.adviser.exceptions.AdviserException</span></code></a></p>
+<dd><p>Bases: <a class="reference internal" href="#thoth.adviser.exceptions.AdviserRunException" title="thoth.adviser.exceptions.AdviserRunException"><code class="xref py py-class docutils literal notranslate"><span class="pre">thoth.adviser.exceptions.AdviserRunException</span></code></a></p>
 <p>An exception raised if dependencies were not resolved and cannot produce stack.</p>
+<dl class="method">
+<dt id="thoth.adviser.exceptions.UnresolvedDependencies.to_dict">
+<code class="sig-name descname">to_dict</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; Optional[Dict[str, str]]<a class="reference internal" href="_modules/thoth/adviser/exceptions.html#UnresolvedDependencies.to_dict"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.exceptions.UnresolvedDependencies.to_dict" title="Permalink to this definition">¶</a></dt>
+<dd><p>Convert unresolved dependencies exception to the user.</p>
+</dd></dl>
+
 <dl class="attribute">
 <dt id="thoth.adviser.exceptions.UnresolvedDependencies.unresolved">
 <code class="sig-name descname">unresolved</code><a class="headerlink" href="#thoth.adviser.exceptions.UnresolvedDependencies.unresolved" title="Permalink to this definition">¶</a></dt>
@@ -900,9 +963,9 @@ but predictor can perform any initial setup in this method. This method should n
 
 <dl class="method">
 <dt id="thoth.adviser.predictor.Predictor.run">
-<em class="property">abstract </em><code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">context: thoth.adviser.context.Context</em>, <em class="sig-param">beam: thoth.adviser.beam.Beam</em><span class="sig-paren">)</span> &#x2192; int<a class="reference internal" href="_modules/thoth/adviser/predictor.html#Predictor.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.predictor.Predictor.run" title="Permalink to this definition">¶</a></dt>
+<em class="property">abstract </em><code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">context: thoth.adviser.context.Context</em>, <em class="sig-param">beam: thoth.adviser.beam.Beam</em><span class="sig-paren">)</span> &#x2192; thoth.adviser.state.State<a class="reference internal" href="_modules/thoth/adviser/predictor.html#Predictor.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.predictor.Predictor.run" title="Permalink to this definition">¶</a></dt>
 <dd><p>The main method used to run the predictor.</p>
-<p>The method accepts a beam of states and returns index of the state which should be used for next expansion.
+<p>The method accepts a beam of states and returns the state which should be used for next expansion.
 The beam has to be kept untouched.</p>
 </dd></dl>
 
@@ -1364,7 +1427,7 @@ is resolved multiple times.</p>
 <p>Stride base class implementation.</p>
 <dl class="method">
 <dt id="thoth.adviser.stride.Stride.run">
-<em class="property">abstract </em><code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">state: thoth.adviser.state.State</em><span class="sig-paren">)</span> &#x2192; Optional[Tuple[float, List[Dict[str, str]]]]<a class="reference internal" href="_modules/thoth/adviser/stride.html#Stride.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.stride.Stride.run" title="Permalink to this definition">¶</a></dt>
+<em class="property">abstract </em><code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">state: thoth.adviser.state.State</em><span class="sig-paren">)</span> &#x2192; None<a class="reference internal" href="_modules/thoth/adviser/stride.html#Stride.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.stride.Stride.run" title="Permalink to this definition">¶</a></dt>
 <dd><p>Main entry-point for strides.</p>
 </dd></dl>
 
@@ -1496,14 +1559,22 @@ is resolved multiple times.</p>
 <p>Thoth’s adviser for recommending Python stacks.</p>
 <dl class="class">
 <dt id="thoth.adviser.Beam">
-<em class="property">class </em><code class="sig-prename descclassname">thoth.adviser.</code><code class="sig-name descname">Beam</code><span class="sig-paren">(</span><em class="sig-param">width: Optional[int] = None, states: List[Tuple[Tuple[float, int], thoth.adviser.state.State]] = NOTHING, counter: int = 0, top_idx: Optional[int] = None, *, beam_history: List[Tuple[int, Optional[float]]] = NOTHING</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Beam" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">thoth.adviser.</code><code class="sig-name descname">Beam</code><span class="sig-paren">(</span><em class="sig-param">width: Optional[int] = None, states: List[Tuple[Tuple[float, int], thoth.adviser.state.State]] = NOTHING, states_idx: Dict[int, int] = NOTHING, last_added=NOTHING, counter: int = 0, top_idx: Optional[int] = None, *, beam_history: List[Tuple[int, Optional[float]]] = NOTHING</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Beam" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.8)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
 <p>Beam implementation.</p>
-<p>The implementation of beam respecting beam width:</p>
-<blockquote>
-<div><p><a class="reference external" href="https://en.wikipedia.org/wiki/Beam_search">https://en.wikipedia.org/wiki/Beam_search</a></p>
-</div></blockquote>
-<p>Beam is internally implemented on top of heap queue to optimize inserts and respect beam width in O(log(N)).</p>
+<p>The implementation of beam respecting beam width: <a class="reference external" href="https://en.wikipedia.org/wiki/Beam_search">https://en.wikipedia.org/wiki/Beam_search</a></p>
+<p>Beam is internally implemented on top of a min-heap queue to optimize inserts and respect
+beam width in O(log(N)).</p>
+<p>The most frequent operation performed on the beam is not always the same - it depends
+on the beam width and number of states generated. If number of states generated  is
+more than the width of the beam, its reasonable to optimize insertions into the beam
+with checks on beam width.</p>
+<p>If number of states generated is smaller than the beam width, the beam could be optimized
+for removal of states.</p>
+<p>As the first scenario is seen in a real-world deployment, the beam uses min-heapq to keep
+addition to the beam with beam_width checks in O(log(N)) and removals of the states in
+O(log(N)). To satisfy removals in O(log(N)), the beam maintains a dictionary mapping a state
+to its index in the beam.</p>
 <dl class="method">
 <dt id="thoth.adviser.Beam.add_state">
 <code class="sig-name descname">add_state</code><span class="sig-paren">(</span><em class="sig-param">state: thoth.adviser.state.State</em><span class="sig-paren">)</span> &#x2192; None<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.add_state"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Beam.add_state" title="Permalink to this definition">¶</a></dt>
@@ -1514,6 +1585,10 @@ is resolved multiple times.</p>
 <dt id="thoth.adviser.Beam.get">
 <code class="sig-name descname">get</code><span class="sig-paren">(</span><em class="sig-param">idx: int</em><span class="sig-paren">)</span> &#x2192; thoth.adviser.state.State<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.get"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Beam.get" title="Permalink to this definition">¶</a></dt>
 <dd><p>Get i-th element from the beam (constant time), keep it in the beam.</p>
+<p>This method is suitable for random state indexing in the beam (like in case of adaptive
+simulated annealing). The actual index is not into a sorted array and has no special meaning
+assigned - beam under the hood uses min-heapq (as of now), but the index used is not guaranteed to
+point to a heap-like data structure.</p>
 </dd></dl>
 
 <dl class="method">
@@ -1521,6 +1596,18 @@ is resolved multiple times.</p>
 <code class="sig-name descname">get_top_idx</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; int<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.get_top_idx"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Beam.get_top_idx" title="Permalink to this definition">¶</a></dt>
 <dd><p>Get index of the highest rated state kept in the beam.</p>
 <p>This operation is done in O(N) time if top is not pre-cached, O(1) otherwise.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="thoth.adviser.Beam.iter_new_added_states">
+<code class="sig-name descname">iter_new_added_states</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; Generator[[thoth.adviser.state.State, None], None]<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.iter_new_added_states"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Beam.iter_new_added_states" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate over states added in the resolution round.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="thoth.adviser.Beam.iter_new_added_states_sorted">
+<code class="sig-name descname">iter_new_added_states_sorted</code><span class="sig-paren">(</span><em class="sig-param">reverse: bool = True</em><span class="sig-paren">)</span> &#x2192; Generator[[thoth.adviser.state.State, None], None]<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.iter_new_added_states_sorted"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Beam.iter_new_added_states_sorted" title="Permalink to this definition">¶</a></dt>
+<dd><p>Iterate over newly added states, sorted based on the score.</p>
 </dd></dl>
 
 <dl class="method">
@@ -1539,7 +1626,7 @@ is resolved multiple times.</p>
 <dt id="thoth.adviser.Beam.new_iteration">
 <code class="sig-name descname">new_iteration</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; None<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.new_iteration"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Beam.new_iteration" title="Permalink to this definition">¶</a></dt>
 <dd><p>Called once a new iteration is done in resolver.</p>
-<p>Used to keep track of beam history.</p>
+<p>Used to keep track of beam history and to keep track of states added.</p>
 </dd></dl>
 
 <dl class="method">
@@ -1553,7 +1640,13 @@ is resolved multiple times.</p>
 <code class="sig-name descname">pop</code><span class="sig-paren">(</span><em class="sig-param">idx: Optional[int] = None</em><span class="sig-paren">)</span> &#x2192; thoth.adviser.state.State<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.pop"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Beam.pop" title="Permalink to this definition">¶</a></dt>
 <dd><p>Pop i-th element from the beam and remove it from the beam (this is actually toppop).</p>
 <p>If index is not provided, pop one of the largest elements kept in the beam.</p>
-<p>If top_state is pre-cached, this operation is done in O(log(N)), O(N) otherwise.</p>
+<p>If top_state is pre-cached or idx is explicitly set, this operation is done in O(log(N)), O(N) otherwise.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="thoth.adviser.Beam.remove">
+<code class="sig-name descname">remove</code><span class="sig-paren">(</span><em class="sig-param">state: thoth.adviser.state.State</em><span class="sig-paren">)</span> &#x2192; None<a class="reference internal" href="_modules/thoth/adviser/beam.html#Beam.remove"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Beam.remove" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the given state from beam.</p>
 </dd></dl>
 
 <dl class="method">
@@ -1957,9 +2050,9 @@ but predictor can perform any initial setup in this method. This method should n
 
 <dl class="method">
 <dt id="thoth.adviser.Predictor.run">
-<em class="property">abstract </em><code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">context: thoth.adviser.context.Context</em>, <em class="sig-param">beam: thoth.adviser.beam.Beam</em><span class="sig-paren">)</span> &#x2192; int<a class="reference internal" href="_modules/thoth/adviser/predictor.html#Predictor.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Predictor.run" title="Permalink to this definition">¶</a></dt>
+<em class="property">abstract </em><code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">context: thoth.adviser.context.Context</em>, <em class="sig-param">beam: thoth.adviser.beam.Beam</em><span class="sig-paren">)</span> &#x2192; thoth.adviser.state.State<a class="reference internal" href="_modules/thoth/adviser/predictor.html#Predictor.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Predictor.run" title="Permalink to this definition">¶</a></dt>
 <dd><p>The main method used to run the predictor.</p>
-<p>The method accepts a beam of states and returns index of the state which should be used for next expansion.
+<p>The method accepts a beam of states and returns the state which should be used for next expansion.
 The beam has to be kept untouched.</p>
 </dd></dl>
 
@@ -2328,7 +2421,7 @@ is resolved multiple times.</p>
 <p>Stride base class implementation.</p>
 <dl class="method">
 <dt id="thoth.adviser.Stride.run">
-<em class="property">abstract </em><code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">state: thoth.adviser.state.State</em><span class="sig-paren">)</span> &#x2192; Optional[Tuple[float, List[Dict[str, str]]]]<a class="reference internal" href="_modules/thoth/adviser/stride.html#Stride.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Stride.run" title="Permalink to this definition">¶</a></dt>
+<em class="property">abstract </em><code class="sig-name descname">run</code><span class="sig-paren">(</span><em class="sig-param">state: thoth.adviser.state.State</em><span class="sig-paren">)</span> &#x2192; None<a class="reference internal" href="_modules/thoth/adviser/stride.html#Stride.run"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#thoth.adviser.Stride.run" title="Permalink to this definition">¶</a></dt>
 <dd><p>Main entry-point for strides.</p>
 </dd></dl>
 
@@ -2455,9 +2548,6 @@ is resolved multiple times.</p>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
-    <a id="sidebar-anchor"></a>
-    
-
   <h3><a href="index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">thoth.adviser package</a><ul>
@@ -2490,13 +2580,13 @@ is resolved multiple times.</p>
 </ul>
 </li>
 </ul>
-
-  <h4>Previous topic</h4>
-  <p class="topless"><a href="resolver.html"
-                        title="previous chapter">Thoth’s offline resolver</a></p>
-  <h4>Next topic</h4>
-  <p class="topless"><a href="thoth.adviser.boots.html"
-                        title="next chapter">thoth.adviser.boots package</a></p>
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation index</a><ul>
+      <li>Previous: <a href="performance.html" title="previous chapter">Performance indicators</a></li>
+      <li>Next: <a href="thoth.adviser.boots.html" title="next chapter">thoth.adviser.boots package</a></li>
+  </ul></li>
+</ul>
   <div role="note" aria-label="source link">
     <h3>This Page</h3>
     <ul class="this-page-menu">
@@ -2518,29 +2608,8 @@ is resolved multiple times.</p>
       </div>
       <div class="clearer"></div>
     </div>
-    <div class="related">
-      <h3>Navigation</h3>
-      <ul>
-        <li class="right" style="margin-right: 10px">
-          <a href="genindex.html" title="General Index"
-             accesskey="I">index</a></li>
-        <li class="right" >
-          <a href="py-modindex.html" title="Python Module Index"
-             >modules</a> |</li>
-        <li class="right" >
-          <a href="thoth.adviser.boots.html" title="thoth.adviser.boots package"
-             accesskey="N">next</a> |</li>
-        <li class="right" >
-          <a href="resolver.html" title="Thoth’s offline resolver"
-             accesskey="P">previous</a> |</li>
-      </ul>
-    </div>
 
-
-    <div class="footer" role="contentinfo">
-        &#169; Copyright 2019, Thoth team.
-      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
-    </div>
+  
 <script type="text/javascript">
   (function() {
     var ga = document.createElement('script');

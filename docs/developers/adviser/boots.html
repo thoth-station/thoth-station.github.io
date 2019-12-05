@@ -1,0 +1,216 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Boot pipeline unit type &#8212; Thoth Adviser 0.6.1 documentation</title>
+    <link rel="stylesheet" href="_static/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Sieve pipeline unit type" href="sieves.html" />
+    <link rel="prev" title="A pipeline unit" href="unit.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="sieves.html" title="Sieve pipeline unit type"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="unit.html" title="A pipeline unit"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.6.1 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="boot-pipeline-unit-type">
+<span id="boots"></span><h1>Boot pipeline unit type<a class="headerlink" href="#boot-pipeline-unit-type" title="Permalink to this headline">¶</a></h1>
+<p>A very first <a class="reference internal" href="unit.html#unit"><span class="std std-ref">pipeline unit</span></a> is called “<a class="reference internal" href="thoth.adviser.html#thoth.adviser.boot.Boot" title="thoth.adviser.boot.Boot"><code class="xref py py-class docutils literal notranslate"><span class="pre">boot</span></code></a>” as it is started as a first pipeline unit. It’s
+main purpose is to halt adviser in case of any undesired conditions or to print
+any messages to logger (that will show up in user logs).  As in case of all
+units, it has access to adviser context to check any input values to the
+adviser (user input, parameters or hyperparameters).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Each boot pipeline unit is called just once before the stack generation
+pipeline is started.</p>
+</div>
+<div class="section" id="main-usage">
+<h2>Main usage<a class="headerlink" href="#main-usage" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Halt adviser before any stack resolution is done based on input values</p>
+<ul>
+<li><p>Any exception raised will halt adviser with an error message (created out
+of exception message) populated to the adviser JSON result except for
+eager stopping (see bellow)</p></li>
+</ul>
+</li>
+<li><p>Print information into logs using <code class="docutils literal notranslate"><span class="pre">logging</span></code></p>
+<ul>
+<li><p>Any information logged will show up in adviser run logs - logging respects
+log-level configuration which was set up during adviser startup based on
+request/adviser configuration</p></li>
+</ul>
+</li>
+<li><p>Prematurely end resolution based on the the final state reached</p>
+<ul>
+<li><p>Raising exception <a class="reference internal" href="thoth.adviser.html#thoth.adviser.exceptions.EagerStopPipeline" title="thoth.adviser.exceptions.EagerStopPipeline"><code class="xref py py-class docutils literal notranslate"><span class="pre">EagerStopPipeline</span></code></a> will cause stopping the whole
+resolver run</p></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="real-world-examples">
+<h2>Real world examples<a class="headerlink" href="#real-world-examples" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Any adjustments to input parameters done can result in a logged messages</p>
+<ul>
+<li><p>If a user uses a Python package index in the <code class="docutils literal notranslate"><span class="pre">Pipfile</span></code> that was not
+enabled by Thoth administrator a boot unit can adjust <code class="docutils literal notranslate"><span class="pre">Pipfile</span></code> (e.g.
+remove Python package index) - this configuration change will be propagated
+Thoth’s response in all integrations</p></li>
+<li><p>If a user uses hardware (CPU/GPU) that is not known to Thoth’s knowledge
+base, a boot unit can adjust this information (remove it completelly or,
+for example, find a similar GPU model for recommendations) and print an
+informative log message</p></li>
+</ul>
+</li>
+<li><p>Gate an application build in the cluster based on configured Python package
+indexes</p>
+<ul>
+<li><p>If a user uses a Python package index that was not enabled by Thoth
+administrator in the <code class="docutils literal notranslate"><span class="pre">Pipfile</span></code> a boot unit can raise an exception causing
+a halt</p></li>
+</ul>
+</li>
+<li><p>Halting adviser in case of not sufficient runtime or buildtime information</p>
+<ul>
+<li><p>If a user uses hardware (CPU/GPU) that is not known to Thoth’s knowledge
+base, a boot unit can halt adviser</p></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="section" id="an-example-implementation">
+<h2>An example implementation<a class="headerlink" href="#an-example-implementation" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">thoth.adviser</span> <span class="kn">import</span> <span class="n">Boot</span>
+
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">ExampleBoot</span><span class="p">(</span><span class="n">Boot</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;This is an example boot implementation.&quot;&quot;&quot;</span>
+
+  <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+      <span class="sd">&quot;&quot;&quot;Main entry-point for boot unit to demonstrate boot example.&quot;&quot;&quot;</span>
+      <span class="n">cpu_family</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">hardware</span><span class="o">.</span><span class="n">cpu_family</span>
+
+      <span class="k">if</span> <span class="n">cpu_family</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+          <span class="n">known_cpu_families</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_cpu_family_all</span><span class="p">()</span>
+          <span class="k">if</span> <span class="n">cpu_family</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">known_cpu_families</span><span class="p">:</span>
+              <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                  <span class="s2">&quot;CPU family used </span><span class="si">%s</span><span class="s2"> is not known, it will not be considered&quot;</span>
+                  <span class="n">cpu_family</span>
+              <span class="p">)</span>
+              <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">hardware</span><span class="o">.</span><span class="n">cpu_family</span> <span class="o">=</span> <span class="kc">None</span>
+              <span class="c1"># Or you can raise an exception causing adviser halt:</span>
+              <span class="c1">#  raise ValueError(f&quot;CPU family used {cpu_family!r} is not known&quot;)</span>
+</pre></div>
+</div>
+<p>The implementation can also provide other methods, such as <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.post_run" title="thoth.adviser.unit.Unit.post_run"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.pre_run</span></code></a>, <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.post_run" title="thoth.adviser.unit.Unit.post_run"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.post_run</span></code></a> or <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.post_run" title="thoth.adviser.unit.Unit.post_run"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.post_run_report</span></code></a> and pipeline unit configuration adjustment.
+See <a class="reference internal" href="unit.html#unit"><span class="std std-ref">unit documentation</span></a> for more info.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Boot pipeline unit type</a><ul>
+<li><a class="reference internal" href="#main-usage">Main usage</a></li>
+<li><a class="reference internal" href="#real-world-examples">Real world examples</a></li>
+<li><a class="reference internal" href="#an-example-implementation">An example implementation</a></li>
+</ul>
+</li>
+</ul>
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation index</a><ul>
+      <li>Previous: <a href="unit.html" title="previous chapter">A pipeline unit</a></li>
+      <li>Next: <a href="sieves.html" title="next chapter">Sieve pipeline unit type</a></li>
+  </ul></li>
+</ul>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/boots.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>

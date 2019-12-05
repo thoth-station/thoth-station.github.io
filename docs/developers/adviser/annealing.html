@@ -1,0 +1,193 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Adaptive simulated annealing &#8212; Thoth Adviser 0.6.1 documentation</title>
+    <link rel="stylesheet" href="_static/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Dependency Monkey" href="dependency_monkey.html" />
+    <link rel="prev" title="Wrap pipeline unit type" href="wraps.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="dependency_monkey.html" title="Dependency Monkey"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="wraps.html" title="Wrap pipeline unit type"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.6.1 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="adaptive-simulated-annealing">
+<span id="annealing"></span><h1>Adaptive simulated annealing<a class="headerlink" href="#adaptive-simulated-annealing" title="Permalink to this headline">¶</a></h1>
+<p>A very first implementation of Adviser and Dependency Monkey was designed to
+load the whole dependency graph into memory and subsequently perform operations
+on the weighted dependency graph. This way the dependency graph was adjusted
+based on scores on edges and by traversing the dependency graph, there were
+produced software stacks. Over time we abandoned this approach as it did not
+scale with size of software stacks (e.g. a TensorFlow Python stack  required
+circa 2.5k queries to the database just for dependency graph retrieval) and
+<a class="reference external" href="https://stackoverflow.blog/2017/09/06/incredible-growth-python//">given the trend in Python ecosystem</a> this
+solution would also not be scalable.</p>
+<p>The new implementation uses a stochastic approach based on Adaptive simulated
+annealing (see <a class="reference external" href="https://en.wikipedia.org/wiki/Adaptive_simulated_annealing">Wikipedia for a brief info</a> and also
+<a class="reference external" href="https://en.wikipedia.org/wiki/Simulated_annealing">simulated annealing</a>).
+Software stacks are lazily expanded from initial states. The initial states are
+formed out of combinations computed on all the resolved direct dependencies. As
+an example, we can create a software stack that requests two packages to be
+installed - <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> and <code class="docutils literal notranslate"><span class="pre">flask</span></code> - with specific version ranges:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tensorflow&gt;=1.14,0</span>
+<span class="go">flask&gt;=1.0.0&lt;=1.1.0</span>
+</pre></div>
+</div>
+<p>Thoth in this case performs offline resolution (based on pre-computed data in
+the database which state how dependencies are structured) of direct
+dependencies and finds matching releases given version range specification - an
+illustrative example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tensorflow==2.0.0</span>
+<span class="go">tensorflow==1.14.0</span>
+<span class="go">tensorflow==1.15.0</span>
+<span class="go">flask==1.1.0</span>
+<span class="go">flask==1.0.0</span>
+</pre></div>
+</div>
+<p>These releases are kept in buckets of a same package type (<code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> and
+<code class="docutils literal notranslate"><span class="pre">flask</span></code>) and sorted based on versions. All the possible combinations of these
+direct dependencies create initial states (as described above) - in this case
+we have 3*2=6 combinations in total:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">product</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">pprint</span> <span class="kn">import</span> <span class="n">pprint</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pprint</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">product</span><span class="p">([</span><span class="s2">&quot;tensorflow==2.0.0&quot;</span><span class="p">,</span> <span class="s2">&quot;tensorflow==1.15.0&quot;</span><span class="p">,</span> <span class="s2">&quot;tensorflow==1.15.0&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;flask==1.1.0&quot;</span><span class="p">,</span> <span class="s2">&quot;flask==1.0.0&quot;</span><span class="p">])))</span>
+<span class="go">[(&#39;tensorflow==2.0.0&#39;, &#39;flask==1.1.0&#39;),</span>
+<span class="go"> (&#39;tensorflow==2.0.0&#39;, &#39;flask==1.0.0&#39;),</span>
+<span class="go"> (&#39;tensorflow==1.15.0&#39;, &#39;flask==1.1.0&#39;),</span>
+<span class="go"> (&#39;tensorflow==1.15.0&#39;, &#39;flask==1.0.0&#39;),</span>
+<span class="go"> (&#39;tensorflow==1.14.0&#39;, &#39;flask==1.1.0&#39;),</span>
+<span class="go"> (&#39;tensorflow==1.14.0&#39;, &#39;flask==1.0.0&#39;)]</span>
+</pre></div>
+</div>
+<p>Each and every combination creates an initial state - see <a class="reference internal" href="thoth.adviser.html#thoth.adviser.state.State" title="thoth.adviser.state.State"><code class="xref py py-class docutils literal notranslate"><span class="pre">State</span></code></a> abstraction in sources for representation of a
+single state which is about to be expanded resolved.</p>
+<p>States are added to a <a class="reference external" href="https://en.wikipedia.org/wiki/Beam_search">beam</a> which
+is designed to limit search space given the memory resources available (keep
+only <code class="docutils literal notranslate"><span class="pre">beam.width</span></code> most promising states to be expanded/resolved).</p>
+<p>The adaptive simulated annealing part of adviser’s resolution algorithm takes
+either a top rated state for expansion or, based on probability, picks some
+another state from the beam. This state is expanded by picking one dependency
+from unresolved dependency listing and obtaining its direct dependencies making
+the dependency resolved and direct dependencies becoming part of unresolved
+dependency listing. A state is in so-called “final state” if all the
+dependencies were resolved and there is no package version clash during
+resolution (no two packages of a same type but in different versions or
+packages of a same type coming from a different Python package source index -
+this is not acceptable in Python packaging). The probability of picking a
+neighbour state (and not the highest rated stack) from beam is computed based
+on, besides other parameters, the temperature function which respects number of
+iterations and number of final states produced so far (thus “adaptive”
+simulated annealing).</p>
+<p>The section described above is a brief summary of <a class="reference internal" href="resolver.html#resolver"><span class="std std-ref">resolver implementation</span></a>. The annealing implementation can also perform hill-climbing. As
+the order in which states are added to the beam is preserved, the first state
+added is also first pop-ed. This simulates <a class="reference internal" href="thoth.adviser.html#thoth.adviser.enums.RecommendationType" title="thoth.adviser.enums.RecommendationType"><code class="xref py py-attr docutils literal notranslate"><span class="pre">LATEST</span></code></a> resolution - expanding always the
+first state added to the beam.</p>
+<p>An example of an adaptive simulated annealing run that produced 1000 Python
+stacks (final states) with no observations on scored packages and states can be
+seen on the following figure. As the database for scoring states is empty
+(Python stacks were just resolved without any guidance), the probability of
+picking a random state from the beam is very high (the algorithm is looking for
+a state which would be better than a score of 0.0). This acceptance probability
+is kept even the temperature dropped.</p>
+<a class="reference external image-reference" href="_static/history_no_data.png"><img alt="Resolving software stacks with simulated annealing with no data available." src="_images/history_no_data.png" /></a>
+<p>On the figure below, there was randomized scoring of top rated states for
+demonstration purposes. As can be seen, the acceptance probability for picking
+a neighbour state for expansion is decreasing with number of final states
+produced and with decreasing temperature during iterations. This caused picking
+the highest rated states for expansion and producing final states out of them
+(fully resolved Python software stacks).</p>
+<a class="reference external image-reference" href="_static/history_random_data.png"><img alt="Resolving software stacks with simulated annealing with random data." src="_images/history_random_data.png" /></a>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation index</a><ul>
+      <li>Previous: <a href="wraps.html" title="previous chapter">Wrap pipeline unit type</a></li>
+      <li>Next: <a href="dependency_monkey.html" title="next chapter">Dependency Monkey</a></li>
+  </ul></li>
+</ul>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/annealing.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
