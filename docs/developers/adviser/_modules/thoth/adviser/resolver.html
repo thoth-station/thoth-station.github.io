@@ -215,6 +215,16 @@
     <span class="p">)</span>
     <span class="n">_context</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Context</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
+    <span class="nd">@limit</span><span class="o">.</span><span class="n">validator</span>
+    <span class="nd">@count</span><span class="o">.</span><span class="n">validator</span>
+    <span class="k">def</span> <span class="nf">_positive_int_validator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Validate the given attribute - the given attribute should have a value of a positive integer.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attribute </span><span class="si">{attribute!r}</span><span class="s2"> should be of type int, got {type(value)!r} instead&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Value for attribute </span><span class="si">{attribute!r}</span><span class="s2"> should be a positive integer, got </span><span class="si">{value}</span><span class="s2"> instead&quot;</span><span class="p">)</span>
+
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">context</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Context</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve context bound to the current resolver.&quot;&quot;&quot;</span>
@@ -456,23 +466,16 @@
             <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">iter_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)),</span> <span class="n">graceful</span><span class="o">=</span><span class="kc">True</span>
         <span class="p">)</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">resolved_direct_dependencies</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">UnresolvedDependencies</span><span class="p">(</span>
-                <span class="s2">&quot;No direct dependencies were resolved&quot;</span><span class="p">,</span>
-                <span class="n">unresolved</span><span class="o">=</span><span class="p">[</span>
-                    <span class="n">pv</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">iter_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-                <span class="p">],</span>
-            <span class="p">)</span>
-
         <span class="n">unresolved</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">package_name</span><span class="p">,</span> <span class="n">package_versions</span> <span class="ow">in</span> <span class="n">resolved_direct_dependencies</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">iter_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">):</span>
+            <span class="n">package_versions</span> <span class="o">=</span> <span class="n">resolved_direct_dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">package_versions</span><span class="p">:</span>
                 <span class="c1"># This means that there were found versions in the graph</span>
                 <span class="c1"># database but none was matching the given version range.</span>
-                <span class="n">unresolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
+                <span class="n">unresolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
 
                 <span class="n">error_msg</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;No versions were found for direct dependency </span><span class="si">{package_name!r}</span><span class="s2">&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;No versions were found for direct dependency </span><span class="si">{package_version.name!r}</span><span class="s2">&quot;</span>
                 <span class="p">)</span>
                 <span class="n">runtime_environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span>
                 <span class="k">if</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
