@@ -83,6 +83,7 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">deque</span>
 <span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">methodtools</span> <span class="kn">import</span> <span class="n">lru_cache</span>
@@ -2728,6 +2729,7 @@
                 <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">HasVulnerability</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">CVE</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">CVE</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
                 <span class="o">.</span><span class="n">all</span><span class="p">()</span>
             <span class="p">)</span>
 
@@ -3898,26 +3900,35 @@
         <span class="n">version_range</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">advisory</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">cve</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">CVE</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Store information about a CVE in the graph database for the given Python package.&quot;&quot;&quot;</span>
         <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
         <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">,</span> <span class="n">session</span><span class="o">.</span><span class="n">begin</span><span class="p">(</span><span class="n">subtransactions</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-            <span class="n">cve</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">CVE</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
-                <span class="n">session</span><span class="p">,</span> <span class="n">cve_id</span><span class="o">=</span><span class="n">record_id</span><span class="p">,</span> <span class="n">version_range</span><span class="o">=</span><span class="n">version_range</span><span class="p">,</span> <span class="n">advisory</span><span class="o">=</span><span class="n">advisory</span><span class="p">,</span> <span class="n">cve_name</span><span class="o">=</span><span class="n">cve</span>
-            <span class="p">)</span>
-            <span class="n">index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_or_create_python_package_index</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">index_url</span><span class="p">,</span> <span class="n">only_if_enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-            <span class="n">entity</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
-                <span class="n">session</span><span class="p">,</span>
-                <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
-                <span class="n">package_version</span><span class="o">=</span><span class="n">package_version</span><span class="p">,</span>
-                <span class="n">python_package_index_id</span><span class="o">=</span><span class="n">index</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
-            <span class="p">)</span>
-            <span class="n">_</span><span class="p">,</span> <span class="n">existed</span> <span class="o">=</span> <span class="n">HasVulnerability</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
-                <span class="n">session</span><span class="p">,</span> <span class="n">cve_id</span><span class="o">=</span><span class="n">cve</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">python_package_version_entity_id</span><span class="o">=</span><span class="n">entity</span><span class="o">.</span><span class="n">id</span>
-            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">exists</span><span class="p">()</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">CVE</span><span class="o">.</span><span class="n">cve_id</span> <span class="o">==</span> <span class="n">record_id</span><span class="p">))</span><span class="o">.</span><span class="n">scalar</span><span class="p">():</span>
+                <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">cve_instance</span> <span class="o">=</span> <span class="n">CVE</span><span class="p">(</span>
+                    <span class="n">advisory</span><span class="o">=</span><span class="n">advisory</span><span class="p">,</span>
+                    <span class="n">cve_name</span><span class="o">=</span><span class="n">cve</span><span class="p">,</span>
+                    <span class="n">cve_id</span><span class="o">=</span><span class="n">record_id</span><span class="p">,</span>
+                    <span class="n">version_range</span><span class="o">=</span><span class="n">version_range</span><span class="p">,</span>
+                    <span class="n">aggregated_at</span><span class="o">=</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">(),</span>
+                <span class="p">)</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">cve_instance</span><span class="p">)</span>
 
-            <span class="k">return</span> <span class="n">cve</span><span class="p">,</span> <span class="n">existed</span></div>
+                <span class="n">index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_or_create_python_package_index</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">index_url</span><span class="p">,</span> <span class="n">only_if_enabled</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="n">entity</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+                    <span class="n">session</span><span class="p">,</span>
+                    <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">=</span><span class="n">package_version</span><span class="p">,</span>
+                    <span class="n">python_package_index_id</span><span class="o">=</span><span class="n">index</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">HasVulnerability</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+                    <span class="n">session</span><span class="p">,</span> <span class="n">cve_id</span><span class="o">=</span><span class="n">cve_instance</span><span class="o">.</span><span class="n">id</span><span class="p">,</span> <span class="n">python_package_version_entity_id</span><span class="o">=</span><span class="n">entity</span><span class="o">.</span><span class="n">id</span>
+                <span class="p">)</span>
+
+                <span class="k">return</span> <span class="kc">False</span></div>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">_rpm_sync_analysis_result</span><span class="p">(</span><span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">,</span> <span class="n">package_extract_run</span><span class="p">:</span> <span class="n">PackageExtractRun</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -4680,10 +4691,14 @@
         <span class="n">parameters</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;parameters&quot;</span><span class="p">]</span>
         <span class="n">cli_arguments</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;thoth-adviser&quot;</span><span class="p">]</span>
         <span class="n">origin</span> <span class="o">=</span> <span class="p">(</span><span class="n">cli_arguments</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metadata&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;origin&quot;</span><span class="p">)</span>
+        <span class="n">is_s2i</span> <span class="o">=</span> <span class="p">(</span><span class="n">cli_arguments</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metadata&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;is_s2i&quot;</span><span class="p">)</span>
         <span class="n">runtime_environment</span> <span class="o">=</span> <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;project&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;runtime_environment&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">origin</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No origin stated in the adviser result </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">adviser_document_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">is_s2i</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No s2i flag stated in the adviser result </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">adviser_document_id</span><span class="p">)</span>
 
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">,</span> <span class="n">session</span><span class="o">.</span><span class="n">begin</span><span class="p">(</span><span class="n">subtransactions</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
             <span class="n">external_hardware_info</span><span class="p">,</span> <span class="n">external_run_software_environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_runtime_environment_conf2models</span><span class="p">(</span>
@@ -4720,6 +4735,7 @@
                 <span class="n">limit</span><span class="o">=</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;limit&quot;</span><span class="p">],</span>
                 <span class="n">limit_latest_versions</span><span class="o">=</span><span class="n">parameters</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;limit_latest_versions&quot;</span><span class="p">),</span>
                 <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+                <span class="n">is_s2i</span><span class="o">=</span><span class="n">is_s2i</span><span class="p">,</span>
                 <span class="n">recommendation_type</span><span class="o">=</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;recommendation_type&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span>
                 <span class="n">requirements_format</span><span class="o">=</span><span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;requirements_format&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span>
                 <span class="n">external_hardware_information_id</span><span class="o">=</span><span class="n">external_hardware_info</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
