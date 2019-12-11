@@ -81,6 +81,8 @@
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
 <span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">deque</span>
+<span class="kn">import</span> <span class="nn">contextlib</span>
+<span class="kn">import</span> <span class="nn">signal</span>
 
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Project</span>
@@ -176,6 +178,18 @@
     <span class="k">return</span> <span class="n">value</span>
 
 
+<span class="nd">@contextlib</span><span class="o">.</span><span class="n">contextmanager</span>
+<span class="k">def</span> <span class="nf">_sigint_handler</span><span class="p">(</span><span class="n">resolver</span><span class="p">:</span> <span class="s2">&quot;Resolver&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Register signal handler for resolver handling.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">handler</span><span class="p">(</span><span class="n">sig_num</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">resolver</span><span class="o">.</span><span class="n">stop_resolving</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="n">old_handler</span> <span class="o">=</span> <span class="n">signal</span><span class="o">.</span><span class="n">getsignal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGINT</span><span class="p">)</span>
+    <span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGINT</span><span class="p">,</span> <span class="n">handler</span><span class="p">)</span>
+    <span class="k">yield</span>
+    <span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGINT</span><span class="p">,</span> <span class="n">old_handler</span><span class="p">)</span>
+
+
 <div class="viewcode-block" id="Resolver"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.resolver.Resolver">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">Resolver</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Resolver for resolving software stacks using pipeline configuration and a predictor.&quot;&quot;&quot;</span>
@@ -208,6 +222,7 @@
         <span class="n">default</span><span class="o">=</span><span class="n">DEFAULT_LIMIT_LATEST_VERSIONS</span><span class="p">,</span>
         <span class="n">converter</span><span class="o">=</span><span class="n">_limit_latest_versions</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
     <span class="p">)</span>
+    <span class="n">stop_resolving</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
     <span class="n">_beam</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Beam</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
     <span class="n">_solver</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
@@ -735,45 +750,50 @@
         <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-            <span class="k">if</span> <span class="p">(</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span>
-                <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">discarded_final_states_count</span>
-                <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span>
-            <span class="p">):</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                    <span class="s2">&quot;Reached limit of stacks to be generated - </span><span class="si">%r</span><span class="s2"> (limit is </span><span class="si">%r</span><span class="s2">), stopping resolver &quot;</span>
-                    <span class="s2">&quot;with the current beam size </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">size</span><span class="p">,</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stop_resolving</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">with</span> <span class="n">_sigint_handler</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">while</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">stop_resolving</span><span class="p">:</span>
+                <span class="k">if</span> <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span>
+                    <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">discarded_final_states_count</span>
+                    <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span>
+                <span class="p">):</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;Reached limit of stacks to be generated - </span><span class="si">%r</span><span class="s2"> (limit is </span><span class="si">%r</span><span class="s2">), stopping resolver &quot;</span>
+                        <span class="s2">&quot;with the current beam size </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">size</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">break</span>
+
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;The beam is empty&quot;</span><span class="p">)</span>
+                    <span class="k">break</span>
+
+                <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">new_iteration</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Expanding state with score </span><span class="si">%g</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+                    <span class="n">state</span><span class="p">,</span>
                 <span class="p">)</span>
-                <span class="k">break</span>
+                <span class="n">final_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_expand_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">final_state</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_strides</span><span class="p">(</span><span class="n">final_state</span><span class="p">):</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_run_wraps</span><span class="p">(</span><span class="n">final_state</span><span class="p">)</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span> <span class="o">+=</span> <span class="mi">1</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">register_accepted_final_state</span><span class="p">(</span><span class="n">final_state</span><span class="p">)</span>
+                        <span class="k">yield</span> <span class="n">final_state</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">discarded_final_states_count</span> <span class="o">+=</span> <span class="mi">1</span>
 
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;The beam is empty&quot;</span><span class="p">)</span>
-                <span class="k">break</span>
-
-            <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">new_iteration</span><span class="p">()</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
-
-            <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
-
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                <span class="s2">&quot;Expanding state with score </span><span class="si">%g</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                <span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
-                <span class="n">state</span><span class="p">,</span>
-            <span class="p">)</span>
-            <span class="n">final_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_expand_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">final_state</span><span class="p">:</span>
-                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_strides</span><span class="p">(</span><span class="n">final_state</span><span class="p">):</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_run_wraps</span><span class="p">(</span><span class="n">final_state</span><span class="p">)</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span> <span class="o">+=</span> <span class="mi">1</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">register_accepted_final_state</span><span class="p">(</span><span class="n">final_state</span><span class="p">)</span>
-                    <span class="k">yield</span> <span class="n">final_state</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">discarded_final_states_count</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stop_resolving</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Resolving stopped based on SIGINT&quot;</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Resolver.resolve_products"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.resolver.Resolver.resolve_products">[docs]</a>    <span class="k">def</span> <span class="nf">resolve_products</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
