@@ -231,6 +231,23 @@
     <span class="n">_DECLARATIVE_BASE</span> <span class="o">=</span> <span class="n">Base</span>
     <span class="n">DEFAULT_COUNT</span> <span class="o">=</span> <span class="mi">100</span>
 
+    <span class="n">_MULTI_VALUE_KEY_PYTHON_PACKAGE_METADATA_MAP</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;classifier&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">HasMetadataClassifier</span><span class="p">,</span> <span class="n">PythonPackageMetadataClassifier</span><span class="p">,</span> <span class="s2">&quot;classifier&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;platform&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">HasMetadataPlatform</span><span class="p">,</span> <span class="n">PythonPackageMetadataPlatform</span><span class="p">,</span> <span class="s2">&quot;platform&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;supported_platform&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="n">HasMetadataSupportedPlatform</span><span class="p">,</span>
+            <span class="n">PythonPackageMetadataSupportedPlatform</span><span class="p">,</span>
+            <span class="s2">&quot;supported_platform&quot;</span>
+            <span class="p">],</span>
+        <span class="s2">&quot;requires_external&quot;</span><span class="p">:</span> <span class="p">[</span>
+            <span class="n">HasMetadataRequiresExternal</span><span class="p">,</span>
+            <span class="n">PythonPackageMetadataRequiresExternal</span><span class="p">,</span>
+            <span class="s2">&quot;requires_external&quot;</span>
+            <span class="p">],</span>
+        <span class="s2">&quot;project_url&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">HasMetadataProjectUrl</span><span class="p">,</span> <span class="n">PythonPackageMetadataProjectUrl</span><span class="p">,</span> <span class="s2">&quot;project_url&quot;</span><span class="p">],</span>
+        <span class="s2">&quot;provides_extra&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">HasMetadataProvidesExtra</span><span class="p">,</span> <span class="n">PythonPackageMetadataProvidesExtra</span><span class="p">,</span> <span class="s2">&quot;optional_feature&quot;</span><span class="p">],</span>
+    <span class="p">}</span>
+
     <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Destruct adapter object.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_STORAGES_LOG_STATS&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))):</span>
@@ -3443,6 +3460,50 @@
 
             <span class="k">return</span> <span class="n">query</span><span class="o">.</span><span class="n">count</span><span class="p">()</span></div>
 
+    <span class="k">def</span> <span class="nf">_get_multi_values_key_python_package_version_metadata</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">python_package_metadata_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]]:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve multi values key metadata for Python package metadata.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">multi_value_results</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">tables</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_MULTI_VALUE_KEY_PYTHON_PACKAGE_METADATA_MAP</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">tables</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">tables</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">python_package_metadata_id</span> <span class="o">==</span> <span class="n">python_package_metadata_id</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tables</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
+                    <span class="n">tables</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="p">)</span>
+                <span class="n">multi_value_results</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="nb">getattr</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">tables</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()]</span>
+
+            <span class="n">distutils_result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">([(</span><span class="n">key</span><span class="p">,</span> <span class="p">[])</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;requires_dist&quot;</span><span class="p">,</span> <span class="s2">&quot;provides_dist&quot;</span><span class="p">,</span> <span class="s2">&quot;obsolete_dist&quot;</span><span class="p">]])</span>
+            <span class="n">multi_value_results</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">distutils_result</span><span class="p">)</span>
+
+            <span class="n">d_query</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">HasMetadataDistutils</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">HasMetadataDistutils</span><span class="o">.</span><span class="n">python_package_metadata_id</span> <span class="o">==</span> <span class="n">python_package_metadata_id</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageMetadataDistutils</span><span class="p">)</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
+                    <span class="n">PythonPackageMetadataDistutils</span>
+                <span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">distutil</span> <span class="ow">in</span> <span class="n">d_query</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+                <span class="n">distutil_dict</span> <span class="o">=</span> <span class="n">distutil</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">distutil_dict</span><span class="p">[</span><span class="s1">&#39;distutils_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">MetadataDistutilsTypeEnum</span><span class="o">.</span><span class="n">REQUIRED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span>
+                    <span class="n">multi_value_results</span><span class="p">[</span><span class="s2">&quot;requires_dist&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">distutil_dict</span><span class="p">[</span><span class="s2">&quot;distutils&quot;</span><span class="p">])</span>
+
+                <span class="k">elif</span> <span class="n">distutil_dict</span><span class="p">[</span><span class="s1">&#39;distutils_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">MetadataDistutilsTypeEnum</span><span class="o">.</span><span class="n">PROVIDED</span><span class="o">.</span><span class="n">value</span><span class="p">:</span>
+                    <span class="n">multi_value_results</span><span class="p">[</span><span class="s2">&quot;provides_dist&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">distutil_dict</span><span class="p">[</span><span class="s2">&quot;distutils&quot;</span><span class="p">])</span>
+
+                <span class="k">elif</span> <span class="n">distutil_dict</span><span class="p">[</span><span class="s1">&#39;distutils_type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">MetadataDistutilsTypeEnum</span><span class="o">.</span><span class="n">OBSOLETE</span><span class="o">.</span><span class="n">value</span><span class="p">:</span>
+                    <span class="n">multi_value_results</span><span class="p">[</span><span class="s2">&quot;obsolete_dist&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">distutil_dict</span><span class="p">[</span><span class="s2">&quot;distutils&quot;</span><span class="p">])</span>
+
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Distutils type not registered in Thoth.&quot;</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">multi_value_results</span>
+
 <div class="viewcode-block" id="GraphDatabase.get_python_package_version_metadata"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_python_package_version_metadata">[docs]</a>    <span class="k">def</span> <span class="nf">get_python_package_version_metadata</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -3455,13 +3516,19 @@
 
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
             <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
-                <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageMetadata</span><span class="p">)</span>
-                <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="p">)</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+                    <span class="n">and_</span><span class="p">(</span>
+                        <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">,</span>
+                        <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span> <span class="o">==</span> <span class="n">package_version</span><span class="p">,</span>
+                        <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">python_package_metadata_id</span><span class="o">.</span><span class="n">isnot</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+                        <span class="p">)</span>
+                    <span class="p">)</span>
                 <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
-                <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">)</span>
-                <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span> <span class="o">==</span> <span class="n">package_version</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">)</span>
-                <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">python_package_metadata_id</span><span class="o">.</span><span class="n">isnot</span><span class="p">(</span><span class="kc">None</span><span class="p">))</span>
+                <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageMetadata</span><span class="p">)</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
+                <span class="n">PythonPackageMetadata</span><span class="p">,</span>
             <span class="p">)</span>
 
             <span class="n">result</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
@@ -3469,7 +3536,10 @@
             <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="n">NotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No record found for </span><span class="si">{package_name!r}</span><span class="s2">, </span><span class="si">{package_version!r}</span><span class="s2">, </span><span class="si">{index_url!r}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-            <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span></div>
+            <span class="n">formatted_result</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+            <span class="n">formatted_result</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_get_multi_values_key_python_package_version_metadata</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">id</span><span class="p">))</span>
+
+            <span class="k">return</span> <span class="n">formatted_result</span></div>
 
     <span class="k">def</span> <span class="nf">_create_python_package_requirement</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>

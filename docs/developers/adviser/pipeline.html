@@ -187,8 +187,35 @@ pipeline unit or predictor for Thoth’s adviser:</p>
 </ul>
 <p>Beam is an abstract data type maintained by resolver that keeps track of pool
 of states that are about to be (possibly) resolved. This pool can have
-restricted size which limits number of states kept in memory and limits number
+restricted width which limits number of states kept in memory and limits number
 of states considered during resolution.</p>
+<p>It’s possible to request a history plot for beam size and the highest rated
+stack score for introspection purposes using the <code class="docutils literal notranslate"><span class="pre">--plot</span></code> option or by
+calling <a class="reference internal" href="thoth.adviser.html#thoth.adviser.beam.Beam.plot" title="thoth.adviser.beam.Beam.plot"><code class="xref py py-func docutils literal notranslate"><span class="pre">Beam.plot</span></code></a>. The figure below
+shows beam history during resolution of 1000 TensorFlow software stacks by
+sampling the state space using <a class="reference internal" href="annealing.html#annealing"><span class="std std-ref">adaptive simulated annealing</span></a>.
+CVE penalization was the only <a class="reference internal" href="steps.html#steps"><span class="std std-ref">pipeline step</span></a> used during
+resolution, resolver did approximately 2500 resolution rounds to score 1000
+software stacks (<code class="docutils literal notranslate"><span class="pre">limit</span></code> parameter to adviser). It took approx. one and half
+minute to produce these 1000 stacks on a local machine, considering just 5 most
+recent libraries in a stack formed out of <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> and <code class="docutils literal notranslate"><span class="pre">flask</span></code>
+packages.</p>
+<a class="reference external image-reference" href="_static/beam_history_plot.png"><img alt="Plotted history of beam size during TensorFlow stacks resolution." src="_images/beam_history_plot.png" /></a>
+<p>As can be seen, the beam limited number of states taken into consideration
+until approx. 1800th round. After this round, the temperature in the
+<a class="reference internal" href="annealing.html#annealing"><span class="std std-ref">adaptive simulated annealing</span></a> started to drop so resolver
+ended up expanding just the top rated state based on <a class="reference internal" href="annealing.html#annealing"><span class="std std-ref">adaptive simulated
+annealing</span></a> predictor output (so stack resolution pipeline started
+to produce more products - resolved software stacks - and reduced production
+of non-final states).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It’s good to find the right balance for the beam width. A beam that is too
+small restricts the state space too much which can cause that no software
+stack is resolved. Too big beam can lead to a very large state space to be
+explored and consumption of too much CPU time (and actual time) to produce
+software stacks.</p>
+</div>
 </div>
 <div class="section" id="pipeline-configuration-creation">
 <h2>Pipeline configuration creation<a class="headerlink" href="#pipeline-configuration-creation" title="Permalink to this headline">¶</a></h2>
@@ -233,7 +260,7 @@ a TensorFlow application:</p>
 <span class="c1"># ... snip</span>
 </pre></div>
 </div>
-<p>Each unit type respects relative ordering and units are groupped based on their
+<p>Each unit type respects relative ordering and units are grouped based on their
 type - for example the very first sieve added is run first, then a second one
 and so on respecting the relative order of sieves in the pipeline configuration
 (the order in which they were included). This logic applies to all pipeline
@@ -245,6 +272,55 @@ advises and for Dependency Monkey to test and evaluate characteristics of
 software stacks. You can use methods provided by <a class="reference internal" href="thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext" title="thoth.adviser.pipeline_builder.PipelineBuilderContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">PipelineBuilderContext</span></code></a> to check if the
 pipeline configuration is created for computing advises or whether the created
 pipeline configuration is used in Dependency Monkey runs.</p>
+</div>
+<div class="section" id="instrumentation-of-resolver-s-pipeline-units">
+<h2>Instrumentation of resolver’s pipeline units<a class="headerlink" href="#instrumentation-of-resolver-s-pipeline-units" title="Permalink to this headline">¶</a></h2>
+<p>Besides letting pipeline units to autonomously register into the pipeline
+configuration, the pipeline configuration can be supplied also explicitly. This
+is useful for instrumenting resolver during <a class="reference internal" href="dependency_monkey.html#dependency-monkey"><span class="std std-ref">Dependency Monkey</span></a> runs. In that case, the <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.should_include" title="thoth.adviser.unit.Unit.should_include"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.should_include</span></code></a> method is never called and the
+configuration of the pipeline is explicitly encoded in a JSON format:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+  <span class="nt">&quot;pipeline&quot;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&quot;boots&quot;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="nt">&quot;sieves&quot;</span><span class="p">:</span> <span class="p">[</span>
+      <span class="p">{</span>
+        <span class="nt">&quot;configuration&quot;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;CutPreReleasesSieve&quot;</span>
+      <span class="p">},</span>
+      <span class="p">{</span>
+        <span class="nt">&quot;configuration&quot;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;PackageIndexSieve&quot;</span>
+      <span class="p">},</span>
+      <span class="p">{</span>
+        <span class="nt">&quot;configuration&quot;</span><span class="p">:</span> <span class="p">{</span>
+          <span class="nt">&quot;without_error&quot;</span><span class="p">:</span> <span class="kc">true</span>
+        <span class="p">},</span>
+        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;SolvedSieve&quot;</span>
+      <span class="p">}</span>
+    <span class="p">],</span>
+    <span class="nt">&quot;steps&quot;</span><span class="p">:</span> <span class="p">[</span>
+      <span class="p">{</span>
+        <span class="nt">&quot;configuration&quot;</span><span class="p">:</span> <span class="p">{</span>
+          <span class="nt">&quot;cve_penalization&quot;</span><span class="p">:</span> <span class="mf">-0.2</span>
+        <span class="p">},</span>
+        <span class="nt">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;CvePenalizationStep&quot;</span>
+      <span class="p">}</span>
+    <span class="p">],</span>
+    <span class="nt">&quot;strides&quot;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="nt">&quot;wraps&quot;</span><span class="p">:</span> <span class="p">[]</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Each unit is referenced by its class name and is included from the
+thoth-adviser’s implementation (modules <a class="reference internal" href="thoth.adviser.boots.html#module-thoth.adviser.boots" title="thoth.adviser.boots"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.boots</span></code></a>,
+<a class="reference internal" href="thoth.adviser.sieves.html#module-thoth.adviser.sieves" title="thoth.adviser.sieves"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.sieves</span></code></a>, <a class="reference internal" href="thoth.adviser.steps.html#module-thoth.adviser.steps" title="thoth.adviser.steps"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.steps</span></code></a>,
+<a class="reference internal" href="thoth.adviser.strides.html#module-thoth.adviser.strides" title="thoth.adviser.strides"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.strides</span></code></a> and <a class="reference internal" href="thoth.adviser.wraps.html#module-thoth.adviser.wraps" title="thoth.adviser.wraps"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.wraps</span></code></a>). The
+configuration is used to adjust unit’s configuration - see <a class="reference internal" href="unit.html#unit"><span class="std std-ref">unit
+documentation section for more info</span></a>.</p>
+<p>This configuration can be supplied to adviser as well as to Dependency Monkey
+via CLI or in the resolver constructor when resolver is created
+programmatically.</p>
 </div>
 <div class="section" id="static-source-code-analysis-library-usage">
 <h2>Static source code analysis - library usage<a class="headerlink" href="#static-source-code-analysis-library-usage" title="Permalink to this headline">¶</a></h2>
@@ -280,6 +356,7 @@ used</span></a>.</p>
 <li><a class="reference internal" href="#pipeline-and-resolver-execution">Pipeline and resolver execution</a></li>
 <li><a class="reference internal" href="#context-and-beam">Context and Beam</a></li>
 <li><a class="reference internal" href="#pipeline-configuration-creation">Pipeline configuration creation</a></li>
+<li><a class="reference internal" href="#instrumentation-of-resolver-s-pipeline-units">Instrumentation of resolver’s pipeline units</a></li>
 <li><a class="reference internal" href="#static-source-code-analysis-library-usage">Static source code analysis - library usage</a></li>
 <li><a class="reference internal" href="#a-note-to-hardware-environment">A note to hardware environment</a></li>
 </ul>
