@@ -83,7 +83,6 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">import</span> <span class="nn">sys</span>
 <span class="kn">import</span> <span class="nn">time</span>
 
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">init_logging</span>
@@ -97,6 +96,7 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 <span class="c1"># This file is created by OpenShift&#39;s liveness probe on timeout.</span>
 <span class="n">_LIVENESS_PROBE_KILL_FILE</span> <span class="o">=</span> <span class="s2">&quot;/tmp/thoth_adviser_cpu_timeout&quot;</span>
+<span class="n">_FORK</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_FORK&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
 
 
 <div class="viewcode-block" id="subprocess_run"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.run.subprocess_run">[docs]</a><span class="k">def</span> <span class="nf">subprocess_run</span><span class="p">(</span>
@@ -107,28 +107,49 @@
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Run the given function (partial annealing method) in a subprocess and output the produced report.&quot;&quot;&quot;</span>
     <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span>
-    <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
 
-    <span class="k">if</span> <span class="n">pid</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Child.</span>
+    <span class="n">pid</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">_FORK</span><span class="p">:</span>
+        <span class="n">pid</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">fork</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">pid</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Child or no-fork mode.</span>
         <span class="c1"># We need to re-init logging for the sub-process.</span>
         <span class="n">init_logging</span><span class="p">()</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Created a child process to compute report&quot;</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">report</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">DependencyMonkeyReport</span><span class="p">,</span> <span class="n">Report</span><span class="p">]</span> <span class="o">=</span> <span class="n">resolver</span><span class="o">.</span><span class="n">resolve</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+                <span class="n">parts</span> <span class="o">=</span> <span class="n">plot</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">file_name</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">extension</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span> <span class="k">else</span> <span class="s2">&quot;png&quot;</span>
+
+                <span class="n">predictor_history_file</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{file_name}</span><span class="s2">_</span><span class="si">{resolver.predictor.__class__.__name__}</span><span class="s2">.</span><span class="si">{extension}</span><span class="s2">&quot;</span>
+                <span class="n">beam_history_file</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{file_name}</span><span class="s2">_</span><span class="si">{resolver.beam.__class__.__name__}</span><span class="s2">.</span><span class="si">{extension}</span><span class="s2">&quot;</span>
                 <span class="k">try</span><span class="p">:</span>
-                    <span class="n">resolver</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">plot</span><span class="p">)</span>
+                    <span class="n">figure</span> <span class="o">=</span> <span class="n">resolver</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+                    <span class="n">figure</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span>
+                        <span class="n">predictor_history_file</span><span class="p">,</span>
+                        <span class="nb">format</span><span class="o">=</span><span class="n">extension</span>
+                    <span class="p">)</span>
                 <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span>
                         <span class="s2">&quot;Failed to plot predictor history to </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">plot</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
                     <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Predictor history saved to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">predictor_history_file</span><span class="p">)</span>
 
                 <span class="k">try</span><span class="p">:</span>
-                    <span class="n">resolver</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">plot</span><span class="p">)</span>
+                    <span class="n">figure</span> <span class="o">=</span> <span class="n">resolver</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">plot</span><span class="p">()</span>
+                    <span class="n">figure</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span>
+                        <span class="n">beam_history_file</span><span class="p">,</span>
+                        <span class="nb">format</span><span class="o">=</span><span class="n">extension</span>
+                    <span class="p">)</span>
                 <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span>
                         <span class="s2">&quot;Failed to plot beam history to </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">plot</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
                     <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Beam history saved to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">beam_history_file</span><span class="p">)</span>
 
             <span class="n">result_dict</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
                 <span class="nb">dict</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">error_msg</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">report</span><span class="o">=</span><span class="n">report</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
@@ -146,7 +167,11 @@
 
         <span class="c1"># Always submit results, even on error.</span>
         <span class="n">print_func</span><span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">,</span> <span class="n">result_dict</span><span class="p">)</span>
-        <span class="n">os</span><span class="o">.</span><span class="n">_exit</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">result_dict</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]))</span>
+
+        <span class="k">if</span> <span class="n">_FORK</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">_exit</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">result_dict</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]))</span>
+
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">result_dict</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">])</span>
     <span class="k">else</span><span class="p">:</span>  <span class="c1"># Parent waits for its child to terminate.</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Waiting for child process </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">pid</span><span class="p">)</span>
         <span class="n">_</span><span class="p">,</span> <span class="n">exit_code</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">waitpid</span><span class="p">(</span><span class="n">pid</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>

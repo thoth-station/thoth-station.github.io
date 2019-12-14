@@ -514,26 +514,6 @@
 
         <span class="k">return</span> <span class="n">resolved_direct_dependencies</span>
 
-    <span class="k">def</span> <span class="nf">_semver_sort_and_limit_latest_versions</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">package_versions</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Sort package tuples based on version and apply latest version limit if configured so.</span>
-
-<span class="sd">        Each package tuple has to be registered to the ASA context. Ordering is from the most recent version down to</span>
-<span class="sd">        older versions.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">sorted_package_versions</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
-            <span class="n">package_versions</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">pv</span><span class="p">:</span> <span class="n">pv</span><span class="o">.</span><span class="n">semantic_version</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span>
-        <span class="p">)</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                <span class="s2">&quot;Limiting latest versions of packages to </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span>
-            <span class="p">)</span>
-            <span class="k">return</span> <span class="n">sorted_package_versions</span><span class="p">[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span><span class="p">]</span>
-
-        <span class="k">return</span> <span class="n">sorted_package_versions</span>
-
     <span class="k">def</span> <span class="nf">_prepare_initial_states</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Prepare initial states for simulated annealing.</span>
 
@@ -546,9 +526,7 @@
             <span class="k">for</span> <span class="n">direct_dependency</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">register_package_version</span><span class="p">(</span><span class="n">direct_dependency</span><span class="p">)</span>
 
-            <span class="n">package_versions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_semver_sort_and_limit_latest_versions</span><span class="p">(</span>
-                <span class="n">package_versions</span>
-            <span class="p">)</span>
+            <span class="n">package_versions</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">pv</span><span class="p">:</span> <span class="n">pv</span><span class="o">.</span><span class="n">semantic_version</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="n">package_versions</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_run_sieves</span><span class="p">(</span><span class="n">package_versions</span><span class="p">))</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">package_versions</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span>
@@ -556,7 +534,10 @@
                     <span class="sa">f</span><span class="s2">&quot;of type </span><span class="si">{direct_dependency_name!r}</span><span class="s2"> were removed by pipeline sieves&quot;</span>
                 <span class="p">)</span>
 
-            <span class="n">direct_dependencies</span><span class="p">[</span><span class="n">direct_dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span><span class="p">:</span>
+                <span class="n">direct_dependencies</span><span class="p">[</span><span class="n">direct_dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span><span class="p">[:</span><span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">direct_dependencies</span><span class="p">[</span><span class="n">direct_dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span>
 
         <span class="c1"># Create an empty state which will be extended with packages based on step results. We know we have resolved</span>
         <span class="c1"># all the dependencies so start with beam which has just empty state and subsequently expand it based on</span>
@@ -723,9 +704,7 @@
             <span class="n">package_versions</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get_package_version</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">dependency_tuples</span>
             <span class="p">]</span>
-            <span class="n">package_versions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_semver_sort_and_limit_latest_versions</span><span class="p">(</span>
-                <span class="n">package_versions</span>
-            <span class="p">)</span>
+            <span class="n">package_versions</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">pv</span><span class="p">:</span> <span class="n">pv</span><span class="o">.</span><span class="n">semantic_version</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
             <span class="n">package_versions</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_run_sieves</span><span class="p">(</span><span class="n">package_versions</span><span class="p">))</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">package_versions</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
@@ -734,7 +713,10 @@
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="kc">None</span>
 
-            <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span>  <span class="c1"># type: ignore</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span><span class="p">:</span>
+                <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span><span class="p">[:</span><span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_run_steps</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">all_dependencies</span><span class="p">)</span>
 
@@ -795,7 +777,7 @@
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">stop_resolving</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Resolving stopped based on SIGINT&quot;</span><span class="p">)</span>
 
-<div class="viewcode-block" id="Resolver.resolve_products"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.resolver.Resolver.resolve_products">[docs]</a>    <span class="k">def</span> <span class="nf">resolve_products</span><span class="p">(</span>
+    <span class="k">def</span> <span class="nf">_do_resolve_products</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Product</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Resolve raw products as produced by this resolver pipeline.&quot;&quot;&quot;</span>
@@ -846,7 +828,15 @@
         <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">post_run</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">call_post_run</span><span class="p">()</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">call_post_run</span><span class="p">()</span>
+
+<div class="viewcode-block" id="Resolver.resolve_products"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.resolver.Resolver.resolve_products">[docs]</a>    <span class="k">def</span> <span class="nf">resolve_products</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Product</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Resolve raw products as produced by this resolver pipeline.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_init_context</span><span class="p">()</span>
+        <span class="k">with</span> <span class="n">Unit</span><span class="o">.</span><span class="n">assigned_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_resolve_products</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Resolver.resolve"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.resolver.Resolver.resolve">[docs]</a>    <span class="k">def</span> <span class="nf">resolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Report</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Resolve software stacks and return resolver report.&quot;&quot;&quot;</span>
@@ -854,7 +844,7 @@
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_init_context</span><span class="p">()</span>
         <span class="k">with</span> <span class="n">Unit</span><span class="o">.</span><span class="n">assigned_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">):</span>
-            <span class="k">for</span> <span class="n">product</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolve_products</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">product</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_resolve_products</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">):</span>
                 <span class="n">report</span><span class="o">.</span><span class="n">add_product</span><span class="p">(</span><span class="n">product</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">product_count</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
