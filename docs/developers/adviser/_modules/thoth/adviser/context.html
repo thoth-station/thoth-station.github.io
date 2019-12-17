@@ -75,6 +75,7 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
 <span class="kn">import</span> <span class="nn">operator</span>
 <span class="kn">import</span> <span class="nn">heapq</span>
 
@@ -85,6 +86,7 @@
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Project</span>
 <span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="kn">import</span> <span class="n">GraphDatabase</span>
 
+<span class="kn">from</span> <span class="nn">.beam</span> <span class="kn">import</span> <span class="n">Beam</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NotFound</span>
 <span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">RecommendationType</span>
 <span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">DecisionType</span>
@@ -104,12 +106,36 @@
     <span class="n">library_usage</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">limit</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">beam</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Beam</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">recommendation_type</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
         <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">RecommendationType</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span>
     <span class="p">)</span>
     <span class="n">decision_type</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">DecisionType</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
     <span class="n">package_versions</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
         <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">PackageVersion</span><span class="p">],</span>
+        <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">dependencies</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]],</span>
+        <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">dependents</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span>
+            <span class="nb">str</span><span class="p">,</span>
+            <span class="n">Dict</span><span class="p">[</span>
+                <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+                <span class="n">Set</span><span class="p">[</span>
+                    <span class="n">Tuple</span><span class="p">[</span>
+                        <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+                        <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+                        <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+                        <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+                    <span class="p">]</span>
+                <span class="p">],</span>
+            <span class="p">],</span>
+        <span class="p">],</span>
         <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">),</span>
     <span class="p">)</span>
@@ -169,14 +195,16 @@
 
 <div class="viewcode-block" id="Context.register_package_version"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.context.Context.register_package_version">[docs]</a>    <span class="k">def</span> <span class="nf">register_package_version</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Register the given package version to the context.&quot;&quot;&quot;</span>
-        <span class="n">registered</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">package_versions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">())</span>
+        <span class="n">package_tuple</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
+        <span class="n">registered</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">package_versions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">registered</span><span class="p">:</span>
             <span class="c1"># If the given package is shared in develop and in the main part, make it main stack part.</span>
             <span class="n">registered</span><span class="o">.</span><span class="n">develop</span> <span class="o">=</span> <span class="n">registered</span><span class="o">.</span><span class="n">develop</span> <span class="ow">or</span> <span class="n">package_version</span><span class="o">.</span><span class="n">develop</span>
-            <span class="c1"># TODO: check if it is the same entry</span>
             <span class="k">return</span> <span class="kc">True</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">package_versions</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()]</span> <span class="o">=</span> <span class="n">package_version</span>
+        <span class="c1"># Direct dependency, no dependency introduced this one.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_note_dependencies</span><span class="p">(</span><span class="n">package_tuple</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">dependency_tuple</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">package_versions</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
         <span class="k">return</span> <span class="kc">False</span></div>
 
 <div class="viewcode-block" id="Context.register_accepted_final_state"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.context.Context.register_accepted_final_state">[docs]</a>    <span class="k">def</span> <span class="nf">register_accepted_final_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -207,8 +235,11 @@
         <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
         <span class="o">*</span><span class="p">,</span>
         <span class="n">develop</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
-        <span class="n">markers</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">dependent_tuple</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">extras</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">os_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">os_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">python_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PackageVersion</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Register the given package tuple to pipeline context and return its package version representative.&quot;&quot;&quot;</span>
         <span class="n">registered</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">package_versions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
@@ -216,7 +247,16 @@
         <span class="k">if</span> <span class="n">registered</span><span class="p">:</span>
             <span class="c1"># If the given package is shared in develop and in the main part, make it main stack part.</span>
             <span class="n">registered</span><span class="o">.</span><span class="n">develop</span> <span class="o">=</span> <span class="n">registered</span><span class="o">.</span><span class="n">develop</span> <span class="ow">or</span> <span class="n">develop</span>
-            <span class="c1"># TODO: check for extras and markers?</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_note_dependencies</span><span class="p">(</span>
+                <span class="n">dependent_tuple</span><span class="p">,</span>
+                <span class="n">package_tuple</span><span class="p">,</span>
+                <span class="n">os_name</span><span class="o">=</span><span class="n">os_name</span><span class="p">,</span>
+                <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
+                <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="c1"># This method is called solely on transitive dependencies - for those we do not track</span>
+            <span class="c1"># extras as extras are already resolved by solver runs (pre-computed). Keep extras untouched</span>
+            <span class="c1"># in this function call.</span>
             <span class="k">return</span> <span class="n">registered</span>
 
         <span class="n">source</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">])</span>
@@ -228,12 +268,52 @@
             <span class="n">name</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
             <span class="n">version</span><span class="o">=</span><span class="s2">&quot;==&quot;</span> <span class="o">+</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
             <span class="n">index</span><span class="o">=</span><span class="n">source</span><span class="p">,</span>
-            <span class="n">markers</span><span class="o">=</span><span class="n">markers</span><span class="p">,</span>
             <span class="n">extras</span><span class="o">=</span><span class="n">extras</span><span class="p">,</span>
             <span class="n">develop</span><span class="o">=</span><span class="n">develop</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">package_versions</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_note_dependencies</span><span class="p">(</span>
+            <span class="n">dependent_tuple</span><span class="p">,</span>
+            <span class="n">package_tuple</span><span class="p">,</span>
+            <span class="n">os_name</span><span class="o">=</span><span class="n">os_name</span><span class="p">,</span>
+            <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
+            <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span><span class="p">,</span>
+        <span class="p">)</span>
         <span class="k">return</span> <span class="n">package_version</span></div>
+
+    <span class="k">def</span> <span class="nf">_note_dependencies</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span>
+        <span class="n">dependency_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
+        <span class="n">os_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">os_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">python_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Note down dependencies that were introduced.&quot;&quot;&quot;</span>
+        <span class="c1"># Mapping: package tuple -&gt; dependency tuple</span>
+        <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dependencies</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">dependency_tuple</span><span class="p">)</span>
+
+        <span class="c1"># Reverse mapping: dependency tuple -&gt; package tuple</span>
+        <span class="k">if</span> <span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dependents</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dependents</span><span class="p">[</span><span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="n">dependency_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dependents</span><span class="p">[</span><span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dependents</span><span class="p">[</span><span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">dependency_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Note down only if we have some dependency - otherwise dependency</span>
+            <span class="c1"># tuple is a direct dependency. In that case we don&#39;t need to keep</span>
+            <span class="c1"># track of environments for which the version was resolved.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dependents</span><span class="p">[</span><span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">dependency_tuple</span><span class="p">]</span><span class="o">.</span><span class="n">add</span><span class="p">(</span>
+                <span class="p">(</span><span class="n">package_tuple</span><span class="p">,</span> <span class="n">os_name</span><span class="p">,</span> <span class="n">os_version</span><span class="p">,</span> <span class="n">python_version</span><span class="p">)</span>
+            <span class="p">)</span>
 
 <div class="viewcode-block" id="Context.is_dependency_monkey"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.context.Context.is_dependency_monkey">[docs]</a>    <span class="k">def</span> <span class="nf">is_dependency_monkey</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Check if the current context refers to a dependency monkey run.&quot;&quot;&quot;</span>

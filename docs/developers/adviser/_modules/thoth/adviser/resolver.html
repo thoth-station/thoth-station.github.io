@@ -78,6 +78,7 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
 <span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">deque</span>
@@ -229,16 +230,25 @@
         <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">PythonPackageGraphSolver</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span>
     <span class="p">)</span>
     <span class="n">_context</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Context</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_reported_shared_dependencies</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">set</span><span class="p">),</span>
+        <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
 
     <span class="nd">@limit</span><span class="o">.</span><span class="n">validator</span>
     <span class="nd">@count</span><span class="o">.</span><span class="n">validator</span>
     <span class="k">def</span> <span class="nf">_positive_int_validator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">attribute</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Validate the given attribute - the given attribute should have a value of a positive integer.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attribute </span><span class="si">{attribute!r}</span><span class="s2"> should be of type int, got {type(value)!r} instead&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Attribute </span><span class="si">{attribute!r}</span><span class="s2"> should be of type int, got {type(value)!r} instead&quot;</span>
+            <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">value</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Value for attribute </span><span class="si">{attribute!r}</span><span class="s2"> should be a positive integer, got </span><span class="si">{value}</span><span class="s2"> instead&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Value for attribute </span><span class="si">{attribute!r}</span><span class="s2"> should be a positive integer, got </span><span class="si">{value}</span><span class="s2"> instead&quot;</span>
+            <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">context</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Context</span><span class="p">:</span>
@@ -276,9 +286,23 @@
             <span class="n">library_usage</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">library_usage</span><span class="p">,</span>
             <span class="n">limit</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
             <span class="n">count</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="p">,</span>
+            <span class="n">beam</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="p">,</span>
             <span class="n">recommendation_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">recommendation_type</span><span class="p">,</span>
             <span class="n">decision_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">decision_type</span><span class="p">,</span>
         <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_report_shared_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Report information about shared dependency in the dependency tree.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">library</span> <span class="ow">in</span> <span class="p">[</span>
+            <span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">dependents</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">]</span>
+        <span class="p">]:</span>
+            <span class="k">if</span> <span class="p">(</span><span class="n">package_tuple</span><span class="p">,</span> <span class="n">library</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reported_shared_dependencies</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_reported_shared_dependencies</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">package_tuple</span><span class="p">,</span> <span class="n">library</span><span class="p">))</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Consider pinning dependency </span><span class="si">%r</span><span class="s2"> as it is introduced by multiple nodes in the dependency graph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">package_tuple</span><span class="p">,</span>
+                    <span class="n">library</span><span class="p">,</span>
+                <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_run_boots</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Run all boots bound to the current annealing run context.&quot;&quot;&quot;</span>
@@ -353,6 +377,7 @@
                         <span class="c1"># We already have this dependency in stack, run steps that are</span>
                         <span class="c1"># required to be run in such cases.</span>
                         <span class="n">multi_package_resolution</span> <span class="o">=</span> <span class="kc">True</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_report_shared_dependency</span><span class="p">(</span><span class="n">package_version_tuple</span><span class="p">)</span>
 
                 <span class="n">score_addition</span> <span class="o">=</span> <span class="mf">0.0</span>
                 <span class="n">justification_addition</span> <span class="o">=</span> <span class="p">[]</span>
@@ -376,9 +401,10 @@
                         <span class="n">step_result</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">package_version</span><span class="p">)</span>
                     <span class="k">except</span> <span class="n">NotAcceptable</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
                         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                            <span class="s2">&quot;Step </span><span class="si">%r</span><span class="s2"> discarded addition of package </span><span class="si">%r</span><span class="s2"> in combination </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="s2">&quot;Step </span><span class="si">%r</span><span class="s2"> discarded addition of package </span><span class="si">%r</span><span class="s2"> in state </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
                             <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
                             <span class="n">package_version_tuple</span><span class="p">,</span>
+                            <span class="n">state</span><span class="p">,</span>
                             <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">),</span>
                         <span class="p">)</span>
                         <span class="k">raise</span> <span class="n">_NoStateAdd</span>
@@ -489,9 +515,7 @@
                 <span class="c1"># database but none was matching the given version range.</span>
                 <span class="n">unresolved</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
 
-                <span class="n">error_msg</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;No versions were found for direct dependency </span><span class="si">{package_version.name!r}</span><span class="s2">&quot;</span>
-                <span class="p">)</span>
+                <span class="n">error_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;No versions were found for direct dependency </span><span class="si">{package_version.name!r}</span><span class="s2">&quot;</span>
                 <span class="n">runtime_environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span>
                 <span class="k">if</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">:</span>
                     <span class="n">error_msg</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;; operating system </span><span class="si">{runtime_environment.operating_system.name!r}</span><span class="s2">&quot;</span>
@@ -507,7 +531,9 @@
                 <span class="k">continue</span>
 
         <span class="k">if</span> <span class="n">unresolved</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">UnresolvedDependencies</span><span class="p">(</span><span class="s2">&quot;Unable to resolve all direct dependencies&quot;</span><span class="p">,</span> <span class="n">unresolved</span><span class="o">=</span><span class="n">unresolved</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="n">UnresolvedDependencies</span><span class="p">(</span>
+                <span class="s2">&quot;Unable to resolve all direct dependencies&quot;</span><span class="p">,</span> <span class="n">unresolved</span><span class="o">=</span><span class="n">unresolved</span>
+            <span class="p">)</span>
 
         <span class="c1"># Now we are free to de-instantiate solver.</span>
         <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_solver</span>
@@ -540,26 +566,11 @@
                 <span class="n">direct_dependencies</span><span class="p">[</span><span class="n">direct_dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span>
 
         <span class="c1"># Create an empty state which will be extended with packages based on step results. We know we have resolved</span>
-        <span class="c1"># all the dependencies so start with beam which has just empty state and subsequently expand it based on</span>
+        <span class="c1"># all the dependencies so start with an empty beam which and an empty state and subsequently expand it based on</span>
         <span class="c1"># resolved direct dependencies.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">wipe</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">package_versions</span> <span class="ow">in</span> <span class="n">direct_dependencies</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-            <span class="c1"># If the beam is empty, create an initial state to be added to the beam if accepted by pipeline steps.</span>
-            <span class="c1"># Even if number of initial states is more than beam.width, we create a list of current states explicitly</span>
-            <span class="c1"># to make sure we iterate over all possible combinations. The beam trims down low scoring states</span>
-            <span class="c1"># as expected.</span>
-            <span class="c1"># As we sort dependencies based on versions, we know we add latest first.</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">size</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="n">states</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">iter_states</span><span class="p">()</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">wipe</span><span class="p">()</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">states</span> <span class="o">=</span> <span class="p">(</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="p">[</span><span class="n">State</span><span class="p">()])</span>
-
-            <span class="k">for</span> <span class="n">state</span> <span class="ow">in</span> <span class="n">states</span><span class="p">:</span>
-                <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_run_steps</span><span class="p">(</span>
-                        <span class="n">state</span><span class="p">,</span> <span class="p">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="p">[</span><span class="n">package_version</span><span class="p">]}</span>
-                    <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_reported_shared_dependencies</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run_steps</span><span class="p">(</span><span class="n">State</span><span class="p">(),</span> <span class="n">direct_dependencies</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_expand_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">State</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Expand the given state, generate new states respecting the pipeline configuration.&quot;&quot;&quot;</span>
@@ -665,23 +676,15 @@
                     <span class="n">record</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">],</span>
                     <span class="n">record</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">],</span>
                 <span class="p">)</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get_package_version</span><span class="p">(</span>
-                    <span class="n">dependency_tuple</span><span class="p">,</span> <span class="n">graceful</span><span class="o">=</span><span class="kc">True</span>
-                <span class="p">):</span>
-                    <span class="n">environment_marker</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_python_environment_marker</span><span class="p">(</span>
-                        <span class="o">*</span><span class="n">package_tuple</span><span class="p">,</span>
-                        <span class="n">dependency_name</span><span class="o">=</span><span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-                        <span class="n">dependency_version</span><span class="o">=</span><span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
-                        <span class="n">os_name</span><span class="o">=</span><span class="n">record</span><span class="p">[</span><span class="s2">&quot;os_name&quot;</span><span class="p">],</span>
-                        <span class="n">os_version</span><span class="o">=</span><span class="n">record</span><span class="p">[</span><span class="s2">&quot;os_version&quot;</span><span class="p">],</span>
-                        <span class="n">python_version</span><span class="o">=</span><span class="n">record</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">],</span>
-                    <span class="p">)</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">register_package_tuple</span><span class="p">(</span>
-                        <span class="n">dependency_tuple</span><span class="p">,</span>
-                        <span class="n">develop</span><span class="o">=</span><span class="n">package_version</span><span class="o">.</span><span class="n">develop</span><span class="p">,</span>  <span class="c1"># Propagate develop flag from parent.</span>
-                        <span class="n">markers</span><span class="o">=</span><span class="n">environment_marker</span><span class="p">,</span>
-                        <span class="n">extras</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
-                    <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">register_package_tuple</span><span class="p">(</span>
+                    <span class="n">dependency_tuple</span><span class="p">,</span>
+                    <span class="n">dependent_tuple</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">,</span>
+                    <span class="n">develop</span><span class="o">=</span><span class="n">package_version</span><span class="o">.</span><span class="n">develop</span><span class="p">,</span>  <span class="c1"># Propagate develop flag from parent.</span>
+                    <span class="n">extras</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">os_name</span><span class="o">=</span><span class="n">record</span><span class="p">[</span><span class="s2">&quot;os_name&quot;</span><span class="p">],</span>
+                    <span class="n">os_version</span><span class="o">=</span><span class="n">record</span><span class="p">[</span><span class="s2">&quot;os_version&quot;</span><span class="p">],</span>
+                    <span class="n">python_version</span><span class="o">=</span><span class="n">record</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
 
                 <span class="k">if</span> <span class="n">dependency_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]:</span>
                     <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dependency_tuple</span><span class="p">)</span>
@@ -759,11 +762,7 @@
                 <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="s2">&quot;Expanding state with score </span><span class="si">%g</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                    <span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
-                    <span class="n">state</span><span class="p">,</span>
-                <span class="p">)</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Expanding state with score </span><span class="si">%g</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="n">state</span><span class="p">)</span>
                 <span class="n">final_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_expand_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">final_state</span><span class="p">:</span>
                     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_strides</span><span class="p">(</span><span class="n">final_state</span><span class="p">):</span>
@@ -807,10 +806,7 @@
                     <span class="n">final_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
                 <span class="p">)</span>
                 <span class="n">product</span> <span class="o">=</span> <span class="n">Product</span><span class="o">.</span><span class="n">from_final_state</span><span class="p">(</span>
-                    <span class="n">graph</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="p">,</span>
-                    <span class="n">project</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="p">,</span>
-                    <span class="n">context</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span>
-                    <span class="n">state</span><span class="o">=</span><span class="n">final_state</span><span class="p">,</span>
+                    <span class="n">context</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">final_state</span>
                 <span class="p">)</span>
                 <span class="k">yield</span> <span class="n">product</span>
         <span class="k">except</span> <span class="n">EagerStopPipeline</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
@@ -831,7 +827,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">call_post_run</span><span class="p">()</span>
 
 <div class="viewcode-block" id="Resolver.resolve_products"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.resolver.Resolver.resolve_products">[docs]</a>    <span class="k">def</span> <span class="nf">resolve_products</span><span class="p">(</span>
-            <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Product</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Resolve raw products as produced by this resolver pipeline.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_init_context</span><span class="p">()</span>
