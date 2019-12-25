@@ -66,7 +66,7 @@
   <h1>Source code for thoth.storages.graph_backup</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
 <span class="c1"># thoth-storages</span>
-<span class="c1"># Copyright(C) 2019 Harshad Reddy Nalla</span>
+<span class="c1"># Copyright(C) 2019 Harshad Reddy Nalla, Fridolin Pokorny</span>
 <span class="c1">#</span>
 <span class="c1"># This program is free software: you can redistribute it and / or modify</span>
 <span class="c1"># it under the terms of the GNU General Public License as published by</span>
@@ -83,13 +83,69 @@
 
 <span class="sd">&quot;&quot;&quot;Adapter for storing graph database backups.&quot;&quot;&quot;</span>
 
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">import</span> <span class="nn">operator</span>
+
+
 <span class="kn">from</span> <span class="nn">.result_base</span> <span class="kn">import</span> <span class="n">ResultStorageBase</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="GraphBackupStore"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.graph_backup.GraphBackupStore">[docs]</a><span class="k">class</span> <span class="nc">GraphBackupStore</span><span class="p">(</span><span class="n">ResultStorageBase</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Adapter for storing graph database backups.&quot;&quot;&quot;</span>
 
-    <span class="n">RESULT_TYPE</span> <span class="o">=</span> <span class="s2">&quot;graph-backup&quot;</span></div>
+    <span class="n">RESULT_TYPE</span> <span class="o">=</span> <span class="s2">&quot;graph-backup&quot;</span>
+
+    <span class="c1"># Keep 21 backups by default.</span>
+    <span class="n">GRAPH_BACKUP_STORE_ROTATE</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;GRAPH_BACKUP_STORE_ROTATE&quot;</span><span class="p">,</span> <span class="mi">21</span><span class="p">))</span>
+    <span class="n">_BACKUP_FILE_DATETIME_FORMAT</span> <span class="o">=</span> <span class="s2">&quot;%y-%m-</span><span class="si">%d</span><span class="s2">-%H-%M-%S&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_rotate_backups</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Rotate backups stored by deleting old once.&quot;&quot;&quot;</span>
+        <span class="n">backup_files_maintained</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">datetime</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Perform a basic check for file name correctness.</span>
+        <span class="k">for</span> <span class="n">backup_file</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">backup_file</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;pg_dump-&quot;</span><span class="p">):</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s2">&quot;Unknown backup file name </span><span class="si">%r</span><span class="s2"> - the file name does not start with &quot;</span>
+                    <span class="s2">&quot;&#39;pg_dump-&#39; prefix, skipping maintaining this file&quot;</span><span class="p">,</span>
+                    <span class="n">backup_file</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">datetime_obj</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">strptime</span><span class="p">(</span><span class="n">backup_file</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;pg_dump-&quot;</span><span class="p">):],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_BACKUP_FILE_DATETIME_FORMAT</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span>
+                    <span class="s2">&quot;Failed to parse datetime from the backup file name </span><span class="si">%r</span><span class="s2">, skipping maintaining this file: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">backup_file</span><span class="p">,</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">backup_files_maintained</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">datetime_obj</span><span class="p">,</span> <span class="n">backup_file</span><span class="p">))</span>
+
+        <span class="n">backup_files_maintained</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">backup_file</span> <span class="ow">in</span> <span class="n">backup_files_maintained</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">GRAPH_BACKUP_STORE_ROTATE</span><span class="p">:]:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Removing backup file </span><span class="si">%r</span><span class="s2"> based on rotation configuration (keeping </span><span class="si">%d</span><span class="s2"> dumps)&quot;</span><span class="p">,</span>
+                <span class="n">backup_file</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">GRAPH_BACKUP_STORE_ROTATE</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">backup_file</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+<div class="viewcode-block" id="GraphBackupStore.store_dump"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.graph_backup.GraphBackupStore.store_dump">[docs]</a>    <span class="k">def</span> <span class="nf">store_dump</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dump_file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Store the given dump, maintain a fixed set of dumps .&quot;&quot;&quot;</span>
+        <span class="n">backup_file_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;pg_dump-{datetime.utcnow().strftime(self._BACKUP_FILE_DATETIME_FORMAT)}&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">store_file</span><span class="p">(</span><span class="n">dump_file_path</span><span class="p">,</span> <span class="n">backup_file_name</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_rotate_backups</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">backup_file_name</span></div></div>
 </pre></div>
 
           </div>
