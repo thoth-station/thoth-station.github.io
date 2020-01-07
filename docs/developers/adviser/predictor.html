@@ -82,29 +82,34 @@ a final state is reached). This guidance can have two main purposes:</p>
 <span class="k">class</span> <span class="nc">MyPredictor</span><span class="p">(</span><span class="n">Predictor</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;An example predictor implementation.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">,</span> <span class="n">beam</span><span class="p">:</span> <span class="n">Beam</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">State</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">,</span> <span class="n">beam</span><span class="p">:</span> <span class="n">Beam</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">State</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Main entry-point for predictor implementation.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="nb">next</span><span class="p">(</span><span class="n">context</span><span class="o">.</span><span class="n">iter_states</span><span class="p">())</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">context</span><span class="o">.</span><span class="n">iter_states</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">state</span><span class="p">,</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">))</span>
 </pre></div>
 </div>
 <p>The main method - <code class="docutils literal notranslate"><span class="pre">run</span></code> - accepts two parameters - <a class="reference internal" href="thoth.adviser.html#thoth.adviser.context.Context" title="thoth.adviser.context.Context"><code class="xref py py-class docutils literal notranslate"><span class="pre">context</span></code></a> (adviser’s context) and a <a class="reference internal" href="thoth.adviser.html#thoth.adviser.beam.Beam" title="thoth.adviser.beam.Beam"><code class="xref py py-class docutils literal notranslate"><span class="pre">beam</span></code></a>. The beam is used as a pool of (not final) states
 that are about to be resolved. The main goal of predictor is to return a state
-present in the beam. This state  will be expanded in the next resolver round.
-The resolver takes first unresolved dependency kept in the state and expands it
-- retrieves all the direct dependencies of that dependency in different
-versions and generates new states out of all the combinations of packages in
-different versions that can occur – if such transition is valid based on
-Python ecosystem dependency resolving; and dependencies are accepted by
-pipeline <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieves</span></a> and <a class="reference internal" href="steps.html#steps"><span class="std std-ref">steps</span></a>.</p>
+present in the beam and package that should be resolved from the returned
+state. The state  will be expanded in the next resolver round by resolving the
+returned package.  The package is resolved by retrieving all the direct
+dependencies of that dependency in different versions and new states are
+generated out of all the combinations of packages in different versions that
+can occur – if such transition is valid based on Python ecosystem dependency
+resolving; and dependencies are accepted by pipeline <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieves</span></a> and
+<a class="reference internal" href="steps.html#steps"><span class="std std-ref">steps</span></a>.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>Predictor does not adjust any properties stored in the context or beam!</p>
-<p>The state considered for the next resolution has to stay in the beam.</p>
+<p>The state and package considered for the next resolution have to stay in the
+beam.</p>
 </div>
-<p>The example implementation above always expands the first state in the beam.
-Note there is no guarantee on order of states in the beam, unless sorted states
-are requested.</p>
-<p>The beam will always hold at least one state.</p>
+<p>The example implementation above always expands the first state in the beam by
+resolving direct dependencies of the first package stored in
+<a class="reference internal" href="thoth.adviser.html#thoth.adviser.state.State.unresolved_dependencies" title="thoth.adviser.state.State.unresolved_dependencies"><code class="xref py py-attr docutils literal notranslate"><span class="pre">State.unresolved_dependencies</span></code></a>.  Note there is no
+guarantee on order of states in the beam, unless sorted states are requested.</p>
+<p>The beam will always hold at least one state. With at least one unresolved
+dependency.</p>
 <p>Another example shows expansion of a random state and iteration over all the
 states present in the beam:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">,</span> <span class="n">beam</span><span class="p">:</span> <span class="n">Beam</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
@@ -112,7 +117,7 @@ states present in the beam:</p>
     <span class="c1">#   return random.randint(0, beam.size - 1)</span>
     <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">state</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">beam</span><span class="o">.</span><span class="n">iter_states</span><span class="p">()):</span>
         <span class="k">if</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">((</span><span class="kc">True</span><span class="p">,</span> <span class="kc">False</span><span class="p">)):</span>
-            <span class="k">return</span> <span class="n">state</span>
+            <span class="k">return</span> <span class="n">state</span><span class="p">,</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">))</span>
 
     <span class="c1"># Fallback to the first state.</span>
     <span class="k">return</span> <span class="n">beam</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
@@ -120,7 +125,7 @@ states present in the beam:</p>
 </div>
 <p>The predictor can keep already computed results in its state, but note there is
 no guarantee on index preserving and order in which states are stored in the
-beam. It’s also recommended to use <a class="reference internal" href="thoth.adviser.html#thoth.adviser.beam.Beam.iter_new_added_states" title="thoth.adviser.beam.Beam.iter_new_added_states"><code class="xref py py-func docutils literal notranslate"><span class="pre">Beam.iter_new_added_states</span></code></a> to check newly added states
+beam. It’s also recommended to use <code class="xref py py-func docutils literal notranslate"><span class="pre">Beam.iter_new_added_states</span></code> to check newly added states
 between predictor runs. Note the state returned is <em>always</em> removed from the
 beam.</p>
 <div class="admonition note">
@@ -151,7 +156,7 @@ resolution.</p>
 <li><p><a class="reference internal" href="thoth.adviser.html#thoth.adviser.predictor.Predictor.post_run_report" title="thoth.adviser.predictor.Predictor.post_run_report"><code class="xref py py-func docutils literal notranslate"><span class="pre">Predictor.post_run_report</span></code></a> - run after the stack generation pipeline is finished and report is constructed as per user request (see <a class="reference internal" href="resolver.html#resolver"><span class="std std-ref">resolver for more info</span></a>)</p></li>
 <li><p><a class="reference internal" href="thoth.adviser.html#thoth.adviser.predictor.Predictor.plot" title="thoth.adviser.predictor.Predictor.plot"><code class="xref py py-func docutils literal notranslate"><span class="pre">Predictor.plot</span></code></a> - used to plot predictor’s history</p></li>
 </ul>
-<p>See <a class="reference internal" href="annealing.html#annealing"><span class="std std-ref">Adaptive Simulated Annealing</span></a> as an example of a
+<p>See <a class="reference internal" href="predictors/annealing.html#annealing"><span class="std std-ref">Adaptive Simulated Annealing</span></a> as an example of a
 predictor that samples state space or performs hill climbing.</p>
 </div>
 </div>

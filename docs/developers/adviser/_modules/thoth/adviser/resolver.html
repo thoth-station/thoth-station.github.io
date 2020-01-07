@@ -78,10 +78,8 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
-<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">deque</span>
 <span class="kn">import</span> <span class="nn">contextlib</span>
 <span class="kn">import</span> <span class="nn">signal</span>
 
@@ -230,11 +228,6 @@
         <span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">PythonPackageGraphSolver</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span>
     <span class="p">)</span>
     <span class="n">_context</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Context</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-    <span class="n">_reported_shared_dependencies</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span>
-        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">set</span><span class="p">),</span>
-        <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="p">)</span>
 
     <span class="nd">@limit</span><span class="o">.</span><span class="n">validator</span>
     <span class="nd">@count</span><span class="o">.</span><span class="n">validator</span>
@@ -291,19 +284,6 @@
             <span class="n">decision_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">decision_type</span><span class="p">,</span>
         <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_report_shared_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Report information about shared dependency in the dependency tree.&quot;&quot;&quot;</span>
-        <span class="k">for</span> <span class="n">library</span> <span class="ow">in</span> <span class="p">[</span>
-            <span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">dependents</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">]</span>
-        <span class="p">]:</span>
-            <span class="k">if</span> <span class="p">(</span><span class="n">package_tuple</span><span class="p">,</span> <span class="n">library</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reported_shared_dependencies</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_reported_shared_dependencies</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">package_tuple</span><span class="p">,</span> <span class="n">library</span><span class="p">))</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="s2">&quot;Consider pinning dependency </span><span class="si">%r</span><span class="s2"> as it is introduced by multiple nodes in the dependency graph: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                    <span class="n">package_tuple</span><span class="p">,</span>
-                    <span class="n">library</span><span class="p">,</span>
-                <span class="p">)</span>
-
     <span class="k">def</span> <span class="nf">_run_boots</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Run all boots bound to the current annealing run context.&quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">boot</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">boots</span><span class="p">:</span>
@@ -341,131 +321,92 @@
         <span class="k">yield from</span> <span class="n">result</span>
 
     <span class="k">def</span> <span class="nf">_run_steps</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">,</span> <span class="n">package_versions_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]]</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">,</span>
+        <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">,</span>
+        <span class="n">unresolved_dependencies</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Run steps and generate a new state.</span>
+        <span class="sd">&quot;&quot;&quot;Run steps and generate a new state.&quot;&quot;&quot;</span>
+        <span class="n">package_version_tuple</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
 
-<span class="sd">        The algorithm under the hood performs backtracking to make sure each step is run once on</span>
-<span class="sd">        the given state. This guarantees less calls to steps making the pipeline more efficient.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">configuration_table</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">package_versions_dict</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
-        <span class="n">configuration_queue</span> <span class="o">=</span> <span class="n">deque</span><span class="p">([((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">state</span><span class="p">)])</span>
+        <span class="n">multi_package_resolution</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="p">:</span>
+            <span class="c1"># We already have this dependency in stack, run steps that are</span>
+            <span class="c1"># required to be run in such cases. The resolver logic called before guarantees there is</span>
+            <span class="c1"># no version or package source clash.</span>
+            <span class="n">multi_package_resolution</span> <span class="o">=</span> <span class="kc">True</span>
 
-        <span class="n">iteration_states_added</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">while</span> <span class="n">configuration_queue</span><span class="p">:</span>
-            <span class="n">idx</span><span class="p">,</span> <span class="n">state</span> <span class="o">=</span> <span class="n">configuration_queue</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
-            <span class="n">package_version</span> <span class="o">=</span> <span class="n">configuration_table</span><span class="p">[</span><span class="n">idx</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">idx</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span>
-            <span class="n">package_version_tuple</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
-            <span class="n">multi_package_resolution</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">score_addition</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">justification_addition</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">steps</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Running step </span><span class="si">%r</span><span class="s2"> for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">package_version_tuple</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">multi_package_resolution</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">step</span><span class="o">.</span><span class="n">MULTI_PACKAGE_RESOLUTIONS</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Skipping running step </span><span class="si">%r</span><span class="s2"> - this step was already run for package </span><span class="si">%r</span><span class="s2"> &quot;</span>
+                    <span class="s2">&quot;and the given step has no MULTI_PACKAGE_RESOLUTIONS flag set&quot;</span><span class="p">,</span>
+                    <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                    <span class="n">package_version_tuple</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
 
             <span class="k">try</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="p">:</span>
-                    <span class="k">if</span> <span class="p">(</span>
-                        <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
-                        <span class="o">!=</span> <span class="n">package_version_tuple</span>
-                    <span class="p">):</span>
-                        <span class="c1"># We already have the given dependency - there is a dependency clash (same name,</span>
-                        <span class="c1"># different version or index url). Such state is invalid, drop it.</span>
-                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                            <span class="s2">&quot;Discarding run of pipeline steps for </span><span class="si">%r</span><span class="s2">: package </span><span class="si">%r</span><span class="s2"> was already &quot;</span>
-                            <span class="s2">&quot;found in different version </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                            <span class="n">package_version_tuple</span><span class="p">,</span>
-                            <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                            <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">],</span>
-                        <span class="p">)</span>
-                        <span class="k">raise</span> <span class="n">_NoStateAdd</span>
-                    <span class="k">else</span><span class="p">:</span>
-                        <span class="c1"># We already have this dependency in stack, run steps that are</span>
-                        <span class="c1"># required to be run in such cases.</span>
-                        <span class="n">multi_package_resolution</span> <span class="o">=</span> <span class="kc">True</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">_report_shared_dependency</span><span class="p">(</span><span class="n">package_version_tuple</span><span class="p">)</span>
+                <span class="n">step_result</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">package_version</span><span class="p">)</span>
+            <span class="k">except</span> <span class="n">NotAcceptable</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Step </span><span class="si">%r</span><span class="s2"> discarded addition of package </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                    <span class="n">package_version_tuple</span><span class="p">,</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">),</span>
+                <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+                <span class="k">return</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">StepError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Failed to run step </span><span class="si">{step.__class__.__name__!r}</span><span class="s2"> for Python package &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{package_version_tuple!r}</span><span class="s2">: {str(exc)}&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
 
-                <span class="n">score_addition</span> <span class="o">=</span> <span class="mf">0.0</span>
-                <span class="n">justification_addition</span> <span class="o">=</span> <span class="p">[]</span>
-                <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">steps</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                        <span class="s2">&quot;Running step </span><span class="si">%r</span><span class="s2"> for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                        <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-                        <span class="n">package_version_tuple</span><span class="p">,</span>
-                    <span class="p">)</span>
+            <span class="k">if</span> <span class="n">step_result</span><span class="p">:</span>
+                <span class="n">step_score_addition</span><span class="p">,</span> <span class="n">step_justification_addition</span> <span class="o">=</span> <span class="n">step_result</span>
 
-                    <span class="k">if</span> <span class="n">multi_package_resolution</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">step</span><span class="o">.</span><span class="n">MULTI_PACKAGE_RESOLUTIONS</span><span class="p">:</span>
-                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                            <span class="s2">&quot;Skipping running step </span><span class="si">%r</span><span class="s2"> - this step was already run for package </span><span class="si">%r</span><span class="s2"> &quot;</span>
-                            <span class="s2">&quot;and step has no MULTI_PACKAGE_RESOLUTIONS flag set&quot;</span><span class="p">,</span>
-                            <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-                            <span class="n">package_version_tuple</span><span class="p">,</span>
-                        <span class="p">)</span>
-                        <span class="k">continue</span>
-
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="n">step_result</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">package_version</span><span class="p">)</span>
-                    <span class="k">except</span> <span class="n">NotAcceptable</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                            <span class="s2">&quot;Step </span><span class="si">%r</span><span class="s2"> discarded addition of package </span><span class="si">%r</span><span class="s2"> in state </span><span class="si">%r</span><span class="s2">: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
-                            <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-                            <span class="n">package_version_tuple</span><span class="p">,</span>
-                            <span class="n">state</span><span class="p">,</span>
-                            <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">),</span>
-                        <span class="p">)</span>
-                        <span class="k">raise</span> <span class="n">_NoStateAdd</span>
-                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">step_score_addition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">step_score_addition</span><span class="p">):</span>
                         <span class="k">raise</span> <span class="n">StepError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Failed to run step </span><span class="si">{step.__class__.__name__!r}</span><span class="s2"> for Python package &quot;</span>
-                            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{package_version_tuple!r}</span><span class="s2">: {str(exc)}&quot;</span>
-                        <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+                            <span class="s2">&quot;Step </span><span class="si">%r</span><span class="s2"> returned score which is not a number&quot;</span><span class="p">,</span>
+                            <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                        <span class="p">)</span>
 
-                    <span class="k">if</span> <span class="n">step_result</span><span class="p">:</span>
-                        <span class="n">step_score_addition</span><span class="p">,</span> <span class="n">step_justification_addition</span> <span class="o">=</span> <span class="n">step_result</span>
+                    <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">step_score_addition</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="n">StepError</span><span class="p">(</span>
+                            <span class="s2">&quot;Step </span><span class="si">%r</span><span class="s2"> returned score that is infinite&quot;</span><span class="p">,</span>
+                            <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                        <span class="p">)</span>
 
-                        <span class="k">if</span> <span class="n">step_score_addition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                            <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">step_score_addition</span><span class="p">):</span>
-                                <span class="k">raise</span> <span class="n">StepError</span><span class="p">(</span>
-                                    <span class="s2">&quot;Step </span><span class="si">%r</span><span class="s2"> returned score which is not a number&quot;</span><span class="p">,</span>
-                                    <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-                                <span class="p">)</span>
+                    <span class="n">score_addition</span> <span class="o">+=</span> <span class="n">step_score_addition</span>
 
-                            <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">step_score_addition</span><span class="p">):</span>
-                                <span class="k">raise</span> <span class="n">StepError</span><span class="p">(</span>
-                                    <span class="s2">&quot;Step </span><span class="si">%r</span><span class="s2"> returned score that is infinite&quot;</span><span class="p">,</span>
-                                    <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-                                <span class="p">)</span>
+                <span class="k">if</span> <span class="n">step_justification_addition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">justification_addition</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">step_justification_addition</span><span class="p">)</span>
 
-                            <span class="n">score_addition</span> <span class="o">+=</span> <span class="n">step_score_addition</span>
+        <span class="c1"># Remove the expanded package version from the original state not to create loops.</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">remove_unresolved_dependency</span><span class="p">(</span><span class="n">package_version_tuple</span><span class="p">)</span>
 
-                        <span class="k">if</span> <span class="n">step_justification_addition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                            <span class="n">justification_addition</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">step_justification_addition</span><span class="p">)</span>
-            <span class="k">except</span> <span class="n">_NoStateAdd</span><span class="p">:</span>
-                <span class="k">pass</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">cloned_state</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">add_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+            <span class="n">cloned_state</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">clone</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cloned_state</span> <span class="o">=</span> <span class="n">state</span>
 
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">multi_package_resolution</span><span class="p">:</span>
-                    <span class="c1"># Do NOT re-add package if it was already resolved.</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                        <span class="s2">&quot;Adding new unresolved dependency </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_version_tuple</span>
-                    <span class="p">)</span>
-                    <span class="n">cloned_state</span><span class="o">.</span><span class="n">add_unresolved_dependency</span><span class="p">(</span><span class="n">package_version_tuple</span><span class="p">)</span>
-
-                <span class="n">cloned_state</span><span class="o">.</span><span class="n">add_justification</span><span class="p">(</span><span class="n">justification_addition</span><span class="p">)</span>
-                <span class="n">cloned_state</span><span class="o">.</span><span class="n">score</span> <span class="o">+=</span> <span class="n">score_addition</span>
-                <span class="n">cloned_state</span><span class="o">.</span><span class="n">latest_version_offset</span> <span class="o">+=</span> <span class="n">idx</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-
-                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">configuration_table</span><span class="p">)</span> <span class="o">==</span> <span class="n">idx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
-                    <span class="c1"># No more to run - we passed all package_version of a type.</span>
-                    <span class="n">cloned_state</span><span class="o">.</span><span class="n">iteration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span>
-                    <span class="n">cloned_state</span><span class="o">.</span><span class="n">iteration_states_added</span> <span class="o">=</span> <span class="n">iteration_states_added</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">add_state</span><span class="p">(</span><span class="n">cloned_state</span><span class="p">)</span>
-                    <span class="n">iteration_states_added</span> <span class="o">+=</span> <span class="mi">1</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">configuration_queue</span><span class="o">.</span><span class="n">appendleft</span><span class="p">(((</span><span class="n">idx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">cloned_state</span><span class="p">))</span>
-
-            <span class="k">if</span> <span class="n">idx</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">configuration_table</span><span class="p">[</span><span class="n">idx</span><span class="p">[</span><span class="mi">0</span><span class="p">]]):</span>
-                <span class="n">configuration_queue</span><span class="o">.</span><span class="n">append</span><span class="p">(((</span><span class="n">idx</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">idx</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">),</span> <span class="n">state</span><span class="p">))</span>
-
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">configuration_table</span><span class="p">)</span> <span class="o">==</span> <span class="n">idx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">configuration_queue</span><span class="p">:</span>
-                <span class="c1"># Pop last item from the queue to act like in case of back tracking.</span>
-                <span class="n">configuration_queue</span><span class="o">.</span><span class="n">appendleft</span><span class="p">(</span><span class="n">configuration_queue</span><span class="o">.</span><span class="n">pop</span><span class="p">())</span>
+        <span class="n">cloned_state</span><span class="o">.</span><span class="n">set_unresolved_dependencies</span><span class="p">(</span><span class="n">unresolved_dependencies</span><span class="p">)</span>
+        <span class="n">cloned_state</span><span class="o">.</span><span class="n">remove_unresolved_dependency_subtree</span><span class="p">(</span><span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">cloned_state</span><span class="o">.</span><span class="n">add_resolved_dependency</span><span class="p">(</span><span class="n">package_version_tuple</span><span class="p">)</span>
+        <span class="n">cloned_state</span><span class="o">.</span><span class="n">iteration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span>
+        <span class="n">cloned_state</span><span class="o">.</span><span class="n">add_justification</span><span class="p">(</span><span class="n">justification_addition</span><span class="p">)</span>
+        <span class="n">cloned_state</span><span class="o">.</span><span class="n">score</span> <span class="o">+=</span> <span class="n">score_addition</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">score_addition</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">add_state</span><span class="p">(</span><span class="n">cloned_state</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_run_strides</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Run strides and check if the given state should be accepted.&quot;&quot;&quot;</span>
@@ -545,11 +486,8 @@
 
         <span class="k">return</span> <span class="n">resolved_direct_dependencies</span>
 
-    <span class="k">def</span> <span class="nf">_prepare_initial_states</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Prepare initial states for simulated annealing.</span>
-
-<span class="sd">        Initial states are all combinations of direct dependencies.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">_prepare_initial_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Prepare initial state for resolver.&quot;&quot;&quot;</span>
         <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_direct_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)</span>
 
         <span class="k">for</span> <span class="n">direct_dependency_name</span><span class="p">,</span> <span class="n">package_versions</span> <span class="ow">in</span> <span class="n">direct_dependencies</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -570,21 +508,17 @@
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">direct_dependencies</span><span class="p">[</span><span class="n">direct_dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span>
 
-        <span class="c1"># Create an empty state which will be extended with packages based on step results. We know we have resolved</span>
-        <span class="c1"># all the dependencies so start with an empty beam which and an empty state and subsequently expand it based on</span>
-        <span class="c1"># resolved direct dependencies.</span>
+        <span class="c1"># Create an initial state which is made out of all the direct dependencies (kept as unresolved) in</span>
+        <span class="c1"># resolved versions.</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">wipe</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_reported_shared_dependencies</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_run_steps</span><span class="p">(</span><span class="n">State</span><span class="p">(),</span> <span class="n">direct_dependencies</span><span class="p">)</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="n">State</span><span class="o">.</span><span class="n">from_direct_dependencies</span><span class="p">(</span><span class="n">direct_dependencies</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">add_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_expand_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">State</span><span class="p">]:</span>
+    <span class="k">def</span> <span class="nf">_expand_state</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">State</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Expand the given state, generate new states respecting the pipeline configuration.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">state</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">:</span>
-            <span class="c1"># No unresolved dependencies, return the state -- its final.</span>
-            <span class="k">return</span> <span class="n">state</span>
-
-        <span class="n">_</span><span class="p">,</span> <span class="n">package_tuple</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="o">.</span><span class="n">popitem</span><span class="p">(</span><span class="n">last</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Expanding state by resolving </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
         <span class="c1"># Obtain extras for the given package. Extras are non-empty only for direct dependencies. If indirect</span>
         <span class="c1"># dependencies use extras, they don&#39;t need to be explicitly stated as solvers mark &quot;hard&quot; dependency on</span>
         <span class="c1"># the given package.</span>
@@ -593,7 +527,6 @@
         <span class="p">)</span>
 
         <span class="n">extras</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">extras</span> <span class="ow">or</span> <span class="p">[]</span>
-        <span class="c1"># Add None which will return also dependencies not marked as extra (see get_depends_on semantics for more info).</span>
         <span class="n">extras</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
 
         <span class="k">try</span><span class="p">:</span>
@@ -603,24 +536,29 @@
                 <span class="n">os_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
                 <span class="n">python_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
                 <span class="n">extras</span><span class="o">=</span><span class="nb">frozenset</span><span class="p">(</span><span class="n">extras</span><span class="p">),</span>
+                <span class="n">marker_evaluation_result</span><span class="o">=</span><span class="kc">True</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">is_fully_specified</span><span class="p">()</span>
+                <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">except</span> <span class="n">NotFoundError</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                 <span class="s2">&quot;Dependency </span><span class="si">%r</span><span class="s2"> is not yet resolved, cannot expand state&quot;</span><span class="p">,</span> <span class="n">package_tuple</span>
             <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
-        <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">package_tuple</span>
-
         <span class="k">if</span> <span class="ow">not</span> <span class="n">dependencies</span><span class="p">:</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">mark_dependency_resolved</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+
             <span class="k">if</span> <span class="ow">not</span> <span class="n">state</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">:</span>
                 <span class="c1"># The given package has no dependencies and nothing to resolve more, mark it as resolved.</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">state</span>
 
-            <span class="c1"># No dependency, add back to beam for resolving unresolved in next rounds.</span>
+            <span class="c1"># No dependency, add the state back to the beam for resolving unresolved in next rounds.</span>
             <span class="n">state</span><span class="o">.</span><span class="n">iteration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span>
-            <span class="n">state</span><span class="o">.</span><span class="n">iteration_states_added</span> <span class="o">=</span> <span class="mi">0</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">add_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_expand_state_add_dependencies</span><span class="p">(</span>
@@ -635,33 +573,14 @@
         <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">,</span>
         <span class="n">dependencies</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">State</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Create new states out of existing ones based on dependencies.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Create new state out of existing ones based on dependencies.&quot;&quot;&quot;</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;Expanding state with dependencies based on packages solved in environments&quot;</span>
+            <span class="s2">&quot;Expanding state with dependencies based on packages solved in software environments&quot;</span>
         <span class="p">)</span>
 
         <span class="n">package_tuple</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
         <span class="n">all_dependencies</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">dependency_name</span><span class="p">,</span> <span class="n">dependency_version</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="p">:</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">is_fully_specified</span><span class="p">():</span>
-                <span class="n">marker_evaluation_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_python_environment_marker_evaluation_result</span><span class="p">(</span>
-                    <span class="o">*</span><span class="n">package_tuple</span><span class="p">,</span>
-                    <span class="n">dependency_name</span><span class="o">=</span><span class="n">dependency_name</span><span class="p">,</span>
-                    <span class="n">dependency_version</span><span class="o">=</span><span class="n">dependency_version</span><span class="p">,</span>
-                    <span class="n">os_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                    <span class="n">os_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
-                    <span class="n">python_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
-                <span class="p">)</span>
-
-                <span class="k">if</span> <span class="n">marker_evaluation_result</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                        <span class="s2">&quot;Removing package </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> from dependency graph as it will not be installed into &quot;</span>
-                        <span class="s2">&quot;the given runtime environment&quot;</span><span class="p">,</span>
-                        <span class="n">dependency_name</span><span class="p">,</span>
-                        <span class="n">dependency_version</span><span class="p">,</span>
-                    <span class="p">)</span>
-                    <span class="k">continue</span>
-
             <span class="n">records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_python_package_version_records</span><span class="p">(</span>
                 <span class="n">package_name</span><span class="o">=</span><span class="n">dependency_name</span><span class="p">,</span>
                 <span class="n">package_version</span><span class="o">=</span><span class="n">dependency_version</span><span class="p">,</span>
@@ -676,12 +595,26 @@
             <span class="k">if</span> <span class="n">dependency_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">all_dependencies</span><span class="p">:</span>
                 <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
 
+            <span class="n">resolved_dependency_tuple</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dependency_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">resolved_dependency_tuple</span>
+                <span class="ow">and</span> <span class="n">resolved_dependency_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="n">dependency_version</span>
+            <span class="p">):</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Skipping adding dependency </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> as this dependency is already present in state: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">dependency_name</span><span class="p">,</span>
+                    <span class="n">dependency_version</span><span class="p">,</span>
+                    <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">],</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+
             <span class="k">for</span> <span class="n">record</span> <span class="ow">in</span> <span class="n">records</span><span class="p">:</span>
                 <span class="n">dependency_tuple</span> <span class="o">=</span> <span class="p">(</span>
                     <span class="n">record</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">],</span>
                     <span class="n">record</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">],</span>
                     <span class="n">record</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">],</span>
                 <span class="p">)</span>
+
                 <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">register_package_tuple</span><span class="p">(</span>
                     <span class="n">dependency_tuple</span><span class="p">,</span>
                     <span class="n">dependent_tuple</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">,</span>
@@ -707,9 +640,37 @@
                 <span class="s2">&quot;version requirements&quot;</span><span class="p">,</span>
                 <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">unsolved</span><span class="p">),</span>
             <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="k">for</span> <span class="n">dependency_name</span><span class="p">,</span> <span class="n">dependency_tuples</span> <span class="ow">in</span> <span class="n">all_dependencies</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">dependency_name</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">:</span>
+                <span class="c1"># We have shared dependencies - let&#39;s compute intersection and use intersected dependencies if</span>
+                <span class="c1"># we can satisfy them. No need to run sieves as they were run in previous iterations on the</span>
+                <span class="c1"># intersected dependencies.</span>
+                <span class="n">dependency_tuples</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+                    <span class="nb">set</span><span class="p">(</span><span class="n">dependency_tuples</span><span class="p">)</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span>
+                        <span class="n">state</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">dependency_tuples</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;No intersected dependencies for package </span><span class="si">%r</span><span class="s2"> found when resolving </span><span class="si">%r</span><span class="s2">, &quot;</span>
+                        <span class="s2">&quot;aborting creation of a new state&quot;</span><span class="p">,</span>
+                        <span class="n">dependency_name</span><span class="p">,</span>
+                        <span class="n">package_tuple</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">None</span>
+
+                <span class="n">dependency_tuples</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span>
+                    <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">d</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get_package_version</span><span class="p">(</span><span class="n">d</span><span class="p">)</span><span class="o">.</span><span class="n">semantic_version</span><span class="p">,</span>
+                    <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">dependency_tuples</span>
+                <span class="k">continue</span>
+
             <span class="n">package_versions</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get_package_version</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">dependency_tuples</span>
             <span class="p">]</span>
@@ -717,20 +678,27 @@
             <span class="n">package_versions</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_run_sieves</span><span class="p">(</span><span class="n">package_versions</span><span class="p">))</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">package_versions</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="s2">&quot;All dependencies of type </span><span class="si">%r</span><span class="s2"> were discarded by sieves, aborting creation of new states&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;All dependencies of type </span><span class="si">%r</span><span class="s2"> were discarded by sieves, aborting creation of a new state&quot;</span><span class="p">,</span>
                     <span class="n">dependency_name</span><span class="p">,</span>
                 <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">None</span>
 
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span><span class="p">:</span>
-                <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span><span class="p">[:</span><span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span><span class="p">]</span>
+                <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">pv</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
+                    <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">[:</span><span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span><span class="p">]</span>
+                <span class="p">]</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span>
+                <span class="n">all_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">pv</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span> <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="n">package_versions</span>
+                <span class="p">]</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">all_dependencies</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">state</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">:</span>
             <span class="c1"># A special case when all the dependencies of the resolved one are installed conditionally</span>
             <span class="c1"># based on environment markers but none of the environment markers is evaluated to True. If</span>
             <span class="c1"># no more unresolved dependencies present, the state is final.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">inf</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">state</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">all_dependencies</span><span class="p">:</span>
@@ -738,11 +706,12 @@
             <span class="c1"># markers but none of the environment markers is evaluated to True. As there are more</span>
             <span class="c1"># dependencies to be added re-add state with adjusted properties.</span>
             <span class="n">state</span><span class="o">.</span><span class="n">iteration</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span>
-            <span class="n">state</span><span class="o">.</span><span class="n">iteration_states_added</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">mark_dependency_resolved</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">add_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_run_steps</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">all_dependencies</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run_steps</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">package_version</span><span class="p">,</span> <span class="n">all_dependencies</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="k">def</span> <span class="nf">_do_resolve_states</span><span class="p">(</span>
@@ -750,7 +719,7 @@
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">State</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Actually perform adaptive simulated annealing.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_run_boots</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_initial_states</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_initial_state</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)</span>
 
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">&quot;Hold tight, Thoth is computing recommendations for your application...&quot;</span>
@@ -767,25 +736,33 @@
                 <span class="p">):</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
                         <span class="s2">&quot;Reached limit of stacks to be generated - </span><span class="si">%r</span><span class="s2"> (limit is </span><span class="si">%r</span><span class="s2">), stopping resolver &quot;</span>
-                        <span class="s2">&quot;with the current beam size </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;with the current beam size </span><span class="si">%d</span><span class="s2"> in iteration </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
                         <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
                         <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
                         <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">size</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span>
                     <span class="p">)</span>
                     <span class="k">break</span>
 
                 <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;The beam is empty&quot;</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;The beam is empty, iteration </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span>
+                    <span class="p">)</span>
                     <span class="k">break</span>
 
                 <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">new_iteration</span><span class="p">()</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
 
-                <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="p">)</span>
+                <span class="n">state</span><span class="p">,</span> <span class="n">unresolved_package_tuple</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Expanding state with score </span><span class="si">%g</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="n">state</span><span class="p">)</span>
-                <span class="n">final_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_expand_state</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Resolving package </span><span class="si">%r</span><span class="s2"> in state with score </span><span class="si">%g</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">unresolved_package_tuple</span><span class="p">,</span>
+                    <span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+                    <span class="n">state</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">final_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_expand_state</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">unresolved_package_tuple</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">final_state</span><span class="p">:</span>
                     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_strides</span><span class="p">(</span><span class="n">final_state</span><span class="p">):</span>
                         <span class="bp">self</span><span class="o">.</span><span class="n">_run_wraps</span><span class="p">(</span><span class="n">final_state</span><span class="p">)</span>
@@ -824,8 +801,10 @@
         <span class="k">try</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">final_state</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_resolve_states</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">):</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                    <span class="s2">&quot;Pipeline reached a new final state, yielding pipeline product with a score of </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;Pipeline reached a new final state, yielding pipeline product with a score of </span><span class="si">%g</span><span class="s2"> (</span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
                     <span class="n">final_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
                 <span class="p">)</span>
                 <span class="n">product</span> <span class="o">=</span> <span class="n">Product</span><span class="o">.</span><span class="n">from_final_state</span><span class="p">(</span>
                     <span class="n">context</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">final_state</span>
