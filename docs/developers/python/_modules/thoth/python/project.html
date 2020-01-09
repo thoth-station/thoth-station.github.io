@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.python.project &#8212; Thoth&#39;s Python library 0.8.0 documentation</title>
+    <title>thoth.python.project &#8212; Thoth&#39;s Python library 0.9.0 documentation</title>
     <link rel="stylesheet" href="../../../_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
@@ -32,7 +32,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth&#39;s Python library 0.8.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth&#39;s Python library 0.9.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -62,6 +62,7 @@
 
 <span class="sd">&quot;&quot;&quot;Project abstraction and operations on project dependencies.&quot;&quot;&quot;</span>
 
+<span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">typing</span>
 <span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
@@ -83,6 +84,7 @@
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">UnableLock</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">InternalError</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NotFound</span>
+<span class="kn">from</span> <span class="nn">.helpers</span> <span class="kn">import</span> <span class="n">parse_requirements</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -205,6 +207,68 @@
 
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">requirements_lock_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">requirements_lock_file</span><span class="p">:</span>
             <span class="n">requirements_lock_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">construct_requirements_txt</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="Project.from_pip_compile_files"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.from_pip_compile_files">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_pip_compile_files</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">requirements_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;requirements.in&quot;</span><span class="p">,</span>
+        <span class="n">requirements_lock_path</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">allow_without_lock</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">RuntimeEnvironment</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Project&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Parse project from files compatible with pip/pip-tools.&quot;&quot;&quot;</span>
+        <span class="n">sources_lock</span><span class="p">,</span> <span class="n">package_versions_lock</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">allow_without_lock</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">requirements_path</span><span class="p">):</span>
+                <span class="n">requirements_lock_path</span> <span class="o">=</span> <span class="n">requirements_lock_path</span> <span class="ow">or</span> <span class="s2">&quot;requirements.txt&quot;</span>
+                <span class="n">sources</span><span class="p">,</span> <span class="n">package_versions</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="n">requirements_lock_path</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sources</span><span class="p">,</span> <span class="n">package_versions</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="n">requirements_path</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">requirements_lock_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">sources_lock</span><span class="p">,</span> <span class="n">package_versions_lock</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="n">requirements_lock_path</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;requirements.txt&quot;</span><span class="p">):</span>
+                    <span class="n">sources_lock</span><span class="p">,</span> <span class="n">package_versions_lock</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="s2">&quot;requirements.txt&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">requirements_lock_path</span> <span class="o">=</span> <span class="n">requirements_lock_path</span> <span class="ow">or</span> <span class="s2">&quot;requirements.txt&quot;</span>
+            <span class="n">sources</span><span class="p">,</span> <span class="n">package_versions</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="n">requirements_path</span><span class="p">)</span>
+            <span class="n">sources_lock</span><span class="p">,</span> <span class="n">package_versions_lock</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="n">requirements_lock_path</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions_lock</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">is_locked</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Package </span><span class="si">{package_version.name}</span><span class="s2"> in lockfile does not &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;use locked version: </span><span class="si">{package_version.version!r}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">hashes</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Parsed package </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> from lockfile </span><span class="si">%r</span><span class="s2"> has no hashes assigned&quot;</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                    <span class="n">requirements_lock_path</span><span class="p">,</span>
+                <span class="p">)</span>
+
+        <span class="n">sources</span> <span class="o">=</span> <span class="n">sources</span> <span class="ow">or</span> <span class="n">sources_lock</span> <span class="ow">or</span> <span class="p">[]</span>
+
+        <span class="c1"># We know which index is assigned.</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">sources</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions_lock</span> <span class="ow">or</span> <span class="p">[]:</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">sources</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># XXX: do we want a default source?</span>
+        <span class="n">meta</span> <span class="o">=</span> <span class="n">PipfileMeta</span><span class="p">(</span><span class="n">sources</span><span class="o">=</span><span class="p">{</span><span class="n">s</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">})</span>
+        <span class="n">pipfile</span> <span class="o">=</span> <span class="n">Pipfile</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">(</span><span class="n">package_versions</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="n">meta</span><span class="p">)</span>
+        <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">package_versions_lock</span><span class="p">:</span>
+            <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">PipfileLock</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">(</span>
+                <span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span>
+                <span class="n">packages</span><span class="o">=</span><span class="n">package_versions_lock</span><span class="p">,</span>
+                <span class="n">meta</span><span class="o">=</span><span class="n">meta</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">pipfile_lock</span><span class="p">,</span> <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Project.from_package_versions"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.from_package_versions">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">from_package_versions</span><span class="p">(</span>
