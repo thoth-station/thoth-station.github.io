@@ -69,6 +69,7 @@
 
 <span class="sd">&quot;&quot;&quot;A state of not fully resolved software stack in adviser&#39;s recommendations implementation.&quot;&quot;&quot;</span>
 
+<span class="kn">import</span> <span class="nn">math</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
@@ -222,12 +223,93 @@
                 <span class="sa">f</span><span class="s2">&quot;No unresolved dependency found in state: </span><span class="si">{self!r}</span><span class="s2">&quot;</span>
             <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span></div>
 
-<div class="viewcode-block" id="State.get_random_unresolved_dependency"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.get_random_unresolved_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">get_random_unresolved_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_termial_function</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute termial function, with red hats off to Donald Knuth.</span>
+
+<span class="sd">        Termial function is:</span>
+
+<span class="sd">          \sum_{k=0}^n k</span>
+
+<span class="sd">        Let&#39;s use the solution using binomial coefficient - (n + 1) over 2.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Termial function used with negative number&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">((</span><span class="n">n</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">n</span><span class="p">)</span> <span class="o">&gt;&gt;</span> <span class="mi">1</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_termial_function_solution</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Compute solution to termial function.</span>
+
+<span class="sd">        Let termial function be:</span>
+
+<span class="sd">           (n**2 + n) / 2 = x</span>
+
+<span class="sd">        This function computes non-negative ceil(n) so that it satisfies x.</span>
+
+<span class="sd">        The solution is optimized to compute a generic parabolic intersection for termial function:</span>
+
+<span class="sd">           x1 = (-b + sqrt(b**2 - 4*a*c)) / 2*a</span>
+<span class="sd">           x2 = (-b - sqrt(b**2 - 4*a*c)) / 2*a</span>
+
+<span class="sd">        Note solution x2 can be discarded based on termial function usage in the sources.</span>
+
+<span class="sd">        The original formula:</span>
+
+<span class="sd">           a*x**2 + b*x + c = 0</span>
+
+<span class="sd">        for solution:</span>
+
+<span class="sd">           (n**2)/2 + n/2 = x</span>
+
+<span class="sd">        where:</span>
+
+<span class="sd">          a = 1/2</span>
+<span class="sd">          b = 1/2</span>
+<span class="sd">          c = -x</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">+</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">0.25</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">&lt;&lt;</span> <span class="mi">1</span><span class="p">)))</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_random_termial</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Compute a random number x such as 0 &lt;= x &lt; n, use termial function not to spread numbers uniformly.</span>
+
+<span class="sd">        To prefer lower numbers more often, termial function is used to assign &quot;weights&quot; for</span>
+<span class="sd">        numbers - then random uniform is used in conjunction with weights.</span>
+
+<span class="sd">        An illustrative example can be cls._random_termial(4) which calls:</span>
+
+<span class="sd">          cls._termial_function(4) == 10</span>
+
+<span class="sd">        This way, we create 10 &quot;cells&quot; where (assignment range is inclusive):</span>
+
+<span class="sd">           * 0 - 3 are assigned to number 3</span>
+<span class="sd">           * 4 - 6 are assigned to number 2</span>
+<span class="sd">           * 7 - 8 are assigned to number 1</span>
+<span class="sd">           * 9 is assigned to number 0</span>
+
+<span class="sd">        Now a random uniform call picks from 0 - 9 (inclusively), then we check what interval we have hit.</span>
+<span class="sd">        The value returned inverts priority, so for cls._termial_function(4) probabilities are:</span>
+
+<span class="sd">          * 0 - 4/10 = 0.4</span>
+<span class="sd">          * 1 - 3/10 = 0.3</span>
+<span class="sd">          * 2 - 2/10 = 0.2</span>
+<span class="sd">          * 3 - 1/10 = 0.1</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_termial_function</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">n</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_termial_function_solution</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">randrange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
+
+<div class="viewcode-block" id="State.get_random_unresolved_dependency"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.get_random_unresolved_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">get_random_unresolved_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefer_recent</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Get a very first unresolved dependency tuple.&quot;&quot;&quot;</span>
         <span class="n">unresolved_dependency_name</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">))</span>
-        <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span>
-            <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">unresolved_dependency_name</span><span class="p">])</span>
-        <span class="p">)</span>
+
+        <span class="n">choices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">unresolved_dependency_name</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">prefer_recent</span><span class="p">:</span>
+            <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="n">choices</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_random_termial</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">choices</span><span class="p">))]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">choices</span><span class="p">)</span>
+
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">unresolved_dependency_name</span><span class="p">][</span>
             <span class="n">unresolved_dependency_id</span>
         <span class="p">]</span></div>
