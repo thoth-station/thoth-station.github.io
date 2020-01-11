@@ -252,10 +252,24 @@
         <span class="c1"># As pipeline steps can have dependencies on each other, iterate over them until we have any change done</span>
         <span class="c1"># to the pipeline configuration.</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Creating pipeline configuration&quot;</span><span class="p">)</span>
+
+        <span class="n">blocked_units</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">set</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_ADVISER_BLOCKED_UNITS&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="s2">&quot;THOTH_ADVISER_BLOCKED_UNITS&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span>
+            <span class="k">else</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="p">)</span>
+
         <span class="n">change</span> <span class="o">=</span> <span class="kc">True</span>
         <span class="k">while</span> <span class="n">change</span><span class="p">:</span>
             <span class="n">change</span> <span class="o">=</span> <span class="kc">False</span>
             <span class="k">for</span> <span class="n">unit_class</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_iter_units</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">unit_class</span><span class="o">.</span><span class="vm">__name__</span> <span class="ow">in</span> <span class="n">blocked_units</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;Avoiding adding pipeline unit </span><span class="si">%r</span><span class="s2"> based on blocked units configuration&quot;</span><span class="p">,</span>
+                        <span class="n">unit_class</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">continue</span>
+
                 <span class="n">unit_configuration</span> <span class="o">=</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">should_include</span><span class="p">(</span><span class="n">ctx</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
                 <span class="k">if</span> <span class="n">unit_configuration</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
