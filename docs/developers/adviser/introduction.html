@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>Introduction to Thoth’s adviser principles &#8212; Thoth Adviser 0.7.0 documentation</title>
+    <title>Introduction to Thoth’s adviser principles &#8212; Thoth Adviser 0.7.2 documentation</title>
     <link rel="stylesheet" href="_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -47,7 +47,7 @@
         <li class="right" >
           <a href="index.html" title="Welcome to Thoth’s adviser documentation"
              accesskey="P">previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.7.0 documentation</a> &#187;</li> 
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.7.2 documentation</a> &#187;</li> 
       </ul>
     </div>  
 
@@ -103,11 +103,127 @@ to expand dependency graphs (lazily), instead of directly implementing
 as in case of other resolvers. See <a class="reference internal" href="resolver.html#resolver"><span class="std std-ref">resolver</span></a> documentation
 for more info.</p>
 </div>
+<div class="section" id="prediction-based-resolution-using-reinforcement-learning">
+<h2>Prediction-based resolution using reinforcement learning<a class="headerlink" href="#prediction-based-resolution-using-reinforcement-learning" title="Permalink to this headline">¶</a></h2>
+<p>As stated above, Thoth’s adviser does not implement <a class="reference external" href="https://en.wikipedia.org/wiki/Boolean_satisfiability_problem">3SAT problem</a> as many
+resolvers do. Instead, the whole resolution is seen as a <a class="reference external" href="https://en.wikipedia.org/wiki/Markov_decision_process">Markov Decision
+Process (MDP)</a>.
+Intuitively, any (not necessary fully resolved) software stack can be
+seen as a state in an MDP and satisfies Markov property:</p>
+<blockquote>
+<div><p>Any future resolution of resolver’s state depends only upon the present
+state, not on the sequence of events (resolution of dependencies) that
+preceded it.</p>
+</div></blockquote>
+<p>A fully resolved software stack that satisfy all the requirements of all the
+dependencies present in the software stack then represents a terminal state in
+an MDP. Finding the best possible software stack (a terminal state with the
+highest score) then corresponds to solving the given MDP.</p>
+<p>The whole design of adviser’s resolution can be seen as a framework for
+writing predictors for prediction based resolution.</p>
+<p>More formally:</p>
+<ul class="simple">
+<li><p>let <em>S</em> be a finite set of states in which the resolution can be in -
+partially but also fully resolved software stacks</p></li>
+<li><p>let <em>A</em> be a finite set of actions, <em>A</em><sub>s</sub> be a finite state of
+actions from a state <em>s</em></p></li>
+<li><p>let <em>R</em><sub>a</sub><em>(s, s’)</em> be expected immediate reward received after
+transitioning from state <em>s</em> to state <em>s’</em> by taking action <em>a</em> following
+some policy π.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The state space as described and shown in the previous section corresponds to
+the score in a terminal state (cumulative score) - when both libraries
+<code class="docutils literal notranslate"><span class="pre">simplelib</span></code> and <code class="docutils literal notranslate"><span class="pre">anotherlib</span></code> are resolved and present in fully pinned
+down software stacks and there are no more unresolved dependencies (no more
+requirements introduced by resolving these two libraries).</p>
+<p>In otherwords, the function plotted corresponds to <a class="reference external" href="https://en.wikipedia.org/wiki/Bellman_equation">Bellman equation</a> for all terminal states
+following a policy during resolution.</p>
+</div>
+<p>Each entry in the state transition function in the MDP corresponds to a
+step that is performed by resolver, by taking an unresolved dependency
+and resolving it.</p>
+<p>Pipeline units called <a class="reference internal" href="steps.html#steps"><span class="std std-ref">steps</span></a> then act like a critic that scores
+the given action taken (compute immediate reward signal).</p>
+<p>For a more illustrative example, let’s suppose that the resolver is taking an
+action in some state s<sub>n</sub>. Let this state be described by unresolved,
+resolved dependencies and its current score (based on Bellman equation).</p>
+<p><em>Resolved dependencies:</em></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">flask==1.1.1</span></code></p></li>
+</ul>
+<p><em>Unresolved dependencies:</em></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">click==6.7</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">click==7.0</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">jinja2==2.10.2</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">jinja2==2.10.3</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">werkzeug==0.15.1</span></code></p></li>
+</ul>
+<p><em>Score:</em> 0.5</p>
+<a class="reference external image-reference" href="_static/mdp.png"><img alt="An illustrative MDP described in the text." class="align-center" src="_images/mdp.png" /></a>
+<p>We resolve an unresolved dependency - let’s say we take action s<sub>n</sub> a<sub>2</sub> and resolve <code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code>, we retrieve an immediate reward
+0.33 and we end up in state s<sub>n + 3</sub>. This action is scored by all
+pipeline units of type <a class="reference internal" href="steps.html#steps"><span class="std std-ref">step</span></a> - a sum of their scores - note that
+this transition can be also invalidated by any of the step pipeline unit present
+in the current pipeline configuration.</p>
+<p>The new state created is described as follows:</p>
+<p><em>Resolved dependencies:</em></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">flask==1.1.1</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code></p></li>
+</ul>
+<p><em>Unresolved dependencies:</em></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">click==6.7</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">click==7.0</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">jinja2==2.10.2</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">jinja2==2.10.3</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">werkzeug==0.15.1</span></code></p></li>
+<li><p>+ all the direct dependencies of <code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code> respecting
+their version range specification.</p></li>
+</ul>
+<p><em>Score:</em> 0.83</p>
+<p>Direct dependencies of <code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code> added to unresolved dependencies
+are filtered based on <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieve pipeline units</span></a> present in the current
+pipeline configuration. Note that sieves can make the given transition invalid if
+they remove all versions for a specific package. As an example, let’s say
+<code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code> depends on <code class="docutils literal notranslate"><span class="pre">daiquiri</span></code> in versions <code class="docutils literal notranslate"><span class="pre">1.0</span></code>, <code class="docutils literal notranslate"><span class="pre">2.0</span></code> or
+<code class="docutils literal notranslate"><span class="pre">3.0</span></code>. If pipeline sieves remove all the versions of <code class="docutils literal notranslate"><span class="pre">daiquiri</span></code>, dependency
+sub-graph of <code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code> cannot be satisfied - hence the action
+s<sub>n</sub> a<sub>2</sub> is invalid.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If there would be any other version of <code class="docutils literal notranslate"><span class="pre">itsdangerous</span></code> in the unresolved
+dependencies listing, it would be removed (as well as its whole dependency
+sub-graph) as package of type <code class="docutils literal notranslate"><span class="pre">itsdangerous</span></code> is already present in the
+current state respecting requirements.</p>
+</div>
+<p>As can be seen, the main role of sieves is to filter out invalid future actions in
+the upcoming resolver rounds, without considering any possible state the resolver
+could end up with (state independent filtering).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If the given action from a state leads to invalid transition, the predictor
+instance receives reward signal equal to <code class="docutils literal notranslate"><span class="pre">math.nan</span></code>.</p>
+</div>
+<p>If a valid transition leads to a state that has no unresolved dependencies,
+the given state is final (terminal state in case of MDP terminology) and it
+represents a fully pinned down software stack.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If the given action from a state leads to a final state (<em>terminal state</em>), the
+predictor instance receives a reward signal equal to <code class="docutils literal notranslate"><span class="pre">math.inf</span></code>.</p>
+</div>
+</div>
 <div class="section" id="nomenclature">
 <h2>Nomenclature<a class="headerlink" href="#nomenclature" title="Permalink to this headline">¶</a></h2>
 <p>In adviser docs but also in other Thoth repositories, one can find the following
 terms:</p>
 <ul class="simple">
+<li><p>Boolean satisfiability problem - <a class="reference external" href="https://en.wikipedia.org/wiki/Boolean_satisfiability_problem">3SAT problem</a></p></li>
 <li><p>initial state - state of resolution in resolver that is made out of resolved direct dependencies into a concrete version coming from a Python package index</p></li>
 <li><p>state - generally speaking any resolver state</p></li>
 <li><p>final state - a state that has no more packages left for resolution (resolved packages form fully resolved software stack) and can become a pipeline product</p></li>
@@ -125,6 +241,9 @@ terms:</p>
 <li><p>pipeline - in Thoth’s context, a stack resolution pipeline is used to generate and score Python software stacks for certain quality - see <a class="reference internal" href="pipeline.html#pipeline"><span class="std std-ref">pipeline for more info</span></a></p></li>
 <li><p>pipeline units - boot, sieve, step, stride, wrap</p></li>
 <li><p>dependency monkey - one of Thoth’s components - Dependency Monkey can generate all the combinations of a software stacks and, optionally, submit them to Amun for additional verification, testing and observation aggregation</p></li>
+<li><p>Bellman equation - see <a class="reference external" href="https://en.wikipedia.org/wiki/Bellman_equation">Bellman equation</a></p></li>
+<li><p>Markov decision process - <a class="reference external" href="https://en.wikipedia.org/wiki/Markov_decision_process">Markov decision process</a></p></li>
+<li><p>Markov property - <a class="reference external" href="https://en.wikipedia.org/wiki/Markov_property">Markov property</a></p></li>
 <li><p>Thoth - one of the ancient Egyptian deities</p></li>
 <li><p>Thoth-Station - see <a class="reference external" href="https://expanse.fandom.com/wiki/Thoth_Station">Thoth Station</a></p></li>
 <li><p>Amun - an executor used in Thoth to verify, install and run applications - see <a class="reference external" href="https://github.com/thoth-station/amun-api">Amun repository for more info</a></p></li>
@@ -156,6 +275,7 @@ terms:</p>
   <ul>
 <li><a class="reference internal" href="#">Introduction to Thoth’s adviser principles</a><ul>
 <li><a class="reference internal" href="#intuition-behind-thoth-s-recommendations">Intuition behind Thoth’s recommendations</a></li>
+<li><a class="reference internal" href="#prediction-based-resolution-using-reinforcement-learning">Prediction-based resolution using reinforcement learning</a></li>
 <li><a class="reference internal" href="#nomenclature">Nomenclature</a></li>
 </ul>
 </li>
