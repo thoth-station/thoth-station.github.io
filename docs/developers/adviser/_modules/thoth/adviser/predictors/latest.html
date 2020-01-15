@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.boots.ubi &#8212; Thoth Adviser 0.7.3 documentation</title>
+    <title>thoth.adviser.predictors.latest &#8212; Thoth Adviser 0.7.3 documentation</title>
     <link rel="stylesheet" href="../../../../_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="../../../../_static/documentation_options.js"></script>
@@ -49,10 +49,10 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <h1>Source code for thoth.adviser.boots.ubi</h1><div class="highlight"><pre>
+  <h1>Source code for thoth.adviser.predictors.latest</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
 <span class="c1"># thoth-adviser</span>
-<span class="c1"># Copyright(C) 2019 Fridolin Pokorny</span>
+<span class="c1"># Copyright(C) 2020 Fridolin Pokorny</span>
 <span class="c1">#</span>
 <span class="c1"># This program is free software: you can redistribute it and / or modify</span>
 <span class="c1"># it under the terms of the GNU General Public License as published by</span>
@@ -67,47 +67,40 @@
 <span class="c1"># You should have received a copy of the GNU General Public License</span>
 <span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
 
-<span class="sd">&quot;&quot;&quot;A boot to remap UBI to RHEL.&quot;&quot;&quot;</span>
+<span class="sd">&quot;&quot;&quot;Implementation of predictor used for resolving latest stacks in the state space.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 
-<span class="kn">from</span> <span class="nn">..boot</span> <span class="kn">import</span> <span class="n">Boot</span>
-<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="kn">import</span> <span class="n">CannotProduceStack</span>
+<span class="kn">from</span> <span class="nn">.hill_climbing</span> <span class="kn">import</span> <span class="n">HillClimbing</span>
+<span class="kn">from</span> <span class="nn">..state</span> <span class="kn">import</span> <span class="n">State</span>
 
-<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">..pipeline_builder</span> <span class="kn">import</span> <span class="n">PipelineBuilderContext</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="UbiBoot"><a class="viewcode-back" href="../../../../thoth.adviser.boots.html#thoth.adviser.boots.ubi.UbiBoot">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">UbiBoot</span><span class="p">(</span><span class="n">Boot</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Remap UBI to RHEL.</span>
+<div class="viewcode-block" id="ApproximatingLatest"><a class="viewcode-back" href="../../../../thoth.adviser.predictors.html#thoth.adviser.predictors.latest.ApproximatingLatest">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">ApproximatingLatest</span><span class="p">(</span><span class="n">HillClimbing</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Implementation of predictor used for resolving latest stacks in the state space.</span>
 
-<span class="sd">    As UBI has ABI compatibility with RHEL, remap any UBI to RHEL.</span>
+<span class="sd">    This predictor approximates resolution to the latest software stack. The resolution to the latest is</span>
+<span class="sd">    approximated using continuous resolution with an optional randomness not to get stuck in a &quot;trap&quot;</span>
+<span class="sd">    if resolution to all latest cannot be satisfied.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-<div class="viewcode-block" id="UbiBoot.should_include"><a class="viewcode-back" href="../../../../thoth.adviser.boots.html#thoth.adviser.boots.ubi.UbiBoot.should_include">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">should_include</span><span class="p">(</span>
-        <span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-        <span class="sd">&quot;&quot;&quot;Register self, always.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_included</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
-            <span class="k">return</span> <span class="p">{}</span>
+<div class="viewcode-block" id="ApproximatingLatest.run"><a class="viewcode-back" href="../../../../thoth.adviser.predictors.html#thoth.adviser.predictors.latest.ApproximatingLatest.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">State</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get last state expanded and expand first unresolved dependency.&quot;&quot;&quot;</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">get_last</span><span class="p">()</span>
 
-        <span class="k">return</span> <span class="kc">None</span></div>
+        <span class="k">if</span> <span class="n">state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">get_random</span><span class="p">()</span>
 
-<div class="viewcode-block" id="UbiBoot.run"><a class="viewcode-back" href="../../../../thoth.adviser.boots.html#thoth.adviser.boots.ubi.UbiBoot.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Remap UBI to RHEL as Thoth keeps track of RHEL and UBI is ABI compatible.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;ubi&quot;</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using observations for RHEL instead of UBI, RHEL is ABI compatible with UBI&quot;</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;rhel&quot;</span></div></div>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">keep_history</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_history</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">state</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">get_random_unresolved_dependency</span><span class="p">(</span><span class="n">prefer_recent</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div></div>
 </pre></div>
 
           </div>
