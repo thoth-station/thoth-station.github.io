@@ -227,6 +227,7 @@
         <span class="n">default</span><span class="o">=</span><span class="n">DEFAULT_LIMIT_LATEST_VERSIONS</span><span class="p">,</span>
         <span class="n">converter</span><span class="o">=</span><span class="n">_limit_latest_versions</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
     <span class="p">)</span>
+    <span class="n">cli_parameters</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>
     <span class="n">stop_resolving</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">log_final_state_count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
         <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
@@ -310,6 +311,7 @@
             <span class="n">beam</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="p">,</span>
             <span class="n">recommendation_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">recommendation_type</span><span class="p">,</span>
             <span class="n">decision_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">decision_type</span><span class="p">,</span>
+            <span class="n">cli_parameters</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cli_parameters</span><span class="p">,</span>
         <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_run_boots</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -415,6 +417,23 @@
                         <span class="k">raise</span> <span class="n">StepError</span><span class="p">(</span>
                             <span class="sa">f</span><span class="s2">&quot;Step </span><span class="si">{step.__class__.__name__}</span><span class="s2"> returned score that is infinite&quot;</span><span class="p">,</span>
                         <span class="p">)</span>
+
+                    <span class="k">if</span> <span class="n">step_score_addition</span> <span class="o">&gt;</span> <span class="n">step</span><span class="o">.</span><span class="n">SCORE_MAX</span><span class="p">:</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="s2">&quot;Step </span><span class="si">%r</span><span class="s2"> returned score higher than allowed (</span><span class="si">%g</span><span class="s2">), normalizing to </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                            <span class="n">step_score_addition</span><span class="p">,</span>
+                            <span class="n">step</span><span class="o">.</span><span class="n">SCORE_MAX</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="n">step_score_addition</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">SCORE_MAX</span>
+                    <span class="k">elif</span> <span class="n">step_score_addition</span> <span class="o">&lt;</span> <span class="n">step</span><span class="o">.</span><span class="n">SCORE_MIN</span><span class="p">:</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                            <span class="s2">&quot;Step </span><span class="si">%r</span><span class="s2"> returned score lower than allowed (</span><span class="si">%g</span><span class="s2">), normalizing to </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                            <span class="n">step_score_addition</span><span class="p">,</span>
+                            <span class="n">step</span><span class="o">.</span><span class="n">SCORE_MIN</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="n">step_score_addition</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">SCORE_MIN</span>
 
                     <span class="n">score_addition</span> <span class="o">+=</span> <span class="n">step_score_addition</span>
 
@@ -951,6 +970,7 @@
         <span class="n">project</span><span class="p">:</span> <span class="n">Project</span><span class="p">,</span>
         <span class="n">recommendation_type</span><span class="p">:</span> <span class="n">RecommendationType</span><span class="p">,</span>
         <span class="n">pipeline_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">PipelineConfig</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">cli_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Resolver&quot;</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get instance of resolver based on the project given to recommend software stacks.&quot;&quot;&quot;</span>
         <span class="n">graph</span> <span class="o">=</span> <span class="n">graph</span> <span class="ow">or</span> <span class="n">GraphDatabase</span><span class="p">()</span>
@@ -974,7 +994,7 @@
                     <span class="sa">f</span><span class="s2">&quot;Unknown pipeline configuration type: {type(pipeline_config)!r}&quot;</span>
                 <span class="p">)</span>
 
-        <span class="n">resolver</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
             <span class="n">beam_width</span><span class="o">=</span><span class="n">beam_width</span><span class="p">,</span>
             <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
             <span class="n">graph</span><span class="o">=</span><span class="n">graph</span><span class="p">,</span>
@@ -985,9 +1005,8 @@
             <span class="n">predictor</span><span class="o">=</span><span class="n">predictor</span><span class="p">,</span>
             <span class="n">project</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
             <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span><span class="p">,</span>
-        <span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">resolver</span></div>
+            <span class="n">cli_parameters</span><span class="o">=</span><span class="n">cli_parameters</span> <span class="ow">or</span> <span class="p">{},</span>
+        <span class="p">)</span></div>
 
 <div class="viewcode-block" id="Resolver.get_dependency_monkey_instance"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.resolver.Resolver.get_dependency_monkey_instance">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">get_dependency_monkey_instance</span><span class="p">(</span>
@@ -1002,6 +1021,7 @@
         <span class="n">project</span><span class="p">:</span> <span class="n">Project</span><span class="p">,</span>
         <span class="n">decision_type</span><span class="p">:</span> <span class="n">DecisionType</span><span class="p">,</span>
         <span class="n">pipeline_config</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">PipelineConfig</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">cli_parameters</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Resolver&quot;</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get instance of resolver based on the project given to run dependency monkey.&quot;&quot;&quot;</span>
         <span class="n">graph</span> <span class="o">=</span> <span class="n">graph</span> <span class="ow">or</span> <span class="n">GraphDatabase</span><span class="p">()</span>
@@ -1025,7 +1045,7 @@
                     <span class="sa">f</span><span class="s2">&quot;Unknown pipeline configuration type: {type(pipeline_config)!r}&quot;</span>
                 <span class="p">)</span>
 
-        <span class="n">resolver</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
             <span class="n">beam_width</span><span class="o">=</span><span class="n">beam_width</span><span class="p">,</span>
             <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
             <span class="n">limit</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>  <span class="c1"># always match as limit is always same as count for Dependency Monkey.</span>
@@ -1036,9 +1056,8 @@
             <span class="n">predictor</span><span class="o">=</span><span class="n">predictor</span><span class="p">,</span>
             <span class="n">project</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
             <span class="n">decision_type</span><span class="o">=</span><span class="n">decision_type</span><span class="p">,</span>
-        <span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">resolver</span></div></div>
+            <span class="n">cli_parameters</span><span class="o">=</span><span class="n">cli_parameters</span> <span class="ow">or</span> <span class="p">{},</span>
+        <span class="p">)</span></div></div>
 </pre></div>
 
           </div>
