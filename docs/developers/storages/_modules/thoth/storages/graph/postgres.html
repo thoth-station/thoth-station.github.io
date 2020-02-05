@@ -102,6 +102,7 @@
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">methodtools</span> <span class="kn">import</span> <span class="n">lru_cache</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">create_engine</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">text</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">desc</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">func</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">exists</span>
@@ -4799,7 +4800,140 @@
         <span class="p">):</span>
             <span class="n">stats</span><span class="p">[</span><span class="n">method_name</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">method</span><span class="o">.</span><span class="n">cache_info</span><span class="p">()</span><span class="o">.</span><span class="n">_asdict</span><span class="p">())</span>
 
-        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;memory_cache_info&quot;</span><span class="p">:</span> <span class="n">stats</span><span class="p">}</span></div></div>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;memory_cache_info&quot;</span><span class="p">:</span> <span class="n">stats</span><span class="p">}</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.get_bloat_data"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_bloat_data">[docs]</a>    <span class="k">def</span> <span class="nf">get_bloat_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get bloat data.&quot;&quot;&quot;</span>
+        <span class="c1"># Reference: https://raw.githubusercontent.com/pgexperts/pgx_scripts/master/bloat/table_bloat_check.sql</span>
+
+        <span class="c1"># define some constants for sizes of things</span>
+        <span class="c1"># for reference down the query and easy maintenance</span>
+        <span class="n">constants</span> <span class="o">=</span> <span class="s2">&quot;SELECT current_setting(&#39;block_size&#39;)::numeric AS bs, 23 AS hdr, 8 AS ma&quot;</span>
+
+        <span class="c1"># screen out table who have attributes</span>
+        <span class="c1"># which dont have stats, such as JSON</span>
+        <span class="n">no_stats</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT table_schema, table_name,</span>
+<span class="s2">                n_live_tup::numeric as est_rows,</span>
+<span class="s2">                pg_table_size(relid)::numeric as table_size</span>
+<span class="s2">            FROM information_schema.columns</span>
+<span class="s2">                JOIN pg_stat_user_tables as psut</span>
+<span class="s2">                ON table_schema = psut.schemaname</span>
+<span class="s2">                AND table_name = psut.relname</span>
+<span class="s2">                LEFT OUTER JOIN pg_stats</span>
+<span class="s2">                ON table_schema = pg_stats.schemaname</span>
+<span class="s2">                    AND table_name = pg_stats.tablename</span>
+<span class="s2">                    AND column_name = attname</span>
+<span class="s2">            WHERE attname IS NULL</span>
+<span class="s2">                AND table_schema NOT IN (&#39;pg_catalog&#39;, &#39;information_schema&#39;)</span>
+<span class="s2">            GROUP BY table_schema, table_name, relid, n_live_tup&quot;&quot;&quot;</span>
+
+        <span class="c1"># calculate null header sizes</span>
+        <span class="c1"># omitting tables which dont have complete stats</span>
+        <span class="c1"># and attributes which aren&#39;t visible</span>
+        <span class="n">null_headers</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT</span>
+<span class="s2">                hdr+1+(sum(case when null_frac &lt;&gt; 0 THEN 1 else 0 END)/8) as nullhdr,</span>
+<span class="s2">                SUM((1-null_frac)*avg_width) as datawidth,</span>
+<span class="s2">                MAX(null_frac) as maxfracsum,</span>
+<span class="s2">                schemaname,</span>
+<span class="s2">                tablename,</span>
+<span class="s2">                hdr, ma, bs</span>
+<span class="s2">            FROM pg_stats CROSS JOIN constants</span>
+<span class="s2">                LEFT OUTER JOIN no_stats</span>
+<span class="s2">                    ON schemaname = no_stats.table_schema</span>
+<span class="s2">                    AND tablename = no_stats.table_name</span>
+<span class="s2">            WHERE schemaname NOT IN (&#39;pg_catalog&#39;, &#39;information_schema&#39;)</span>
+<span class="s2">                AND no_stats.table_name IS NULL</span>
+<span class="s2">                AND EXISTS ( SELECT 1</span>
+<span class="s2">                    FROM information_schema.columns</span>
+<span class="s2">                        WHERE schemaname = columns.table_schema</span>
+<span class="s2">                            AND tablename = columns.table_name )</span>
+<span class="s2">            GROUP BY schemaname, tablename, hdr, ma, bs&quot;&quot;&quot;</span>
+
+        <span class="c1"># estimate header and row size</span>
+        <span class="n">data_headers</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT</span>
+<span class="s2">                ma, bs, hdr, schemaname, tablename,</span>
+<span class="s2">                (datawidth+(hdr+ma-(case when hdr%ma=0 THEN ma ELSE hdr%ma END)))::numeric AS datahdr,</span>
+<span class="s2">                (maxfracsum*(nullhdr+ma-(case when nullhdr%ma=0 THEN ma ELSE nullhdr%ma END))) AS nullhdr2</span>
+<span class="s2">            FROM null_headers&quot;&quot;&quot;</span>
+
+        <span class="c1"># make estimates of how large the table should be</span>
+        <span class="c1"># based on row and page size</span>
+        <span class="n">table_estimates</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT schemaname, tablename, bs,</span>
+<span class="s2">                reltuples::numeric as est_rows, relpages * bs as table_bytes,</span>
+<span class="s2">            CEIL((reltuples*</span>
+<span class="s2">                    (datahdr + nullhdr2 + 4 + ma -</span>
+<span class="s2">                        (CASE WHEN datahdr%ma=0</span>
+<span class="s2">                            THEN ma ELSE datahdr%ma END)</span>
+<span class="s2">                        )/(bs-20))) * bs AS expected_bytes,</span>
+<span class="s2">                reltoastrelid</span>
+<span class="s2">            FROM data_headers</span>
+<span class="s2">                JOIN pg_class ON tablename = relname</span>
+<span class="s2">                JOIN pg_namespace ON relnamespace = pg_namespace.oid</span>
+<span class="s2">                    AND schemaname = nspname</span>
+<span class="s2">            WHERE pg_class.relkind = &#39;r&#39;&quot;&quot;&quot;</span>
+
+        <span class="c1"># add in estimated TOAST table sizes</span>
+        <span class="c1"># estimate based on 4 toast tuples per page because we dont have</span>
+        <span class="c1"># anything better.  also append the no_data tables</span>
+        <span class="n">estimates_with_toast</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT schemaname, tablename,</span>
+<span class="s2">                TRUE as can_estimate,</span>
+<span class="s2">                est_rows,</span>
+<span class="s2">                table_bytes + ( coalesce(toast.relpages, 0) * bs ) as table_bytes,</span>
+<span class="s2">                expected_bytes + ( ceil( coalesce(toast.reltuples, 0) / 4 ) * bs ) as expected_bytes</span>
+<span class="s2">            FROM table_estimates LEFT OUTER JOIN pg_class as toast</span>
+<span class="s2">                ON table_estimates.reltoastrelid = toast.oid</span>
+<span class="s2">                    AND toast.relkind = &#39;t&#39;&quot;&quot;&quot;</span>
+
+        <span class="c1"># add some extra metadata to the table data and calculations to be reused</span>
+        <span class="c1"># including whether we cant estimate it or whether we think it might be compressed</span>
+        <span class="n">table_estimates_plus</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT current_database() as databasename,</span>
+<span class="s2">                    schemaname, tablename, can_estimate,</span>
+<span class="s2">                    est_rows,</span>
+<span class="s2">                    CASE WHEN table_bytes &gt; 0</span>
+<span class="s2">                        THEN table_bytes::NUMERIC</span>
+<span class="s2">                        ELSE NULL::NUMERIC END</span>
+<span class="s2">                        AS table_bytes,</span>
+<span class="s2">                    CASE WHEN expected_bytes &gt; 0</span>
+<span class="s2">                        THEN expected_bytes::NUMERIC</span>
+<span class="s2">                        ELSE NULL::NUMERIC END</span>
+<span class="s2">                            AS expected_bytes,</span>
+<span class="s2">                    CASE WHEN expected_bytes &gt; 0 AND table_bytes &gt; 0</span>
+<span class="s2">                        AND expected_bytes &lt;= table_bytes</span>
+<span class="s2">                        THEN (table_bytes - expected_bytes)::NUMERIC</span>
+<span class="s2">                        ELSE 0::NUMERIC END AS bloat_bytes</span>
+<span class="s2">            FROM estimates_with_toast</span>
+<span class="s2">            UNION ALL</span>
+<span class="s2">            SELECT current_database() as databasename,</span>
+<span class="s2">                table_schema, table_name, FALSE,</span>
+<span class="s2">                est_rows, table_size,</span>
+<span class="s2">                NULL::NUMERIC, NULL::NUMERIC</span>
+<span class="s2">            FROM no_stats&quot;&quot;&quot;</span>
+
+        <span class="c1"># do final math calculations and formatting</span>
+        <span class="n">bloat_data</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT current_database() as databasename,</span>
+<span class="s2">            schemaname, tablename, can_estimate,</span>
+<span class="s2">            table_bytes, round(table_bytes/(1024^2)::NUMERIC,3) as table_mb,</span>
+<span class="s2">            expected_bytes, round(expected_bytes/(1024^2)::NUMERIC,3) as expected_mb,</span>
+<span class="s2">            round(bloat_bytes*100/table_bytes) as pct_bloat,</span>
+<span class="s2">            round(bloat_bytes/(1024::NUMERIC^2),2) as mb_bloat,</span>
+<span class="s2">            table_bytes, expected_bytes, est_rows</span>
+<span class="s2">        FROM table_estimates_plus&quot;&quot;&quot;</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">resultproxy</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;WITH constants AS (</span><span class="si">{constants}</span><span class="s2">),</span><span class="se">\</span>
+<span class="s2">                no_stats AS (</span><span class="si">{no_stats}</span><span class="s2">),</span><span class="se">\</span>
+<span class="s2">                null_headers AS (</span><span class="si">{null_headers}</span><span class="s2">),</span><span class="se">\</span>
+<span class="s2">                data_headers AS (</span><span class="si">{data_headers}</span><span class="s2">),</span><span class="se">\</span>
+<span class="s2">                table_estimates AS (</span><span class="si">{table_estimates}</span><span class="s2">),</span><span class="se">\</span>
+<span class="s2">                estimates_with_toast AS (</span><span class="si">{estimates_with_toast}</span><span class="s2">),</span><span class="se">\</span>
+<span class="s2">                table_estimates_plus AS (</span><span class="si">{table_estimates_plus}</span><span class="s2">) &quot;</span> <span class="o">+</span> <span class="n">bloat_data</span><span class="p">)</span>
+
+            <span class="n">result</span> <span class="o">=</span> <span class="p">[{</span><span class="n">column</span><span class="p">:</span> <span class="n">value</span> <span class="k">for</span> <span class="n">column</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">rowproxy</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span> <span class="k">for</span> <span class="n">rowproxy</span> <span class="ow">in</span> <span class="n">resultproxy</span><span class="p">]</span>
+
+        <span class="n">bloat_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">table</span> <span class="k">for</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">result</span> <span class="k">if</span> <span class="n">table</span><span class="p">[</span><span class="s1">&#39;pct_bloat&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">table</span><span class="p">[</span><span class="s1">&#39;mb_bloat&#39;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">bloat_data</span></div></div>
 </pre></div>
 
           </div>
