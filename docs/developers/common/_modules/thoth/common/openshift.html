@@ -479,7 +479,7 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_status_report</span><span class="p">(</span><span class="n">state</span><span class="p">)</span></div>
 
     <span class="k">def</span> <span class="nf">_get_pod_id_from_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get pod name from a job.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Get a single pod name from a job.&quot;&quot;&quot;</span>
         <span class="c1"># Kubernetes automatically adds &#39;job-name&#39; label -&gt; reuse it.</span>
         <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Pod&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
             <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span>
@@ -498,6 +498,30 @@
             <span class="k">raise</span> <span class="n">NotFoundException</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Job with the given id </span><span class="si">{job_id}</span><span class="s2"> was not found&quot;</span><span class="p">)</span>
 
         <span class="n">result</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_get_pod_ids_from_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get multiple pod names from a job.</span>
+
+<span class="sd">        This function is useful for a Job which schedules multiple pods, i.e.</span>
+<span class="sd">        when run to completion.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Kubernetes automatically adds &#39;job-name&#39; label -&gt; reuse it.</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Pod&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span>
+            <span class="n">label_selector</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;job-name=</span><span class="si">{job_id}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;OpenShift response for pod ids from job: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;items&quot;</span><span class="p">,</span> <span class="p">[])):</span>
+            <span class="k">raise</span> <span class="n">NotFoundException</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Job with the given id </span><span class="si">{job_id}</span><span class="s2"> was not found&quot;</span><span class="p">)</span>
+
+        <span class="n">result</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">pod</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">pod</span> <span class="ow">in</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;items&quot;</span><span class="p">]</span>
+        <span class="p">]</span>
+
         <span class="k">return</span> <span class="n">result</span>
 
 <div class="viewcode-block" id="OpenShift.get_configmap"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_configmap">[docs]</a>    <span class="k">def</span> <span class="nf">get_configmap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">configmap_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
@@ -529,34 +553,62 @@
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">result</span></div>
 
+<div class="viewcode-block" id="OpenShift.get_job_status"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_job_status">[docs]</a>    <span class="k">def</span> <span class="nf">get_job_status</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get status of a Job and Pods created by the Job.</span>
+
+<span class="sd">        :raises: NotFoundError if no Job of such name is found in the namespace</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_TRANSLATION_TABLE</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;startTime&quot;</span><span class="p">:</span> <span class="s2">&quot;started_at&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;completionTime&quot;</span><span class="p">:</span> <span class="s2">&quot;finished_at&quot;</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="n">job_status</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">resources</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;batch/v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Job&quot;</span><span class="p">)</span>
+
+            <span class="n">job</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">job_id</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">job</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s2">&quot;conditions&quot;</span><span class="p">:</span>
+                    <span class="c1"># conditions are discarded</span>
+                    <span class="k">continue</span>
+                <span class="n">job_status</span><span class="p">[</span><span class="n">_TRANSLATION_TABLE</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">k</span><span class="p">)]</span> <span class="o">=</span> <span class="n">v</span>
+
+            <span class="c1"># add completions information so that we can determine whether</span>
+            <span class="c1"># the Job is already finished according to the number of `succeeded`</span>
+            <span class="c1"># pods</span>
+            <span class="n">job_status</span><span class="p">[</span><span class="s2">&quot;completions&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">job</span><span class="p">[</span><span class="s2">&quot;spec&quot;</span><span class="p">][</span><span class="s2">&quot;completions&quot;</span><span class="p">]</span>
+
+        <span class="k">except</span> <span class="n">OpenShiftNotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NotFoundException</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Job </span><span class="si">{job_id!r}</span><span class="s2"> not found in namespace </span><span class="si">{namespace!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="k">return</span> <span class="n">job_status</span></div>
+
 <div class="viewcode-block" id="OpenShift.get_job_status_report"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_job_status_report">[docs]</a>    <span class="k">def</span> <span class="nf">get_job_status_report</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
-        <span class="sd">&quot;&quot;&quot;Get status of a pod running inside a job.&quot;&quot;&quot;</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">job_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pod_id_from_job</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
-        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="c1"># Try to retrieve configmap - if we are successful it means we have registered the given</span>
-                <span class="c1"># job (workload), but it was queued due to resources not being available. This code will go away</span>
-                <span class="c1"># once we introduce a proper workflow management.</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">get_configmap</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
-                <span class="k">return</span> <span class="p">{</span>
-                    <span class="s2">&quot;container&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                    <span class="s2">&quot;exit_code&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                    <span class="s2">&quot;finished_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                    <span class="s2">&quot;reason&quot;</span><span class="p">:</span> <span class="s2">&quot;WorkloadRegistered&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;started_at&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-                    <span class="s2">&quot;state&quot;</span><span class="p">:</span> <span class="s2">&quot;registered&quot;</span><span class="p">,</span>
-                <span class="p">}</span>
-            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-                <span class="c1"># Try to obtain the job once again - this can avoid timing issues when job</span>
-                <span class="c1"># is just created and we are asking for the job id.</span>
-                <span class="n">job_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pod_id_from_job</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
+        <span class="sd">&quot;&quot;&quot;Get status report of a Job and Pods created by the Job.&quot;&quot;&quot;</span>
+        <span class="n">report</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_job_status</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_pod_status_report</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span></div>
+        <span class="n">pod_ids</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pod_ids_from_job</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
+        <span class="n">pods</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">get_pod_status_report</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pod_ids</span>
+        <span class="p">]</span>
+
+        <span class="n">report</span><span class="p">[</span><span class="s2">&quot;pods&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pods</span>
+        <span class="k">return</span> <span class="n">report</span></div>
 
 <div class="viewcode-block" id="OpenShift.get_job_log"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_job_log">[docs]</a>    <span class="k">def</span> <span class="nf">get_job_log</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get log of a pod running inside a job.&quot;&quot;&quot;</span>
+        <span class="n">pod_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pod_id_from_job</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_pod_log</span><span class="p">(</span><span class="n">pod_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="OpenShift.get_job_logs"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_job_logs">[docs]</a>    <span class="k">def</span> <span class="nf">get_job_logs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Get log of a pod running inside a job.&quot;&quot;&quot;</span>
         <span class="n">pod_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_pod_id_from_job</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_pod_log</span><span class="p">(</span><span class="n">pod_id</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span></div>
@@ -2586,7 +2638,32 @@
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Unknown job status </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="n">excptn</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">jobs_status_count</span></div></div>
+        <span class="k">return</span> <span class="n">jobs_status_count</span></div>
+
+<div class="viewcode-block" id="OpenShift.get_workflow"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_workflow">[docs]</a>    <span class="k">def</span> <span class="nf">get_workflow</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">label_selector</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get Workflow from a namespace, use label_selector to identify which one to get.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;argoproj.io/v1alpha1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Workflow&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;workflows&quot;</span>
+            <span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="n">label_selector</span>
+            <span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;OpenShift response for getting template by label_selector </span><span class="si">%r</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">label_selector</span><span class="p">,</span>
+                <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="n">OpenShiftNotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NotFoundException</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The given Workflow containing label </span><span class="si">{label_selector}</span><span class="s2"> could not be found&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+
+        <span class="n">wf</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">wf</span></div></div>
 </pre></div>
 
           </div>
