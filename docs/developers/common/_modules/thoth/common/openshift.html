@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.common.openshift &#8212; Thoth Common 0.10.9 documentation</title>
+    <title>thoth.common.openshift &#8212; Thoth Common 0.10.11 documentation</title>
     <link rel="stylesheet" href="../../../_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Common 0.10.9 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Common 0.10.11 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -77,6 +77,8 @@
 <span class="kn">import</span> <span class="nn">random</span>
 <span class="kn">import</span> <span class="nn">urllib3</span>
 <span class="kn">import</span> <span class="nn">time</span>
+
+<span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">urlparse</span>
 
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
@@ -1038,11 +1040,13 @@
             <span class="s1">&#39;THOTH_SOLVER_INDEXES&#39;</span><span class="p">:</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">indexes</span><span class="p">)</span> <span class="k">if</span> <span class="n">indexes</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
         <span class="p">}</span>
 
+        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_assign_workflow_parameters</span><span class="p">()</span>
+
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workflow</span><span class="p">(</span>
             <span class="n">workflow</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">workflow_manager</span><span class="o">.</span><span class="n">submit_solver_workflow</span><span class="p">,</span>
             <span class="n">parameters</span><span class="o">=</span><span class="p">{</span>
                 <span class="s2">&quot;template_parameters&quot;</span><span class="p">:</span> <span class="n">template_parameters</span><span class="p">,</span>
-                <span class="s2">&quot;workflow_parameters&quot;</span><span class="p">:</span> <span class="p">{},</span>
+                <span class="s2">&quot;workflow_parameters&quot;</span><span class="p">:</span> <span class="n">workflow_parameters</span><span class="p">,</span>
             <span class="p">},</span>
         <span class="p">)</span></div>
 
@@ -1725,7 +1729,7 @@
                 <span class="s2">&quot;THOTH_ADVISER_LIMIT_LATEST_VERSIONS&quot;</span>
             <span class="p">]</span> <span class="o">=</span> <span class="n">limit_latest_versions</span>
 
-        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_assign_workflow_parameters</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workflow</span><span class="p">(</span>
             <span class="n">workflow</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">workflow_manager</span><span class="o">.</span><span class="n">submit_adviser_workflow</span><span class="p">,</span>
@@ -1734,6 +1738,17 @@
                 <span class="s2">&quot;workflow_parameters&quot;</span><span class="p">:</span> <span class="n">workflow_parameters</span><span class="p">,</span>
             <span class="p">},</span>
         <span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">_assign_workflow_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Check and assign workflow parameters for different services.&quot;&quot;&quot;</span>
+        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;ceph_bucket_prefix&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_CEPH_BUCKET_PREFIX&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;ceph_bucket_name&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_CEPH_BUCKET&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;ceph_host&quot;</span><span class="p">:</span> <span class="n">urlparse</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_S3_ENDPOINT_URL&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">netloc</span><span class="p">,</span>
+            <span class="s2">&quot;deployment_name&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_DEPLOYMENT_NAME&quot;</span><span class="p">]</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">workflow_parameters</span>
 
 <div class="viewcode-block" id="OpenShift.run_adviser"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.run_adviser">[docs]</a>    <span class="k">def</span> <span class="nf">run_adviser</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
