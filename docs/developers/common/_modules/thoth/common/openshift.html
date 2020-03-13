@@ -698,215 +698,46 @@
         <span class="n">result</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">result</span></div>
 
-<div class="viewcode-block" id="OpenShift.create_inspection_imagestream"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.create_inspection_imagestream">[docs]</a>    <span class="k">def</span> <span class="nf">create_inspection_imagestream</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inspection_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Create imagestream for Amun.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
-                <span class="s2">&quot;Amun infra namespace is required in order to create Amun inspection imagestreams&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
-                <span class="s2">&quot;Unable to create inspection image stream without Amun inspection namespace being set&quot;</span>
-            <span class="p">)</span>
-
-        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span>
-            <span class="s2">&quot;template=amun-inspection-imagestream&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span>
-        <span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">set_template_parameters</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="n">AMUN_INSPECTION_ID</span><span class="o">=</span><span class="n">inspection_id</span><span class="p">)</span>
-        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">oc_process</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
-        <span class="n">imagestream</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">api_version</span><span class="o">=</span><span class="n">imagestream</span><span class="p">[</span><span class="s2">&quot;apiVersion&quot;</span><span class="p">],</span> <span class="n">kind</span><span class="o">=</span><span class="n">imagestream</span><span class="p">[</span><span class="s2">&quot;kind&quot;</span><span class="p">]</span>
-        <span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">body</span><span class="o">=</span><span class="n">imagestream</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">)</span>
-
-        <span class="n">response</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;OpenShift response for creating Amun ImageStream: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="p">)</span>
-
-        <span class="n">result</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">result</span></div>
-
-<div class="viewcode-block" id="OpenShift.schedule_inspection_build"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_inspection_build">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_inspection_build</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">inspection_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span>
+<div class="viewcode-block" id="OpenShift.schedule_inspection"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_inspection">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_inspection</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dockerfile</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">specification</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">target</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Schedule inspection build.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Schedule an inspection run.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">:</span>
             <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
-                <span class="s2">&quot;Unable to schedule inspection build without Amun inspection namespace being set&quot;</span>
+                <span class="s2">&quot;Unable to schedule inspection without Amun inspection namespace being set.&quot;</span>
             <span class="p">)</span>
 
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workload</span><span class="p">(</span>
-            <span class="n">run_method_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">run_inspection_build</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-            <span class="n">template_method_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">get_inspection_build_template</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-            <span class="n">template_method_parameters</span><span class="o">=</span><span class="p">{</span>
-                <span class="s2">&quot;parameters&quot;</span><span class="p">:</span> <span class="n">parameters</span><span class="p">,</span>
-                <span class="s2">&quot;use_hw_template&quot;</span><span class="p">:</span> <span class="n">use_hw_template</span><span class="p">,</span>
+        <span class="n">inspection_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_id</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;inspection&quot;</span><span class="p">,</span> <span class="n">identifier</span><span class="o">=</span><span class="n">specification</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;identifier&quot;</span><span class="p">))</span>
+
+        <span class="n">template_parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
+        <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_INSPECTION_ID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">inspection_id</span>
+        <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_GENERATED_DOCKERFILE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dockerfile</span>
+        <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_CPU&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;build&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">]</span>
+        <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_MEMORY&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;build&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span><span class="s2">&quot;memory&quot;</span><span class="p">]</span>
+
+        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_assign_workflow_parameters_for_ceph</span><span class="p">()</span>
+        <span class="n">workflow_parameters</span><span class="p">[</span><span class="s2">&quot;dockerfile&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dockerfile</span>
+        <span class="n">workflow_parameters</span><span class="p">[</span><span class="s2">&quot;specification&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">specification</span><span class="p">)</span>
+        <span class="n">workflow_parameters</span><span class="p">[</span><span class="s2">&quot;target&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">target</span>
+
+        <span class="k">if</span> <span class="s2">&quot;allowed_failures&quot;</span> <span class="ow">in</span> <span class="n">specification</span><span class="p">:</span>
+            <span class="n">workflow_parameters</span><span class="p">[</span><span class="s2">&quot;allowed-failures&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;allowed_failures&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">&quot;batch_size&quot;</span> <span class="ow">in</span> <span class="n">specification</span><span class="p">:</span>
+            <span class="n">workflow_parameters</span><span class="p">[</span><span class="s2">&quot;batch-size&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;batch_size&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="s2">&quot;parallelism&quot;</span> <span class="ow">in</span> <span class="n">specification</span><span class="p">:</span>
+            <span class="n">workflow_parameters</span><span class="p">[</span><span class="s2">&quot;parallelism&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;parallelism&quot;</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workflow</span><span class="p">(</span>
+            <span class="n">workflow</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">workflow_manager</span><span class="o">.</span><span class="n">submit_inspection_workflow</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">&quot;template_parameters&quot;</span><span class="p">:</span> <span class="n">template_parameters</span><span class="p">,</span>
+                <span class="s2">&quot;workflow_parameters&quot;</span><span class="p">:</span> <span class="n">workflow_parameters</span><span class="p">,</span>
             <span class="p">},</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">,</span>
-            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;amun-inspection-build&quot;</span><span class="p">,</span> <span class="s2">&quot;inspection&quot;</span><span class="p">:</span> <span class="n">inspection_id</span><span class="p">},</span>
-            <span class="n">job_id</span><span class="o">=</span><span class="n">inspection_id</span> <span class="o">+</span> <span class="s2">&quot;-build&quot;</span><span class="p">,</span>
         <span class="p">)</span></div>
-
-<div class="viewcode-block" id="OpenShift.get_inspection_build_template"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_inspection_build_template">[docs]</a>    <span class="k">def</span> <span class="nf">get_inspection_build_template</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Get inspection buildconfig that should be run.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
-                <span class="s2">&quot;Infra namespace is required in order to create inspection imagestreams&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
-                <span class="s2">&quot;Unable to create inspection buildconfig without Amun inspection namespace being set&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">use_hw_template</span><span class="p">:</span>
-            <span class="n">label_selector</span> <span class="o">=</span> <span class="s2">&quot;template=amun-inspection-buildconfig-with-cpu&quot;</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">label_selector</span> <span class="o">=</span> <span class="s2">&quot;template=amun-inspection-buildconfig&quot;</span>
-
-        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="n">label_selector</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">set_template_parameters</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="o">**</span><span class="n">parameters</span><span class="p">)</span>
-
-        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">oc_process</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">template</span></div>
-
-<div class="viewcode-block" id="OpenShift.run_inspection_build"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.run_inspection_build">[docs]</a>    <span class="k">def</span> <span class="nf">run_inspection_build</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">template</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Run the inspection build.&quot;&quot;&quot;</span>
-        <span class="n">buildconfig</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">api_version</span><span class="o">=</span><span class="n">buildconfig</span><span class="p">[</span><span class="s2">&quot;apiVersion&quot;</span><span class="p">],</span> <span class="n">kind</span><span class="o">=</span><span class="n">buildconfig</span><span class="p">[</span><span class="s2">&quot;kind&quot;</span><span class="p">]</span>
-        <span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">body</span><span class="o">=</span><span class="n">buildconfig</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">)</span>
-
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for creating Amun BuildConfig: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-        <span class="p">)</span>
-        <span class="n">result</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">name</span>
-        <span class="k">return</span> <span class="n">result</span></div>
-
-<div class="viewcode-block" id="OpenShift.schedule_inspection_job"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_inspection_job">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_inspection_job</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">inspection_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
-        <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
-        <span class="n">cpu_requests</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">memory_requests</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">infra_namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">registry</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Schedule the given job run, the scheduled job is handled by workload operator based resources available.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
-                <span class="s2">&quot;Unable to schedule inspection job without Amun inspection namespace being set&quot;</span>
-            <span class="p">)</span>
-
-        <span class="n">parameters</span> <span class="o">=</span> <span class="nb">locals</span><span class="p">()</span>
-        <span class="n">parameters</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;self&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-        <span class="n">parameters</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;inspection_id&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workload</span><span class="p">(</span>
-            <span class="n">run_method_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">run_inspection_job</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-            <span class="n">run_method_parameters</span><span class="o">=</span><span class="n">parameters</span><span class="p">,</span>
-            <span class="n">template_method_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">get_inspection_job_template</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
-            <span class="n">template_method_parameters</span><span class="o">=</span><span class="p">{</span>
-                <span class="s2">&quot;use_hw_template&quot;</span><span class="p">:</span> <span class="n">use_hw_template</span><span class="p">,</span>
-                <span class="s2">&quot;cpu_requests&quot;</span><span class="p">:</span> <span class="n">cpu_requests</span><span class="p">,</span>
-                <span class="s2">&quot;memory_requests&quot;</span><span class="p">:</span> <span class="n">memory_requests</span><span class="p">,</span>
-            <span class="p">},</span>
-            <span class="n">job_id</span><span class="o">=</span><span class="n">inspection_id</span><span class="p">,</span>
-            <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">,</span>
-            <span class="n">labels</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;component&quot;</span><span class="p">:</span> <span class="s2">&quot;amun-inspection&quot;</span><span class="p">},</span>
-        <span class="p">)</span></div>
-
-<div class="viewcode-block" id="OpenShift.run_inspection_job"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.run_inspection_job">[docs]</a>    <span class="k">def</span> <span class="nf">run_inspection_job</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span>
-        <span class="n">template</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="o">*</span><span class="p">,</span>
-        <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-        <span class="n">cpu_requests</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">memory_requests</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">infra_namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">registry</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Create the actual inspection job.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
-                <span class="s2">&quot;Amun infra namespace is required in order to create inspection job&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
-                <span class="s2">&quot;Amun inspection namespace is required in order to create inspection job&quot;</span>
-            <span class="p">)</span>
-
-        <span class="c1"># Fill in required fields for image pulling.</span>
-        <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;THOTH_INFRA_NAMESPACE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">infra_namespace</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span>
-        <span class="p">)</span>
-        <span class="k">if</span> <span class="n">registry</span><span class="p">:</span>
-            <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;THOTH_REGISTRY&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">registry</span>
-
-        <span class="n">template</span> <span class="o">=</span> <span class="n">template</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_inspection_job_template</span><span class="p">(</span>
-            <span class="n">use_hw_template</span><span class="o">=</span><span class="n">use_hw_template</span><span class="p">,</span>
-            <span class="n">cpu_requests</span><span class="o">=</span><span class="n">cpu_requests</span><span class="p">,</span>
-            <span class="n">memory_requests</span><span class="o">=</span><span class="n">memory_requests</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">set_template_parameters</span><span class="p">(</span><span class="n">template</span><span class="p">,</span> <span class="o">**</span><span class="n">parameters</span><span class="p">)</span>
-
-        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">oc_process</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
-        <span class="n">job</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">api_version</span><span class="o">=</span><span class="n">job</span><span class="p">[</span><span class="s2">&quot;apiVersion&quot;</span><span class="p">],</span> <span class="n">kind</span><span class="o">=</span><span class="n">job</span><span class="p">[</span><span class="s2">&quot;kind&quot;</span><span class="p">]</span>
-        <span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">body</span><span class="o">=</span><span class="n">job</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">)</span>
-
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for creating Amun Job: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-        <span class="p">)</span>
-        <span class="n">result</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">name</span>
-        <span class="k">return</span> <span class="n">result</span></div>
-
-<div class="viewcode-block" id="OpenShift.get_inspection_job_template"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_inspection_job_template">[docs]</a>    <span class="k">def</span> <span class="nf">get_inspection_job_template</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="o">*</span><span class="p">,</span>
-        <span class="n">use_hw_template</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
-        <span class="n">cpu_requests</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">memory_requests</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Get template for an inspection job.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_inspection_namespace</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
-                <span class="s2">&quot;Unable to create inspection job without Amun inspection namespace being set&quot;</span>
-            <span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">use_hw_template</span><span class="p">:</span>
-            <span class="n">label_selector</span> <span class="o">=</span> <span class="s2">&quot;template=amun-inspection-job-with-cpu&quot;</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">label_selector</span> <span class="o">=</span> <span class="s2">&quot;template=amun-inspection-job&quot;</span>
-
-        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="n">label_selector</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">amun_infra_namespace</span><span class="p">)</span>
-
-        <span class="c1"># We explicitly set template CPU and memory here so that we can schedule based</span>
-        <span class="c1"># on resources needed in the workload-operator. We cannot do this as a partial oc process,</span>
-        <span class="c1"># so we explicitly modify template here (other parameters are about to be expanded later).</span>
-        <span class="n">container_spec</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">][</span><span class="s2">&quot;template&quot;</span><span class="p">][</span><span class="s2">&quot;spec&quot;</span><span class="p">][</span>
-            <span class="s2">&quot;containers&quot;</span>
-        <span class="p">][</span><span class="mi">0</span><span class="p">]</span>
-
-        <span class="k">if</span> <span class="n">cpu_requests</span><span class="p">:</span>
-            <span class="n">container_spec</span><span class="p">[</span><span class="s2">&quot;resources&quot;</span><span class="p">][</span><span class="s2">&quot;limits&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cpu_requests</span>
-            <span class="n">container_spec</span><span class="p">[</span><span class="s2">&quot;resources&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">cpu_requests</span>
-
-        <span class="k">if</span> <span class="n">memory_requests</span><span class="p">:</span>
-            <span class="n">container_spec</span><span class="p">[</span><span class="s2">&quot;resources&quot;</span><span class="p">][</span><span class="s2">&quot;limits&quot;</span><span class="p">][</span><span class="s2">&quot;memory&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">memory_requests</span>
-            <span class="n">container_spec</span><span class="p">[</span><span class="s2">&quot;resources&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span><span class="s2">&quot;memory&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">memory_requests</span>
-
-        <span class="k">return</span> <span class="n">template</span></div>
 
 <div class="viewcode-block" id="OpenShift.get_solver_names"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_solver_names">[docs]</a>    <span class="k">def</span> <span class="nf">get_solver_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve name of solvers available in installation.&quot;&quot;&quot;</span>
@@ -914,23 +745,13 @@
             <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
                 <span class="s2">&quot;Infra namespace is required in order to list solvers&quot;</span>
             <span class="p">)</span>
-        <span class="n">label_selector</span> <span class="o">=</span> <span class="s2">&quot;template=solver&quot;</span>
 
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_argo</span><span class="p">:</span>
-            <span class="n">label_selector</span> <span class="o">=</span> <span class="s2">&quot;template=solver-workload-operator&quot;</span>
+        <span class="n">cm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_configmap</span><span class="p">(</span><span class="s2">&quot;thoth&quot;</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">)</span>
+        <span class="n">solvers</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">cm</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;solvers&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">solvers</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No solvers found in thoth ConfigMap&quot;</span><span class="p">)</span>
 
-        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-            <span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;template.openshift.io/v1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Template&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;templates&quot;</span>
-        <span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="n">label_selector</span><span class="p">)</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;OpenShift response for getting solver template: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-        <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
-        <span class="k">return</span> <span class="p">[</span>
-            <span class="n">obj</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;labels&quot;</span><span class="p">][</span><span class="s2">&quot;solver-type&quot;</span><span class="p">]</span>
-            <span class="k">for</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;objects&quot;</span><span class="p">]</span>
-            <span class="k">if</span> <span class="s2">&quot;solver-type&quot;</span> <span class="ow">in</span> <span class="n">obj</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;labels&quot;</span><span class="p">]</span>
-        <span class="p">]</span></div>
+        <span class="k">return</span> <span class="n">solvers</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_all_solvers"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_all_solvers">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_all_solvers</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1040,7 +861,7 @@
             <span class="s1">&#39;THOTH_SOLVER_INDEXES&#39;</span><span class="p">:</span> <span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">indexes</span><span class="p">)</span> <span class="k">if</span> <span class="n">indexes</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
         <span class="p">}</span>
 
-        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_assign_workflow_parameters</span><span class="p">()</span>
+        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_assign_workflow_parameters_for_ceph</span><span class="p">()</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workflow</span><span class="p">(</span>
             <span class="n">workflow</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">workflow_manager</span><span class="o">.</span><span class="n">submit_solver_workflow</span><span class="p">,</span>
@@ -1327,12 +1148,19 @@
         <span class="k">return</span> <span class="n">workflow</span><span class="p">(</span><span class="o">**</span><span class="n">parameters</span><span class="p">)</span>
 
 <div class="viewcode-block" id="OpenShift.generate_id"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.generate_id">[docs]</a>    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">generate_id</span><span class="p">(</span><span class="n">prefix</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">generate_id</span><span class="p">(</span><span class="n">prefix</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">identifier</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Generate an identifier.&quot;&quot;&quot;</span>
+        <span class="c1"># A very first method used &#39;generatedName&#39; in ImageStream configuration,</span>
+        <span class="c1"># but it looks like there is a bug in OpenShift as it did not generated any</span>
+        <span class="c1"># name and failed with regexp issues (that were not related to the</span>
+        <span class="c1"># generateName configuration).</span>
+        <span class="k">if</span> <span class="n">prefix</span> <span class="ow">and</span> <span class="n">identifier</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">-</span><span class="si">%s</span><span class="s2">-&quot;</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="si">%08x</span><span class="s2">&quot;</span><span class="p">)</span> <span class="o">%</span> <span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="n">identifier</span><span class="p">,</span> <span class="n">random</span><span class="o">.</span><span class="n">getrandbits</span><span class="p">(</span><span class="mi">32</span><span class="p">))</span>
+
         <span class="k">if</span> <span class="n">prefix</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">prefix</span> <span class="o">+</span> <span class="s2">&quot;-</span><span class="si">%08x</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">random</span><span class="o">.</span><span class="n">getrandbits</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">return</span> <span class="s2">&quot;-</span><span class="si">%08x</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">random</span><span class="o">.</span><span class="n">getrandbits</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span></div>
+
+        <span class="k">return</span> <span class="s2">&quot;-</span><span class="si">%08x</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">random</span><span class="o">.</span><span class="n">getrandbits</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_dependency_monkey"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_dependency_monkey">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_dependency_monkey</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -1729,9 +1557,9 @@
                 <span class="s2">&quot;THOTH_ADVISER_LIMIT_LATEST_VERSIONS&quot;</span>
             <span class="p">]</span> <span class="o">=</span> <span class="n">limit_latest_versions</span>
 
-        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_assign_workflow_parameters</span><span class="p">()</span>
+        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_assign_workflow_parameters_for_ceph</span><span class="p">()</span>
 
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workflow</span><span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workflow</span><span class="p">(</span>
             <span class="n">workflow</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">workflow_manager</span><span class="o">.</span><span class="n">submit_adviser_workflow</span><span class="p">,</span>
             <span class="n">parameters</span><span class="o">=</span><span class="p">{</span>
                 <span class="s2">&quot;template_parameters&quot;</span><span class="p">:</span> <span class="n">template_parameters</span><span class="p">,</span>
@@ -1739,8 +1567,8 @@
             <span class="p">},</span>
         <span class="p">)</span></div>
 
-    <span class="k">def</span> <span class="nf">_assign_workflow_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Check and assign workflow parameters for different services.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">_assign_workflow_parameters_for_ceph</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Check and assign workflow parameters for different services to interact with Ceph.&quot;&quot;&quot;</span>
         <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;ceph_bucket_prefix&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_CEPH_BUCKET_PREFIX&quot;</span><span class="p">],</span>
             <span class="s2">&quot;ceph_bucket_name&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_CEPH_BUCKET&quot;</span><span class="p">],</span>
@@ -2660,36 +2488,67 @@
         <span class="k">return</span> <span class="n">jobs_status_count</span></div>
 
 <div class="viewcode-block" id="OpenShift.get_workflow"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_workflow">[docs]</a>    <span class="k">def</span> <span class="nf">get_workflow</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">label_selector</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">label_selector</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Get Workflow from a namespace, use label_selector to identify which one to get.&quot;&quot;&quot;</span>
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-                <span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;argoproj.io/v1alpha1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Workflow&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;workflows&quot;</span>
-            <span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-                <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="n">label_selector</span>
-            <span class="p">)</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                <span class="s2">&quot;OpenShift response for getting template by label_selector </span><span class="si">%r</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                <span class="n">label_selector</span><span class="p">,</span>
-                <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
-            <span class="p">)</span>
-        <span class="k">except</span> <span class="n">OpenShiftNotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">NotFoundException</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;The given Workflow containing label </span><span class="si">{</span><span class="n">label_selector</span><span class="si">}</span><span class="s2"> could not be found&quot;</span>
-            <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+        <span class="sd">&quot;&quot;&quot;Get Workflow from a namespace, use one of name or label_selector to identify which one to get.&quot;&quot;&quot;</span>
+        <span class="n">wf</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">name</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">label_selector</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Only one of `name` or `label_selector` can be provided.&quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Ignoring `label_selector=</span><span class="si">{</span><span class="n">label_selector</span><span class="si">}</span><span class="s2">`.&quot;</span>
+                <span class="p">)</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;argoproj.io/v1alpha1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Workflow&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;workflows&quot;</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span>
+                <span class="p">)</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;OpenShift response for getting template by name </span><span class="si">%r</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">name</span><span class="p">,</span>
+                    <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="n">OpenShiftNotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">NotFoundException</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;The given Workflow </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> could not be found&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
 
-        <span class="n">wf</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">wf</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+        <span class="k">elif</span> <span class="n">label_selector</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">api_version</span><span class="o">=</span><span class="s2">&quot;argoproj.io/v1alpha1&quot;</span><span class="p">,</span> <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;Workflow&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;workflows&quot;</span>
+                <span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="n">label_selector</span>
+                <span class="p">)</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;OpenShift response for getting template by label_selector </span><span class="si">%r</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">label_selector</span><span class="p">,</span>
+                    <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="n">OpenShiftNotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">NotFoundException</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;The given Workflow containing label </span><span class="si">{</span><span class="n">label_selector</span><span class="si">}</span><span class="s2"> could not be found&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_raise_on_invalid_response_size</span><span class="p">(</span><span class="n">response</span><span class="p">)</span>
+
+            <span class="n">wf</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;items&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Either `name` or `label_selector` has to be provided.&quot;</span><span class="p">)</span>
+
         <span class="k">return</span> <span class="n">wf</span></div>
 
 <div class="viewcode-block" id="OpenShift.get_workflow_status"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_workflow_status">[docs]</a>    <span class="k">def</span> <span class="nf">get_workflow_status</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">label_selector</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">label_selector</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Get a Workflow status, use label_selector to identify which one to get.&quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Get a Workflow status, use one of name or label_selector to identify which one to get.&quot;&quot;&quot;</span>
         <span class="n">wf</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_workflow</span><span class="p">(</span>
-            <span class="n">label_selector</span><span class="o">=</span><span class="n">label_selector</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="n">label_selector</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">wf</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span></div></div>
