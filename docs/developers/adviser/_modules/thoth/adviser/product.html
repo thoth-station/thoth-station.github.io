@@ -128,35 +128,42 @@
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">hashes</span><span class="p">:</span>
                     <span class="n">log_once</span><span class="p">(</span><span class="n">_LOGGER</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_LOG_HASHES</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">,</span> <span class="s2">&quot;No hashes found for package </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">)</span>
 
-                <span class="c1"># Fill environment markers by checking dependencies that introduced this dependency.</span>
-                <span class="c1"># We do it only if we have no hashes - if hashes are present, the environment marker was</span>
-                <span class="c1"># already picked (can be set to None if no marker is present).</span>
-                <span class="c1"># For direct dependencies, dependents can return an empty set (if dependency is not</span>
-                <span class="c1"># shared with other dependencies) and marker is propagated from PackageVersion registered in</span>
-                <span class="c1"># Context.register_package_version.</span>
-                <span class="n">dependents_tuples</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">dependents</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">]</span>
-                <span class="k">for</span> <span class="n">dependent_tuple</span> <span class="ow">in</span> <span class="n">dependents_tuples</span><span class="p">:</span>
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="n">environment_marker</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_python_environment_marker</span><span class="p">(</span>
-                            <span class="o">*</span><span class="n">dependent_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-                            <span class="n">dependency_name</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-                            <span class="n">dependency_version</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
-                            <span class="n">os_name</span><span class="o">=</span><span class="n">dependent_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
-                            <span class="n">os_version</span><span class="o">=</span><span class="n">dependent_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
-                            <span class="n">python_version</span><span class="o">=</span><span class="n">dependent_tuple</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
-                        <span class="p">)</span>
-                    <span class="k">except</span> <span class="n">NotFoundError</span><span class="p">:</span>
-                        <span class="c1"># This can happen if we do resolution that is agnostic to runtime</span>
-                        <span class="c1"># environment. In that case a dependency introduced in one runtime</span>
-                        <span class="c1"># environment does not need to co-exist in another runtime environment considering</span>
-                        <span class="c1"># marker evaluation result.</span>
-                        <span class="k">continue</span>
+            <span class="c1"># Fill environment markers by checking dependencies that introduced this dependency.</span>
+            <span class="c1"># We do it only if we have no hashes - if hashes are present, the environment marker was</span>
+            <span class="c1"># already picked (can be set to None if no marker is present).</span>
+            <span class="c1"># For direct dependencies, dependents can return an empty set (if dependency is not</span>
+            <span class="c1"># shared with other dependencies) and marker is propagated from PackageVersion registered in</span>
+            <span class="c1"># Context.register_package_version.</span>
+            <span class="n">dependents_tuples</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">dependents</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">]</span>
 
-                    <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">markers</span> <span class="ow">and</span> <span class="n">environment_marker</span><span class="p">:</span>
-                        <span class="c1"># Install dependency if any of dependents need it.</span>
-                        <span class="n">package_version</span><span class="o">.</span><span class="n">markers</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">markers</span><span class="si">}</span><span class="s2">) or (</span><span class="si">{</span><span class="n">environment_marker</span><span class="si">}</span><span class="s2">)&quot;</span>
-                    <span class="k">elif</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">markers</span> <span class="ow">and</span> <span class="n">environment_marker</span><span class="p">:</span>
-                        <span class="n">package_version</span><span class="o">.</span><span class="n">markers</span> <span class="o">=</span> <span class="n">environment_marker</span>
+            <span class="c1"># Marker depends based on the stack that was resolved. Do not change package_version directly,</span>
+            <span class="c1"># rather clone it and used a cloned version not to clash with environment markers.</span>
+            <span class="n">environment_marker</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">for</span> <span class="n">dependent_tuple</span> <span class="ow">in</span> <span class="n">dependents_tuples</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">marker</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_python_environment_marker</span><span class="p">(</span>
+                        <span class="o">*</span><span class="n">dependent_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                        <span class="n">dependency_name</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                        <span class="n">dependency_version</span><span class="o">=</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                        <span class="n">os_name</span><span class="o">=</span><span class="n">dependent_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                        <span class="n">os_version</span><span class="o">=</span><span class="n">dependent_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+                        <span class="n">python_version</span><span class="o">=</span><span class="n">dependent_tuple</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+                    <span class="p">)</span>
+                <span class="k">except</span> <span class="n">NotFoundError</span><span class="p">:</span>
+                    <span class="c1"># This can happen if we do resolution that is agnostic to runtime</span>
+                    <span class="c1"># environment. In that case a dependency introduced in one runtime</span>
+                    <span class="c1"># environment does not need to co-exist in another runtime environment considering</span>
+                    <span class="c1"># marker evaluation result.</span>
+                    <span class="k">continue</span>
+
+                <span class="k">if</span> <span class="n">marker</span> <span class="ow">and</span> <span class="n">environment_marker</span><span class="p">:</span>
+                    <span class="c1"># Multiple markers based on dependency that introduced it.</span>
+                    <span class="n">environment_marker</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">environment_marker</span><span class="si">}</span><span class="s2">) or (</span><span class="si">{</span><span class="n">marker</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="k">elif</span> <span class="n">marker</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">environment_marker</span><span class="p">:</span>
+                    <span class="n">environment_marker</span> <span class="o">=</span> <span class="n">marker</span>
+
+            <span class="k">if</span> <span class="n">environment_marker</span><span class="p">:</span>
+                <span class="n">package_version</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">evolve</span><span class="p">(</span><span class="n">package_version</span><span class="p">,</span> <span class="n">markers</span><span class="o">=</span><span class="n">environment_marker</span><span class="p">)</span>
 
             <span class="n">package_versions_locked</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
 
