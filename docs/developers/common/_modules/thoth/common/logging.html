@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.common.logging &#8212; Thoth Common 0.12.3 documentation</title>
+    <title>thoth.common.logging &#8212; Thoth Common 0.12.4 documentation</title>
     <link rel="stylesheet" href="../../../_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Common 0.12.3 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Common 0.12.4 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -95,10 +95,10 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 <span class="n">_JSON_LOGGING_FORMAT</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">([</span>
     <span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;name&quot;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;levelno&quot;</span><span class="p">,</span> <span class="s2">&quot;levelno&quot;</span><span class="p">),</span>
+    <span class="c1"># (&quot;levelno&quot;, &quot;levelno&quot;),</span>
     <span class="p">(</span><span class="s2">&quot;levelname&quot;</span><span class="p">,</span> <span class="s2">&quot;levelname&quot;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;pathname&quot;</span><span class="p">,</span> <span class="s2">&quot;pathname&quot;</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">&quot;filename&quot;</span><span class="p">,</span> <span class="s2">&quot;filename&quot;</span><span class="p">),</span>
+    <span class="c1"># (&quot;pathname&quot;, &quot;pathname&quot;),</span>
+    <span class="c1"># (&quot;filename&quot;, &quot;filename&quot;),</span>
     <span class="p">(</span><span class="s2">&quot;module&quot;</span><span class="p">,</span> <span class="s2">&quot;module&quot;</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">&quot;lineno&quot;</span><span class="p">,</span> <span class="s2">&quot;lineno&quot;</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">&quot;funcname&quot;</span><span class="p">,</span> <span class="s2">&quot;funcName&quot;</span><span class="p">),</span>
@@ -288,10 +288,27 @@
             <span class="p">),</span>
         <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># The most straightforward way for setting up all the loggers (werkzeug, flask, gunicorn) is to</span>
+        <span class="c1"># discard their default configuration and force them to use JSON logger configured for the root logger.</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">_acquireLock</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">logger</span> <span class="ow">in</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="o">.</span><span class="n">manager</span><span class="o">.</span><span class="n">loggerDict</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">logging</span><span class="o">.</span><span class="n">Logger</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">logger</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;gunicorn.access&quot;</span><span class="p">:</span>
+                <span class="c1"># We configure access log in gunicorn config file, see API deployment</span>
+                <span class="c1"># configuration and gunicorn.conf.py file.</span>
+                <span class="k">continue</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">handlers</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">NOTSET</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">propagate</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">_releaseLock</span><span class="p">()</span>
+
         <span class="n">handler</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()</span>
         <span class="n">formatter</span> <span class="o">=</span> <span class="n">JsonFormatter</span><span class="p">(</span><span class="n">_JSON_LOGGING_FORMAT</span><span class="p">)</span>
         <span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">formatter</span><span class="p">)</span>
         <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
 
     <span class="n">root_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;thoth.common&quot;</span><span class="p">)</span>
     <span class="n">environment</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;SENTRY_ENVIRONMENT&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_DEPLOYMENT_NAME&quot;</span><span class="p">))</span>

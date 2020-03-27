@@ -230,18 +230,7 @@
     <span class="p">)</span>
     <span class="n">cli_parameters</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>
     <span class="n">stop_resolving</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-    <span class="n">log_final_state_count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
-        <span class="n">default</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span>
-            <span class="s2">&quot;THOTH_ADVISER_LOG_FINAL_STATE_COUNT&quot;</span><span class="p">,</span> <span class="n">DEFAULT_LOG_FINAL_STATE_COUNT</span>
-        <span class="p">),</span>
-    <span class="p">)</span>
-    <span class="n">log_final_state_top</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span>
-        <span class="n">default</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span>
-            <span class="s2">&quot;THOTH_ADVISER_LOG_FINAL_STATE_TOP&quot;</span><span class="p">,</span> <span class="n">DEFAULT_LOG_FINAL_STATE_TOP</span>
-        <span class="p">),</span>
-    <span class="p">)</span>
+    <span class="n">log_final_state_count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
 
     <span class="n">_beam</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Beam</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
     <span class="n">_solver</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
@@ -274,6 +263,12 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;Value for attribute </span><span class="si">{</span><span class="n">attribute</span><span class="si">!r}</span><span class="s2"> should be a positive integer, got </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2"> instead&quot;</span>
             <span class="p">)</span>
+
+    <span class="nd">@log_final_state_count</span><span class="o">.</span><span class="n">default</span>
+    <span class="k">def</span> <span class="nf">_log_final_state_count_default</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Determine how often the pipeline should log about its progress.&quot;&quot;&quot;</span>
+        <span class="c1"># Log each 10% by default.</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_LOG_FINAL_STATE_COUNT&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span> <span class="o">//</span> <span class="mi">10</span><span class="p">))</span> <span class="ow">or</span> <span class="mi">1</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">context</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Context</span><span class="p">:</span>
@@ -1047,28 +1042,16 @@
                 <span class="k">if</span> <span class="p">(</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span> <span class="o">-</span> <span class="mi">1</span>
                 <span class="p">)</span> <span class="o">%</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_final_state_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">log_final_state_top</span><span class="p">:</span>
-                        <span class="c1"># As logging top can give additional overhead, print top only if the user requested so.</span>
-                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                            <span class="s2">&quot;Pipeline reached </span><span class="si">%d</span><span class="s2"> final states out of </span><span class="si">%d</span><span class="s2"> requested in iteration </span><span class="si">%d</span><span class="s2"> &quot;</span>
-                            <span class="s2">&quot;(pipeline pace </span><span class="si">%.02f</span><span class="s2"> stacks/second), top rated software stack has a score of </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span>
-                            <span class="o">/</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">),</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
-                        <span class="p">)</span>
-                    <span class="k">else</span><span class="p">:</span>
-                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                            <span class="s2">&quot;Pipeline reached </span><span class="si">%d</span><span class="s2"> final states out of </span><span class="si">%d</span><span class="s2"> requested in &quot;</span>
-                            <span class="s2">&quot;iteration </span><span class="si">%d</span><span class="s2"> (pipeline pace </span><span class="si">%.02f</span><span class="s2"> stacks/second)&quot;</span><span class="p">,</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span>
-                            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span>
-                            <span class="o">/</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">),</span>
-                        <span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                        <span class="s2">&quot;Pipeline reached </span><span class="si">%d</span><span class="s2"> final states out of </span><span class="si">%d</span><span class="s2"> requested in iteration </span><span class="si">%d</span><span class="s2"> &quot;</span>
+                        <span class="s2">&quot;(pipeline pace </span><span class="si">%.02f</span><span class="s2"> stacks/second), top rated software stack has a score of </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span>
+                        <span class="o">/</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">),</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+                    <span class="p">)</span>
 
                 <span class="n">product</span> <span class="o">=</span> <span class="n">Product</span><span class="o">.</span><span class="n">from_final_state</span><span class="p">(</span>
                     <span class="n">context</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">final_state</span>
