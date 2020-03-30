@@ -83,11 +83,13 @@
 
 <span class="sd">&quot;&quot;&quot;An SQL database for storing Thoth data.&quot;&quot;&quot;</span>
 
+<span class="kn">import</span> <span class="nn">functools</span>
 <span class="kn">import</span> <span class="nn">re</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">weakref</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
@@ -101,9 +103,7 @@
 <span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
-<span class="kn">from</span> <span class="nn">methodtools</span> <span class="kn">import</span> <span class="n">lru_cache</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">create_engine</span>
-<span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">text</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">desc</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">func</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">exists</span>
@@ -114,7 +114,6 @@
 <span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="kn">import</span> <span class="n">sessionmaker</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy.orm.session</span> <span class="kn">import</span> <span class="n">Session</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy.dialects.postgresql</span> <span class="kn">import</span> <span class="n">insert</span>
-<span class="kn">from</span> <span class="nn">sqlalchemy.dialects</span> <span class="kn">import</span> <span class="n">postgresql</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy_utils.functions</span> <span class="kn">import</span> <span class="n">create_database</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy_utils.functions</span> <span class="kn">import</span> <span class="n">database_exists</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
@@ -196,8 +195,6 @@
 <span class="kn">from</span> <span class="nn">.models_performance</span> <span class="kn">import</span> <span class="n">PERFORMANCE_MODEL_BY_NAME</span><span class="p">,</span> <span class="n">ALL_PERFORMANCE_MODELS</span>
 <span class="kn">from</span> <span class="nn">.models_performance</span> <span class="kn">import</span> <span class="n">PERFORMANCE_MODELS_ML_FRAMEWORKS</span>
 
-<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">Counter</span>
-
 <span class="kn">from</span> <span class="nn">.sql_base</span> <span class="kn">import</span> <span class="n">SQLBase</span>
 <span class="kn">from</span> <span class="nn">.models_base</span> <span class="kn">import</span> <span class="n">Base</span>
 <span class="kn">from</span> <span class="nn">.query_result_base</span> <span class="kn">import</span> <span class="n">PythonQueryResult</span>
@@ -245,6 +242,33 @@
 
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="lru_cache"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.lru_cache">[docs]</a><span class="k">def</span> <span class="nf">lru_cache</span><span class="p">(</span><span class="o">*</span><span class="n">lru_args</span><span class="p">,</span> <span class="o">**</span><span class="n">lru_kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Implement a cache for methods.</span>
+
+<span class="sd">    Based on:</span>
+<span class="sd">      https://stackoverflow.com/questions/33672412/python-functools-lru-cache-with-class-methods-release-object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># XXX: possibly move to another module to make it available for the whole Thoth</span>
+    <span class="k">def</span> <span class="nf">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+        <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="k">def</span> <span class="nf">wrapped_func</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="c1"># We&#39;re storing the wrapped method inside the instance. If we had</span>
+            <span class="c1"># a strong reference to self the instance would never die.</span>
+            <span class="n">self_weak</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+            <span class="nd">@functools</span><span class="o">.</span><span class="n">wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+            <span class="nd">@functools</span><span class="o">.</span><span class="n">lru_cache</span><span class="p">(</span><span class="o">*</span><span class="n">lru_args</span><span class="p">,</span> <span class="o">**</span><span class="n">lru_kwargs</span><span class="p">)</span>
+            <span class="k">def</span> <span class="nf">cached_method</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="n">self_weak</span><span class="p">(),</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+            <span class="nb">setattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">func</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">cached_method</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">cached_method</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">wrapped_func</span>
+
+    <span class="k">return</span> <span class="n">decorator</span></div>
 
 
 <span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">()</span>
