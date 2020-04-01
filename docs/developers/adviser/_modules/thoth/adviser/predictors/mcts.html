@@ -85,6 +85,8 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 <span class="c1"># 0 means unlimited memory for policy learning.</span>
 <span class="n">_MCTS_POLICY_SIZE</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_MCTS_POLICY_SIZE&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+<span class="c1"># Percentage relative to `limit` for the heat-up part.</span>
+<span class="n">_MCTS_HEAT_UP</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_MCTS_HEAT_UP&quot;</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
 <span class="n">_MCTS_POLICY_SIZE_CHECK_ITERATION</span> <span class="o">=</span> <span class="mi">1024</span>
 
 
@@ -134,6 +136,11 @@
 
 <div class="viewcode-block" id="MCTS.run"><a class="viewcode-back" href="../../../../thoth.adviser.predictors.html#thoth.adviser.predictors.mcts.MCTS.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">State</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
         <span class="sd">&quot;&quot;&quot;Run MCTS with adaptive simulated annealing schedule.&quot;&quot;&quot;</span>
+        <span class="c1"># In a heat up part, we run TD-like learning on the first candidates, not to get stuck in one state</span>
+        <span class="c1"># that generates its children.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">limit</span> <span class="o">//</span> <span class="n">_MCTS_HEAT_UP</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
         <span class="c1"># As beam can be limited to width, it can happen that the last stack is pushed away (based on the score)</span>
         <span class="c1"># from the beam. To avoid expanding state that is not present in the beam, check that the last added state</span>
         <span class="c1"># in the beam is the one we keep as next expanded. If they do not match, the last added is not the next state</span>
