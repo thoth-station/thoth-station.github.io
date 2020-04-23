@@ -4465,6 +4465,45 @@
 
         <span class="k">return</span> <span class="n">importlib_metadata</span>
 
+<div class="viewcode-block" id="GraphDatabase.sync_revsolver_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.sync_revsolver_result">[docs]</a>    <span class="k">def</span> <span class="nf">sync_revsolver_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Sync results of the reverse solver.</span>
+
+<span class="sd">        This updates relations for DependsOn on a new package release.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dependency_name</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;solve&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+        <span class="n">dependency_version</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;solve&quot;</span><span class="p">][</span><span class="s2">&quot;version&quot;</span><span class="p">]</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">,</span> <span class="n">session</span><span class="o">.</span><span class="n">begin</span><span class="p">(</span><span class="n">subtransactions</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">python_package_version_entity</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+                <span class="n">session</span><span class="p">,</span>
+                <span class="n">package_name</span><span class="o">=</span><span class="n">dependency_name</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">=</span><span class="n">dependency_version</span><span class="p">,</span>
+                <span class="n">python_package_index_id</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">]:</span>
+                <span class="n">python_package_version</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">])</span>
+                    <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span> <span class="o">==</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">])</span>
+                    <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">os_name</span> <span class="o">==</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;os_name&quot;</span><span class="p">])</span>
+                    <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">os_version</span> <span class="o">==</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;os_version&quot;</span><span class="p">])</span>
+                    <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">python_version</span> <span class="o">==</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">])</span>
+                    <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
+                    <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">])</span>
+                    <span class="o">.</span><span class="n">one</span><span class="p">()</span>
+                <span class="p">)</span>
+
+                <span class="n">DependsOn</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+                    <span class="n">session</span><span class="p">,</span>
+                    <span class="n">version</span><span class="o">=</span><span class="n">python_package_version</span><span class="p">,</span>
+                    <span class="n">entity</span><span class="o">=</span><span class="n">python_package_version_entity</span><span class="p">,</span>
+                    <span class="n">version_range</span><span class="o">=</span><span class="n">entry</span><span class="p">[</span><span class="s2">&quot;version_range&quot;</span><span class="p">],</span>
+                    <span class="n">marker</span><span class="o">=</span><span class="n">entry</span><span class="p">[</span><span class="s2">&quot;marker&quot;</span><span class="p">],</span>
+                    <span class="n">extra</span><span class="o">=</span><span class="n">entry</span><span class="p">[</span><span class="s2">&quot;extra&quot;</span><span class="p">],</span>
+                    <span class="n">marker_evaluation_result</span><span class="o">=</span><span class="n">entry</span><span class="p">[</span><span class="s2">&quot;marker_evaluation_result&quot;</span><span class="p">],</span>
+                <span class="p">)</span></div>
+
 <div class="viewcode-block" id="GraphDatabase.sync_solver_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.sync_solver_result">[docs]</a>    <span class="k">def</span> <span class="nf">sync_solver_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Sync the given solver result to the graph database.&quot;&quot;&quot;</span>
         <span class="n">solver_document_id</span> <span class="o">=</span> <span class="n">SolverResultsStore</span><span class="o">.</span><span class="n">get_document_id</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
