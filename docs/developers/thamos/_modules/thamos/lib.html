@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.lib &#8212; Thamos 0.10.0 documentation</title>
+    <title>thamos.lib &#8212; Thamos 0.10.3 documentation</title>
     <link rel="stylesheet" href="../../_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 0.10.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 0.10.3 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -91,6 +91,7 @@
 <span class="kn">from</span> <span class="nn">invectio</span> <span class="kn">import</span> <span class="n">gather_library_usage</span>
 <span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="kn">import</span> <span class="n">run_command</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Project</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">ThothAdviserIntegrationEnum</span>
 
 <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">__version__</span> <span class="k">as</span> <span class="n">thamos_version</span>
 <span class="kn">from</span> <span class="nn">.swagger_client.rest</span> <span class="kn">import</span> <span class="n">ApiException</span>
@@ -105,6 +106,7 @@
 <span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">ProvenanceApi</span>
 <span class="kn">from</span> <span class="nn">.config</span> <span class="kn">import</span> <span class="n">config</span> <span class="k">as</span> <span class="n">thoth_config</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">UnknownAnalysisType</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="ne">TimeoutError</span>
 
 <span class="n">urllib3</span><span class="o">.</span><span class="n">disable_warnings</span><span class="p">(</span><span class="n">urllib3</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">InsecureRequestWarning</span><span class="p">)</span>
 
@@ -113,6 +115,7 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 <span class="n">_RETRY_ON_ERROR_COUNT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_RETRY_ON_ERROR_COUNT&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
 <span class="n">_RETRY_ON_ERROR_SLEEP</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_RETRY_ON_ERROR_SLEEP&quot;</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">))</span>
+<span class="n">_THAMOS_TIMEOUT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_TIMEOUT&quot;</span><span class="p">,</span> <span class="mi">2000</span><span class="p">))</span>
 
 
 <div class="viewcode-block" id="with_api_client"><a class="viewcode-back" href="../../thamos.html#thamos.lib.with_api_client">[docs]</a><span class="k">def</span> <span class="nf">with_api_client</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Callable</span><span class="p">):</span>
@@ -166,7 +169,10 @@
     <span class="n">retries</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">with</span> <span class="n">spinner</span><span class="p">():</span>
         <span class="n">sleep</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># TODO: remove once we fully run on Argo workflows</span>
+        <span class="n">start_time</span> <span class="o">=</span> <span class="n">monotonic</span><span class="p">()</span>
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">_THAMOS_TIMEOUT</span> <span class="ow">and</span> <span class="n">monotonic</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span> <span class="o">&gt;</span> <span class="n">_THAMOS_TIMEOUT</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TimeoutError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Thoth backend did not respond in time, timeout set to </span><span class="si">{</span><span class="n">_THAMOS_TIMEOUT</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">response</span> <span class="o">=</span> <span class="n">status_func</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
@@ -318,6 +324,7 @@
     <span class="n">github_check_run_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">github_installation_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">github_base_repo_url</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">source_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">ThothAdviserIntegrationEnum</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]:</span>
     <span class="sd">&quot;&quot;&quot;Submit a stack for adviser checks and wait for results.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">pipfile</span><span class="p">:</span>
@@ -376,11 +383,14 @@
     <span class="k">if</span> <span class="n">recommendation_type</span><span class="p">:</span>
         <span class="n">recommendation_type</span> <span class="o">=</span> <span class="n">recommendation_type</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
 
+    <span class="k">if</span> <span class="n">source_type</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">_is_s2i</span><span class="p">():</span>
+        <span class="n">source_type</span> <span class="o">=</span> <span class="n">ThothAdviserIntegrationEnum</span><span class="o">.</span><span class="n">S2I</span>
+
     <span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">&quot;recommendation_type&quot;</span><span class="p">:</span> <span class="n">recommendation_type</span><span class="p">,</span>
         <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
         <span class="s2">&quot;force&quot;</span><span class="p">:</span> <span class="n">force</span><span class="p">,</span>
-        <span class="s2">&quot;is_s2i&quot;</span><span class="p">:</span> <span class="n">_is_s2i</span><span class="p">(),</span>
+        <span class="s2">&quot;source_type&quot;</span><span class="p">:</span> <span class="n">source_type</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
         <span class="s2">&quot;origin&quot;</span><span class="p">:</span> <span class="n">_get_origin</span><span class="p">(),</span>
         <span class="s2">&quot;dev&quot;</span><span class="p">:</span> <span class="n">dev</span><span class="p">,</span>
     <span class="p">}</span>
@@ -439,23 +449,24 @@
 
 
 <div class="viewcode-block" id="advise_here"><a class="viewcode-back" href="../../thamos.html#thamos.lib.advise_here">[docs]</a><span class="k">def</span> <span class="nf">advise_here</span><span class="p">(</span>
-    <span class="n">recommendation_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">recommendation_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">runtime_environment</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">runtime_environment_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">limit_latest_versions</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">runtime_environment_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">limit_latest_versions</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">no_static_analysis</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">nowait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">limit</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">origin</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">github_event_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">github_check_run_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">github_installation_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">github_base_repo_url</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">github_base_repo_url</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">source_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">ThothAdviserIntegrationEnum</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]:</span>
     <span class="sd">&quot;&quot;&quot;Run advise in current directory, requires no arguments.&quot;&quot;&quot;</span>
     <span class="n">requirements_format</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">requirements_format</span>
@@ -466,29 +477,30 @@
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown configuration option for requirements format: </span><span class="si">{</span><span class="n">requirements_format</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;Pipfile&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pipfile</span><span class="p">:</span>
-        <span class="n">pipfile_lock_str</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">pipfile</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span>
+    <span class="n">pipfile_lock_str</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
 
-        <span class="k">return</span> <span class="n">advise</span><span class="p">(</span>
-            <span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span>
-            <span class="n">pipfile_lock</span><span class="o">=</span><span class="n">pipfile_lock_str</span><span class="p">,</span>
-            <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span><span class="p">,</span>
-            <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
-            <span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment_name</span><span class="p">,</span>
-            <span class="n">limit_latest_versions</span><span class="o">=</span><span class="n">limit_latest_versions</span><span class="p">,</span>
-            <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span>
-            <span class="n">no_static_analysis</span><span class="o">=</span><span class="n">no_static_analysis</span><span class="p">,</span>
-            <span class="n">nowait</span><span class="o">=</span><span class="n">nowait</span><span class="p">,</span>
-            <span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span>
-            <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span>
-            <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
-            <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
-            <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
-            <span class="n">github_event_type</span><span class="o">=</span><span class="n">github_event_type</span><span class="p">,</span>
-            <span class="n">github_check_run_id</span><span class="o">=</span><span class="n">github_check_run_id</span><span class="p">,</span>
-            <span class="n">github_installation_id</span><span class="o">=</span><span class="n">github_installation_id</span><span class="p">,</span>
-            <span class="n">github_base_repo_url</span><span class="o">=</span><span class="n">github_base_repo_url</span><span class="p">,</span>
-        <span class="p">)</span></div>
+    <span class="k">return</span> <span class="n">advise</span><span class="p">(</span>
+        <span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span>
+        <span class="n">pipfile_lock</span><span class="o">=</span><span class="n">pipfile_lock_str</span><span class="p">,</span>
+        <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span><span class="p">,</span>
+        <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
+        <span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment_name</span><span class="p">,</span>
+        <span class="n">limit_latest_versions</span><span class="o">=</span><span class="n">limit_latest_versions</span><span class="p">,</span>
+        <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span>
+        <span class="n">no_static_analysis</span><span class="o">=</span><span class="n">no_static_analysis</span><span class="p">,</span>
+        <span class="n">nowait</span><span class="o">=</span><span class="n">nowait</span><span class="p">,</span>
+        <span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span>
+        <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span>
+        <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
+        <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+        <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+        <span class="n">source_type</span><span class="o">=</span><span class="n">source_type</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="n">github_event_type</span><span class="o">=</span><span class="n">github_event_type</span><span class="p">,</span>
+        <span class="n">github_check_run_id</span><span class="o">=</span><span class="n">github_check_run_id</span><span class="p">,</span>
+        <span class="n">github_installation_id</span><span class="o">=</span><span class="n">github_installation_id</span><span class="p">,</span>
+        <span class="n">github_base_repo_url</span><span class="o">=</span><span class="n">github_base_repo_url</span><span class="p">,</span>
+    <span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="provenance_check"><a class="viewcode-back" href="../../thamos.html#thamos.lib.provenance_check">[docs]</a><span class="nd">@with_api_client</span>

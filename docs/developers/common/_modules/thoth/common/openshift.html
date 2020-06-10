@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.common.openshift &#8212; Thoth Common 0.13.1 documentation</title>
+    <title>thoth.common.openshift &#8212; Thoth Common 0.13.9 documentation</title>
     <link rel="stylesheet" href="../../../_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Common 0.13.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Common 0.13.9 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -76,7 +76,6 @@
 <span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">import</span> <span class="nn">random</span>
 <span class="kn">import</span> <span class="nn">urllib3</span>
-<span class="kn">import</span> <span class="nn">time</span>
 
 <span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">urlparse</span>
 
@@ -87,14 +86,23 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 
 <span class="kn">from</span> <span class="nn">openshift.dynamic.exceptions</span> <span class="kn">import</span> <span class="n">NotFoundError</span> <span class="k">as</span> <span class="n">OpenShiftNotFoundError</span>
-
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NotKnownThothIntegration</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">QebHwtInputsMissing</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">KebechetInputsMissing</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NotFoundException</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">ConfigurationError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">SolverNameParseError</span>
 <span class="kn">from</span> <span class="nn">.helpers</span> <span class="kn">import</span> <span class="p">(</span>
     <span class="n">get_service_account_token</span><span class="p">,</span>
     <span class="n">_get_incluster_token_file</span><span class="p">,</span>
     <span class="n">_get_incluster_ca_file</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">ThothAdviserIntegrationEnum</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">.workflows</span> <span class="kn">import</span> <span class="n">WorkflowManager</span>
 
 <span class="n">urllib3</span><span class="o">.</span><span class="n">disable_warnings</span><span class="p">()</span>
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
@@ -199,7 +207,7 @@
             <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_use_argo</span> <span class="o">=</span> <span class="n">use_argo</span> <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_USE_ARGO&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_workflow_manager</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_workflow_manager</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="s2">&quot;WorkflowManager&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">token</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -221,7 +229,7 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_use_argo</span>
 
     <span class="nd">@use_argo</span><span class="o">.</span><span class="n">setter</span>
-    <span class="k">def</span> <span class="nf">use_argo</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">use_argo</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enable</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Set whether Argo Workflows are enabled.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">enable</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Argo Workflows enabled&quot;</span><span class="p">)</span>
@@ -231,15 +239,90 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_use_argo</span> <span class="o">=</span> <span class="n">enable</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">workflow_manager</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">workflow_manager</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;WorkflowManager&quot;</span><span class="p">:</span>  <span class="c1"># by using a string here we create a forward reference</span>
         <span class="sd">&quot;&quot;&quot;Return WorkflowManager instance.</span>
 
 <span class="sd">        This property lazily initializes the WorkflowManager.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_workflow_manager</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="kn">from</span> <span class="nn">.workflows</span> <span class="kn">import</span> <span class="n">WorkflowManager</span>
+
             <span class="bp">self</span><span class="o">.</span><span class="n">_workflow_manager</span> <span class="o">=</span> <span class="n">WorkflowManager</span><span class="p">(</span><span class="n">openshift</span><span class="o">=</span><span class="bp">self</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_workflow_manager</span>
+
+<div class="viewcode-block" id="OpenShift.normalize_os_version"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.normalize_os_version">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">normalize_os_version</span><span class="p">(</span>
+        <span class="n">os_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">os_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Normalize operating system version based on operating system used.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">os_name</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">os_version</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">os_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;rhel&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">os_version</span>
+
+        <span class="c1"># Discard any minor release, if present.</span>
+        <span class="k">return</span> <span class="n">os_version</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="OpenShift.parse_python_solver_name"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.parse_python_solver_name">[docs]</a>    <span class="k">def</span> <span class="nf">parse_python_solver_name</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">solver_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Parse os and Python identifiers encoded into solver name.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">solver_name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;solver-&quot;</span><span class="p">):</span>
+            <span class="n">solver_identifiers</span> <span class="o">=</span> <span class="n">solver_name</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;solver-&quot;</span><span class="p">)</span> <span class="p">:]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SolverNameParseError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Solver name has to start with &#39;solver-&#39; prefix: </span><span class="si">{</span><span class="n">solver_name</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">parts</span> <span class="o">=</span> <span class="n">solver_identifiers</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SolverNameParseError</span><span class="p">(</span>
+                <span class="s2">&quot;Solver should be in a form of &#39;solver-&lt;os_name&gt;-&lt;os_version&gt;-&lt;python_version&gt;, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;solver name </span><span class="si">{</span><span class="n">solver_name</span><span class="si">!r}</span><span class="s2"> does not correspond to this naming schema&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">python_version</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">python_version</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;py&quot;</span><span class="p">):</span>
+            <span class="n">python_version</span> <span class="o">=</span> <span class="n">python_version</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;py&quot;</span><span class="p">)</span> <span class="p">:]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SolverNameParseError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Python version encoded into Python solver name does not start with &#39;py&#39; prefix: </span><span class="si">{</span><span class="n">solver_name</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">python_version</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">python_version</span><span class="p">))</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;os_name&quot;</span><span class="p">:</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="s2">&quot;os_version&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_os_version</span><span class="p">(</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]),</span>
+            <span class="s2">&quot;python_version&quot;</span><span class="p">:</span> <span class="n">python_version</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+<div class="viewcode-block" id="OpenShift.obtain_solver_from_runtime_environment"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.obtain_solver_from_runtime_environment">[docs]</a>    <span class="k">def</span> <span class="nf">obtain_solver_from_runtime_environment</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Define solver from runtime_environment.&quot;&quot;&quot;</span>
+        <span class="n">solver</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">operating_system</span> <span class="o">=</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;operating_system&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">operating_system</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">solver</span>
+
+        <span class="n">os_name</span> <span class="o">=</span> <span class="n">runtime_environment</span><span class="p">[</span><span class="s2">&quot;operating_system&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+        <span class="n">os_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_os_version</span><span class="p">(</span>
+            <span class="n">operating_system</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">),</span> <span class="n">operating_system</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">python_version</span> <span class="o">=</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;python_version&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">os_version</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">solver</span>
+
+        <span class="k">if</span> <span class="n">python_version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">solver</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;solver-</span><span class="si">{</span><span class="n">os_name</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">os_version</span><span class="si">}</span><span class="s2">-py</span><span class="si">{</span><span class="n">python_version</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">solver</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;solver-</span><span class="si">{</span><span class="n">os_name</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">os_version</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">parse_python_solver_name</span><span class="p">(</span><span class="n">solver</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">solver</span></div>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">_set_env_var</span><span class="p">(</span><span class="n">template</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="o">**</span><span class="n">env_var</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -461,7 +544,7 @@
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">_status_report</span><span class="p">(</span><span class="n">status</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
         <span class="sd">&quot;&quot;&quot;Construct status response for API response from master API response.&quot;&quot;&quot;</span>
-        <span class="n">_TRANSLATION_TABLE</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">_TRANSLATION_TABLE</span> <span class="o">=</span> <span class="p">{</span>  <span class="c1"># noqa</span>
             <span class="s2">&quot;exitCode&quot;</span><span class="p">:</span> <span class="s2">&quot;exit_code&quot;</span><span class="p">,</span>
             <span class="s2">&quot;finishedAt&quot;</span><span class="p">:</span> <span class="s2">&quot;finished_at&quot;</span><span class="p">,</span>
             <span class="s2">&quot;reason&quot;</span><span class="p">:</span> <span class="s2">&quot;reason&quot;</span><span class="p">,</span>
@@ -483,7 +566,7 @@
         <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">status</span><span class="p">[</span><span class="n">state</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;containerID&quot;</span><span class="p">:</span>
                 <span class="n">value</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="n">value</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;docker://&quot;</span><span class="p">):]</span>
+                    <span class="n">value</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;docker://&quot;</span><span class="p">)</span> <span class="p">:]</span>
                     <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;docker://&quot;</span><span class="p">)</span>
                     <span class="k">else</span> <span class="n">value</span>
                 <span class="p">)</span>
@@ -580,7 +663,7 @@
 
 <span class="sd">        :raises: NotFoundError if no Job of such name is found in the namespace</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">_TRANSLATION_TABLE</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">_TRANSLATION_TABLE</span> <span class="o">=</span> <span class="p">{</span>  <span class="c1"># noqa</span>
             <span class="s2">&quot;startTime&quot;</span><span class="p">:</span> <span class="s2">&quot;started_at&quot;</span><span class="p">,</span>
             <span class="s2">&quot;completionTime&quot;</span><span class="p">:</span> <span class="s2">&quot;finished_at&quot;</span><span class="p">,</span>
         <span class="p">}</span>
@@ -723,7 +806,7 @@
         <span class="n">specification</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
         <span class="n">target</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Schedule an inspection run.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_argo</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
@@ -741,10 +824,16 @@
         <span class="n">template_parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">parameters</span><span class="p">)</span>
         <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;THOTH_INFRA_NAMESPACE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span>
         <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_INSPECTION_ID&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">inspection_id</span>
-        <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_BUILD_CPU&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;build&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">]</span>
-        <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_BUILD_MEMORY&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;build&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span><span class="s2">&quot;memory&quot;</span><span class="p">]</span>
+        <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_BUILD_CPU&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;build&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span>
+            <span class="s2">&quot;cpu&quot;</span>
+        <span class="p">]</span>
+        <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_BUILD_MEMORY&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;build&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span>
+            <span class="s2">&quot;memory&quot;</span>
+        <span class="p">]</span>
         <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_RUN_CPU&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;run&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span><span class="s2">&quot;cpu&quot;</span><span class="p">]</span>
-        <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_RUN_MEMORY&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;run&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span><span class="s2">&quot;memory&quot;</span><span class="p">]</span>
+        <span class="n">template_parameters</span><span class="p">[</span><span class="s2">&quot;AMUN_RUN_MEMORY&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">specification</span><span class="p">[</span><span class="s2">&quot;run&quot;</span><span class="p">][</span><span class="s2">&quot;requests&quot;</span><span class="p">][</span>
+            <span class="s2">&quot;memory&quot;</span>
+        <span class="p">]</span>
 
         <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_assign_workflow_parameters_for_ceph</span><span class="p">()</span>
         <span class="n">workflow_parameters</span><span class="p">[</span><span class="s2">&quot;dockerfile&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dockerfile</span>
@@ -769,18 +858,18 @@
                 <span class="s2">&quot;Infra namespace is required in order to list solvers&quot;</span>
             <span class="p">)</span>
 
-        <span class="n">cm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_configmap</span><span class="p">(</span><span class="s2">&quot;thoth&quot;</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">)</span>
+        <span class="n">cm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_configmap</span><span class="p">(</span><span class="s2">&quot;solvers&quot;</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">)</span>
         <span class="n">solvers</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">cm</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;solvers&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()]</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">solvers</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No solvers found in thoth ConfigMap&quot;</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No solvers found in solvers ConfigMap&quot;</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">solvers</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_all_solvers"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_all_solvers">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_all_solvers</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">packages</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">output</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
+        <span class="n">output</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">indexes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">transitive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -796,8 +885,8 @@
                 <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
                 <span class="n">transitive</span><span class="o">=</span><span class="n">transitive</span><span class="p">,</span>
             <span class="p">)</span>
-
-            <span class="n">solver_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">solver_id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">solver_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">solver_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">solver_id</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="n">solver_ids</span></div>
 
@@ -848,14 +937,14 @@
 <div class="viewcode-block" id="OpenShift.schedule_solver"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_solver">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_solver</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">packages</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-        <span class="n">output</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">solver</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="o">*</span><span class="p">,</span>
+        <span class="n">output</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">indexes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">transitive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">job_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Schedule the given solver.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">middletier_namespace</span><span class="p">:</span>
             <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
@@ -1171,7 +1260,9 @@
 
         <span class="k">return</span> <span class="n">job_id</span>
 
-    <span class="k">def</span> <span class="nf">_schedule_workflow</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">workflow</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Callable</span><span class="p">,</span> <span class="n">parameters</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">def</span> <span class="nf">_schedule_workflow</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">workflow</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Schedule an Argo Workflow.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">workflow</span><span class="p">(</span><span class="o">**</span><span class="n">parameters</span><span class="p">)</span>
 
@@ -1262,9 +1353,9 @@
             <span class="s2">&quot;IMAGE_STREAM_NAMESPACE&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span>
             <span class="s2">&quot;THOTH_ADVISER_REQUIREMENTS&quot;</span><span class="p">:</span> <span class="n">requirements</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\\</span><span class="s2">n&quot;</span><span class="p">),</span>
             <span class="s2">&quot;THOTH_ADVISER_PIPELINE&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">pipeline</span><span class="p">),</span>
-            <span class="s2">&quot;THOTH_ADVISER_RUNTIME_ENVIRONMENT&quot;</span><span class="p">:</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">runtime_environment</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
-                <span class="n">runtime_environment</span>
-            <span class="p">),</span>
+            <span class="s2">&quot;THOTH_ADVISER_RUNTIME_ENVIRONMENT&quot;</span><span class="p">:</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">runtime_environment</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">),</span>
             <span class="s2">&quot;THOTH_AMUN_CONTEXT&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">context</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\\</span><span class="s2">n&quot;</span><span class="p">),</span>
             <span class="s2">&quot;THOTH_DEPENDENCY_MONKEY_STACK_OUTPUT&quot;</span><span class="p">:</span> <span class="n">stack_output</span> <span class="ow">or</span> <span class="s2">&quot;-&quot;</span><span class="p">,</span>
             <span class="s2">&quot;THOTH_DEPENDENCY_MONKEY_REPORT_OUTPUT&quot;</span><span class="p">:</span> <span class="n">report_output</span> <span class="ow">or</span> <span class="s2">&quot;-&quot;</span><span class="p">,</span>
@@ -1510,6 +1601,66 @@
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span><span class="s2">&quot;template=build-dependencies&quot;</span><span class="p">)</span></div>
 
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_verify_thoth_integration</span><span class="p">(</span><span class="n">source_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Verify if Thoth integration exists.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">source_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">ThothAdviserIntegrationEnum</span><span class="o">.</span><span class="n">__members__</span>
+            <span class="ow">and</span> <span class="n">source_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="n">NotKnownThothIntegration</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;This integration </span><span class="si">{</span><span class="n">source_type</span><span class="si">}</span><span class="s2"> is not provided </span><span class="se">\</span>
+<span class="s2">                    in Thoth: </span><span class="si">{</span><span class="n">ThothAdviserIntegrationEnum</span><span class="o">.</span><span class="n">__members__</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+<div class="viewcode-block" id="OpenShift.verify_github_app_inputs"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.verify_github_app_inputs">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">verify_github_app_inputs</span><span class="p">(</span>
+        <span class="n">github_event_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">github_check_run_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">github_installation_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">github_base_repo_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">origin</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Verify if Thoth GitHub App integration inputs are correct.&quot;&quot;&quot;</span>
+        <span class="n">parameters</span> <span class="o">=</span> <span class="nb">locals</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+            <span class="k">raise</span> <span class="n">QebHwtInputsMissing</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Not all inputs to schedule Qeb-Hwt GitHub App are provided: </span><span class="si">{</span><span class="n">parameters</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span></div>
+
+<div class="viewcode-block" id="OpenShift.verify_kebechet_inputs"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.verify_kebechet_inputs">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">verify_kebechet_inputs</span><span class="p">(</span>
+        <span class="n">origin</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Verify if Thoth Kebechet integration inputs are correct.&quot;&quot;&quot;</span>
+        <span class="n">parameters</span> <span class="o">=</span> <span class="nb">locals</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">parameters</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+            <span class="k">raise</span> <span class="n">KebechetInputsMissing</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Not all inputs to schedule Kebechet are provided: </span><span class="si">{</span><span class="n">parameters</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="OpenShift.verify_integration_inputs"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.verify_integration_inputs">[docs]</a>    <span class="k">def</span> <span class="nf">verify_integration_inputs</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">source_type</span><span class="p">:</span> <span class="n">ThothAdviserIntegrationEnum</span><span class="p">,</span>
+        <span class="n">github_event_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">github_check_run_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">github_installation_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">github_base_repo_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">origin</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Verify if inputs for registered Thoth integrations are correct.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">source_type</span> <span class="ow">is</span> <span class="n">ThothAdviserIntegrationEnum</span><span class="o">.</span><span class="n">GITHUB_APP</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">verify_github_app_inputs</span><span class="p">(</span>
+                <span class="n">github_event_type</span><span class="o">=</span><span class="n">github_event_type</span><span class="p">,</span>
+                <span class="n">github_check_run_id</span><span class="o">=</span><span class="n">github_check_run_id</span><span class="p">,</span>
+                <span class="n">github_installation_id</span><span class="o">=</span><span class="n">github_installation_id</span><span class="p">,</span>
+                <span class="n">github_base_repo_url</span><span class="o">=</span><span class="n">github_base_repo_url</span><span class="p">,</span>
+                <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">source_type</span> <span class="ow">is</span> <span class="n">ThothAdviserIntegrationEnum</span><span class="o">.</span><span class="n">KEBECHET</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">verify_kebechet_inputs</span><span class="p">(</span>
+                <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+            <span class="p">)</span></div>
+
 <div class="viewcode-block" id="OpenShift.schedule_adviser"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_adviser">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_adviser</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">application_stack</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
@@ -1521,7 +1672,6 @@
         <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">library_usage</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">origin</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">is_s2i</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">job_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1531,12 +1681,25 @@
         <span class="n">github_installation_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">github_base_repo_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">re_run_adviser_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">source_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ThothAdviserIntegrationEnum</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Schedule an adviser run.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend_namespace</span><span class="p">:</span>
             <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
                 <span class="s2">&quot;Unable to schedule adviser without backend namespace being set&quot;</span>
             <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">source_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_verify_thoth_integration</span><span class="p">(</span><span class="n">source_type</span><span class="o">=</span><span class="n">source_type</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">verify_integration_inputs</span><span class="p">(</span>
+            <span class="n">source_type</span><span class="o">=</span><span class="n">source_type</span><span class="p">,</span>
+            <span class="n">github_event_type</span><span class="o">=</span><span class="n">github_event_type</span><span class="p">,</span>
+            <span class="n">github_check_run_id</span><span class="o">=</span><span class="n">github_check_run_id</span><span class="p">,</span>
+            <span class="n">github_installation_id</span><span class="o">=</span><span class="n">github_installation_id</span><span class="p">,</span>
+            <span class="n">github_base_repo_url</span><span class="o">=</span><span class="n">github_base_repo_url</span><span class="p">,</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+        <span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_argo</span><span class="p">:</span>
             <span class="n">job_id</span> <span class="o">=</span> <span class="n">job_id</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_id</span><span class="p">(</span><span class="s2">&quot;adviser&quot;</span><span class="p">)</span>
@@ -1581,8 +1744,8 @@
                 <span class="s2">&quot;github_installation_id&quot;</span><span class="p">:</span> <span class="n">github_installation_id</span><span class="p">,</span>
                 <span class="s2">&quot;github_base_repo_url&quot;</span><span class="p">:</span> <span class="n">github_base_repo_url</span><span class="p">,</span>
                 <span class="s2">&quot;origin&quot;</span><span class="p">:</span> <span class="n">origin</span><span class="p">,</span>
-                <span class="s2">&quot;is_s2i&quot;</span><span class="p">:</span> <span class="n">is_s2i</span><span class="p">,</span>
                 <span class="s2">&quot;re_run_adviser_id&quot;</span><span class="p">:</span> <span class="n">re_run_adviser_id</span><span class="p">,</span>
+                <span class="s2">&quot;source_type&quot;</span><span class="p">:</span> <span class="n">source_type</span><span class="p">,</span>
             <span class="p">}</span>
         <span class="p">)</span>
 
@@ -1629,7 +1792,6 @@
         <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">library_usage</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">origin</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">is_s2i</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">job_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1640,6 +1802,7 @@
         <span class="n">github_base_repo_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">re_run_adviser_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">template</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">source_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ThothAdviserIntegrationEnum</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Run adviser on the provided user input.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend_namespace</span><span class="p">:</span>
@@ -1647,10 +1810,22 @@
                 <span class="s2">&quot;Running adviser requires backend namespace configuration&quot;</span>
             <span class="p">)</span>
 
+        <span class="k">if</span> <span class="n">source_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_verify_thoth_integration</span><span class="p">(</span><span class="n">source_type</span><span class="o">=</span><span class="n">source_type</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">verify_integration_inputs</span><span class="p">(</span>
+            <span class="n">source_type</span><span class="o">=</span><span class="n">source_type</span><span class="p">,</span>
+            <span class="n">github_event_type</span><span class="o">=</span><span class="n">github_event_type</span><span class="p">,</span>
+            <span class="n">github_check_run_id</span><span class="o">=</span><span class="n">github_check_run_id</span><span class="p">,</span>
+            <span class="n">github_installation_id</span><span class="o">=</span><span class="n">github_installation_id</span><span class="p">,</span>
+            <span class="n">github_base_repo_url</span><span class="o">=</span><span class="n">github_base_repo_url</span><span class="p">,</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+        <span class="p">)</span>
+
         <span class="n">template</span> <span class="o">=</span> <span class="n">template</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_adviser_template</span><span class="p">()</span>
         <span class="n">job_id</span> <span class="o">=</span> <span class="n">job_id</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_id</span><span class="p">(</span><span class="s2">&quot;adviser&quot;</span><span class="p">)</span>
 
-        <span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;IMAGE_STREAM_NAMESPACE&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">,</span>
             <span class="s2">&quot;THOTH_ADVISER_REQUIREMENTS&quot;</span><span class="p">:</span> <span class="n">application_stack</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;requirements&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
                 <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\\</span><span class="s2">n&quot;</span>
@@ -1662,9 +1837,9 @@
                 <span class="s2">&quot;requirements_format&quot;</span><span class="p">,</span> <span class="s2">&quot;pipenv&quot;</span>
             <span class="p">),</span>
             <span class="s2">&quot;THOTH_ADVISER_RECOMMENDATION_TYPE&quot;</span><span class="p">:</span> <span class="n">recommendation_type</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span>
-            <span class="s2">&quot;THOTH_ADVISER_RUNTIME_ENVIRONMENT&quot;</span><span class="p">:</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">runtime_environment</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
-                <span class="n">runtime_environment</span>
-            <span class="p">),</span>
+            <span class="s2">&quot;THOTH_ADVISER_RUNTIME_ENVIRONMENT&quot;</span><span class="p">:</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">runtime_environment</span> <span class="ow">is</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">),</span>
             <span class="s2">&quot;THOTH_ADVISER_LIBRARY_USAGE&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">library_usage</span><span class="p">),</span>
             <span class="s2">&quot;THOTH_ADVISER_METADATA&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
                 <span class="p">{</span>
@@ -1673,8 +1848,8 @@
                     <span class="s2">&quot;github_installation_id&quot;</span><span class="p">:</span> <span class="n">github_installation_id</span><span class="p">,</span>
                     <span class="s2">&quot;github_base_repo_url&quot;</span><span class="p">:</span> <span class="n">github_base_repo_url</span><span class="p">,</span>
                     <span class="s2">&quot;origin&quot;</span><span class="p">:</span> <span class="n">origin</span><span class="p">,</span>
-                    <span class="s2">&quot;is_s2i&quot;</span><span class="p">:</span> <span class="n">is_s2i</span><span class="p">,</span>
                     <span class="s2">&quot;re_run_adviser_id&quot;</span><span class="p">:</span> <span class="n">re_run_adviser_id</span><span class="p">,</span>
+                    <span class="s2">&quot;source_type&quot;</span><span class="p">:</span> <span class="n">source_type</span><span class="p">,</span>
                 <span class="p">}</span>
             <span class="p">),</span>
             <span class="s2">&quot;THOTH_ADVISER_OUTPUT&quot;</span><span class="p">:</span> <span class="n">output</span><span class="p">,</span>
@@ -2075,7 +2250,7 @@
         <span class="n">origin</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">revision</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">host</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Schedule Thamos Advise Workflow for Qeb-Hwt GitHub App..&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_argo</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
@@ -2104,9 +2279,8 @@
         <span class="p">)</span></div>
 
 <div class="viewcode-block" id="OpenShift.schedule_kebechet_workflow"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_kebechet_workflow">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_kebechet_workflow</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span>
-        <span class="n">webhook_payload</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">webhook_payload</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Schedule Kebechet Workflow for a Webhook from GitHub App..&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_argo</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
@@ -2116,7 +2290,7 @@
         <span class="n">workflow_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_id</span><span class="p">(</span><span class="s2">&quot;kebechet-job&quot;</span><span class="p">)</span>
         <span class="n">template_parameters</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;WORKFLOW_ID&quot;</span><span class="p">:</span> <span class="n">workflow_id</span><span class="p">,</span>
-            <span class="s2">&quot;WEBHOOK_PAYLOAD&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">webhook_payload</span><span class="p">)</span>
+            <span class="s2">&quot;WEBHOOK_PAYLOAD&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">webhook_payload</span><span class="p">),</span>
         <span class="p">}</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workflow</span><span class="p">(</span>
@@ -2563,8 +2737,8 @@
 
 <div class="viewcode-block" id="OpenShift.get_workflow"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_workflow">[docs]</a>    <span class="k">def</span> <span class="nf">get_workflow</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">label_selector</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">label_selector</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Get Workflow from a namespace, use one of name or label_selector to identify which one to get.&quot;&quot;&quot;</span>
@@ -2625,16 +2799,16 @@
 
 <div class="viewcode-block" id="OpenShift.get_workflow_status"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.get_workflow_status">[docs]</a>    <span class="k">def</span> <span class="nf">get_workflow_status</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
-        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-        <span class="n">label_selector</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">label_selector</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Get a Workflow status, use one of name or label_selector to identify which one to get.&quot;&quot;&quot;</span>
         <span class="n">wf</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_workflow</span><span class="p">(</span>
-            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="n">label_selector</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">label_selector</span><span class="o">=</span><span class="n">label_selector</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span>
         <span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">wf</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span></div></div>
+        <span class="n">to_ret</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">wf</span><span class="p">[</span><span class="s2">&quot;status&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">to_ret</span></div></div>
 </pre></div>
 
           </div>
