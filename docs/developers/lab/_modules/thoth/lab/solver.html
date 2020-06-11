@@ -76,8 +76,11 @@
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
 
 <span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="kn">import</span> <span class="n">SolverResultsStore</span>
+<span class="kn">from</span> <span class="nn">.common</span> <span class="kn">import</span> <span class="n">_aggregate_thoth_results</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;thoth.lab.solver&quot;</span><span class="p">)</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="aggregate_solver_results"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.solver.aggregate_solver_results">[docs]</a><span class="k">def</span> <span class="nf">aggregate_solver_results</span><span class="p">(</span>
@@ -90,41 +93,13 @@
 <span class="sd">    :param is_local: flag to retreive the dataset locally or from S3 (credentials are required)</span>
 <span class="sd">    :param solver_repo_path: required if you want to retrieve the solver dataset locally and `is_local` is set to True</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">limit_results</span><span class="p">:</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Limiting results to </span><span class="si">{</span><span class="n">max_ids</span><span class="si">}</span><span class="s2"> to test functions!!&quot;</span><span class="p">)</span>
-
-    <span class="n">solver_reports</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="n">c_s</span> <span class="o">=</span> <span class="mi">1</span>
-
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_local</span><span class="p">:</span>
-        <span class="n">solver_store</span> <span class="o">=</span> <span class="n">SolverResultsStore</span><span class="p">()</span>
-        <span class="n">solver_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
-
-        <span class="k">for</span> <span class="n">solver_id</span> <span class="ow">in</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Document n. </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">c_s</span><span class="p">)</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">solver_id</span><span class="p">)</span>
-
-            <span class="n">solver_report</span> <span class="o">=</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="o">=</span><span class="n">solver_id</span><span class="p">)</span>
-
-            <span class="n">solver_reports</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">solver_report</span><span class="p">)</span>
-
-            <span class="n">c_s</span> <span class="o">+=</span> <span class="mi">1</span>
-
-    <span class="k">elif</span> <span class="n">is_local</span><span class="p">:</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retrieving solver dataset at path... </span><span class="si">{</span><span class="n">solver_repo_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">solver_repo_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
-            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;There is no dataset at this path&quot;</span><span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">solver_document_path</span> <span class="ow">in</span> <span class="n">solver_repo_path</span><span class="o">.</span><span class="n">iterdir</span><span class="p">():</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">solver_document_path</span><span class="p">)</span>
-
-            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">solver_document_path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">solver_json</span><span class="p">:</span>
-                <span class="n">solver_report</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">solver_json</span><span class="p">)</span>
-
-            <span class="n">solver_reports</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">solver_report</span><span class="p">)</span>
-        <span class="n">c_s</span> <span class="o">+=</span> <span class="mi">1</span>
-
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Number of Solver reports retrieved is: </span><span class="si">%r</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">c_s</span><span class="p">)</span>
+    <span class="n">solver_reports</span> <span class="o">=</span> <span class="n">_aggregate_thoth_results</span><span class="p">(</span>
+        <span class="n">limit_results</span><span class="o">=</span><span class="n">limit_results</span><span class="p">,</span>
+        <span class="n">max_ids</span><span class="o">=</span><span class="n">max_ids</span><span class="p">,</span>
+        <span class="n">is_local</span><span class="o">=</span><span class="n">is_local</span><span class="p">,</span>
+        <span class="n">repo_path</span><span class="o">=</span><span class="n">solver_repo_path</span><span class="p">,</span>
+        <span class="n">store</span><span class="o">=</span><span class="n">SolverResultsStore</span><span class="p">,</span>
+    <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">solver_reports</span></div>
 
