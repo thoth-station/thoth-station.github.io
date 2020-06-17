@@ -67,6 +67,7 @@
 <span class="kn">import</span> <span class="nn">typing</span>
 <span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">lru_cache</span>
 <span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">urlparse</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">datetime</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">import</span> <span class="nn">requests</span>
@@ -80,6 +81,8 @@
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">VersionIdentifierError</span>
 <span class="kn">from</span> <span class="nn">.configuration</span> <span class="kn">import</span> <span class="n">config</span>
 <span class="kn">from</span> <span class="nn">.artifact</span> <span class="kn">import</span> <span class="n">Artifact</span>
+
+<span class="kn">from</span> <span class="nn">thoth.common.helpers</span> <span class="kn">import</span> <span class="n">parse_datetime</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
@@ -449,7 +452,21 @@
                 <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;digests&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">artifact</span><span class="o">.</span><span class="n">gather_hashes</span><span class="p">()</span>
             <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">result</span></div></div>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="Source.get_package_release_date"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.source.Source.get_package_release_date">[docs]</a>    <span class="k">def</span> <span class="nf">get_package_release_date</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,)</span> <span class="o">-&gt;</span> <span class="n">datetime</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get time at which package was uploaded to package index.&quot;&quot;&quot;</span>
+        <span class="n">package_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_warehouse_get_api_package_info</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
+        <span class="n">release</span> <span class="o">=</span> <span class="n">package_json</span><span class="p">[</span><span class="s2">&quot;releases&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">release</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NotFound</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Version </span><span class="si">{</span><span class="n">package_version</span><span class="si">}</span><span class="s2"> not found for </span><span class="si">{</span><span class="n">package_name</span><span class="si">}</span><span class="s2"> on </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">warehouse_api_url</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="n">artifact</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">release</span> <span class="k">if</span> <span class="n">x</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;source&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">artifact</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NotFound</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;No source distribution for </span><span class="si">{</span><span class="n">package_name</span><span class="si">}</span><span class="s2">===</span><span class="si">{</span><span class="n">package_version</span><span class="si">}</span><span class="s2"> found on </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">warehouse_api_url</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">parse_datetime</span><span class="p">(</span><span class="n">artifact</span><span class="p">[</span><span class="s2">&quot;upload_time_iso_8601&quot;</span><span class="p">][:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span></div></div>
 </pre></div>
 
           </div>

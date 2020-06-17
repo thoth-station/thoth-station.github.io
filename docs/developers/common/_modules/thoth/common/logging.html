@@ -93,6 +93,7 @@
 <span class="n">_DEFAULT_LOGGING_CONF_START</span> <span class="o">=</span> <span class="s2">&quot;THOTH_LOG_&quot;</span>
 <span class="n">_LOGGING_ADJUSTMENT_CONF</span> <span class="o">=</span> <span class="s2">&quot;THOTH_ADJUST_LOGGING&quot;</span>
 <span class="n">_SENTRY_DSN</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;SENTRY_DSN&quot;</span><span class="p">)</span>
+<span class="n">_SENTRY_TRACES_SAMPLE_RATE</span> <span class="o">=</span> <span class="mf">0.25</span>
 <span class="n">_IGNORED_EXCEPTIONS</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 <span class="n">_JSON_LOGGING_FORMAT</span> <span class="o">=</span> <span class="n">OrderedDict</span><span class="p">(</span>
@@ -356,6 +357,17 @@
                 <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">_SENTRY_DSN</span><span class="p">:</span>
+        <span class="n">sentry_sdk_init_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="kn">import</span> <span class="nn">flask</span>  <span class="c1"># noqa: F401</span>
+
+            <span class="n">sentry_sdk_init_kwargs</span><span class="p">[</span><span class="s2">&quot;traces_sample_rate&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_SENTRY_TRACES_SAMPLE_RATE</span>
+            <span class="n">root_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Setting Sentry&#39;s traces sample rate to </span><span class="si">%f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">_SENTRY_TRACES_SAMPLE_RATE</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+            <span class="k">pass</span>
+
         <span class="k">try</span><span class="p">:</span>
             <span class="n">integrations</span> <span class="o">=</span> <span class="n">_get_sentry_integrations</span><span class="p">()</span>
             <span class="n">root_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
@@ -369,6 +381,7 @@
                 <span class="n">environment</span><span class="o">=</span><span class="n">environment</span><span class="p">,</span>
                 <span class="n">integrations</span><span class="o">=</span><span class="n">integrations</span><span class="p">,</span>
                 <span class="n">before_send</span><span class="o">=</span><span class="n">before_send_handler</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">sentry_sdk_init_kwargs</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
             <span class="n">root_logger</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span>
