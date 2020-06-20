@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.lab.common &#8212; Thoth lab 0.2.0 documentation</title>
+    <title>thoth.lab.common &#8212; Thoth lab 0.2.3 documentation</title>
     <link rel="stylesheet" href="../../../_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth lab 0.2.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth lab 0.2.3 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -73,7 +73,11 @@
 <span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">from</span> <span class="nn">thoth.storages.result_base</span> <span class="kn">import</span> <span class="n">ResultStorageBase</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">thoth.storages.si_bandit</span> <span class="kn">import</span> <span class="n">SIBanditResultsStore</span>
+<span class="kn">from</span> <span class="nn">thoth.storages.si_cloc</span> <span class="kn">import</span> <span class="n">SIClocResultsStore</span>
+<span class="kn">from</span> <span class="nn">thoth.storages.inspections</span> <span class="kn">import</span> <span class="n">InspectionResultsStore</span>
+<span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="kn">import</span> <span class="n">SolverResultsStore</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">from</span> <span class="nn">zipfile</span> <span class="kn">import</span> <span class="n">ZipFile</span>
 
@@ -94,7 +98,7 @@
     <span class="n">max_ids</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
     <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="n">repo_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">store</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ResultStorageBase</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">store_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">is_inspection</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]:</span>
     <span class="sd">&quot;&quot;&quot;Aggregate results from jsons stored in Ceph for Thoth or locally from repo.</span>
@@ -114,27 +118,12 @@
     <span class="k">else</span><span class="p">:</span>
         <span class="n">files</span> <span class="o">=</span> <span class="p">[]</span>
 
-    <span class="n">counter</span> <span class="o">=</span> <span class="mi">1</span>
-
     <span class="k">if</span> <span class="ow">not</span> <span class="n">is_local</span><span class="p">:</span>
-        <span class="n">store</span> <span class="o">=</span> <span class="n">store</span><span class="p">()</span>
-        <span class="n">store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
-
-        <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Document n. </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">counter</span><span class="p">)</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
-
-            <span class="n">report</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="o">=</span><span class="n">document_id</span><span class="p">)</span>
-
-            <span class="n">files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
-
-            <span class="k">if</span> <span class="n">limit_results</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">counter</span> <span class="o">==</span> <span class="n">max_ids</span><span class="p">:</span>
-                    <span class="k">return</span> <span class="n">files</span>
-
-            <span class="n">counter</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">files</span><span class="p">,</span> <span class="n">counter</span> <span class="o">=</span> <span class="n">aggregate_thoth_results_from_ceph</span><span class="p">(</span><span class="n">store_name</span><span class="o">=</span><span class="n">store_name</span><span class="p">,</span> <span class="n">files</span><span class="o">=</span><span class="n">files</span><span class="p">)</span>
 
     <span class="k">elif</span> <span class="n">is_local</span><span class="p">:</span>
+        <span class="n">counter</span> <span class="o">=</span> <span class="mi">1</span>
+
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Retrieving dataset at path... </span><span class="si">{</span><span class="n">repo_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">repo_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;There is no dataset at this path&quot;</span><span class="p">)</span>
@@ -183,9 +172,39 @@
 
                 <span class="n">counter</span> <span class="o">+=</span> <span class="mi">1</span>
 
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Number of file retrieved is: </span><span class="si">%r</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">counter</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Number of file retrieved is: </span><span class="si">%r</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">counter</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">files</span></div>
+
+
+<div class="viewcode-block" id="aggregate_thoth_results_from_ceph"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.common.aggregate_thoth_results_from_ceph">[docs]</a><span class="k">def</span> <span class="nf">aggregate_thoth_results_from_ceph</span><span class="p">(</span><span class="n">store_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">files</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="nb">list</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="nb">list</span><span class="p">],</span> <span class="nb">int</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Aggregate Thoth results from Ceph.&quot;&quot;&quot;</span>
+    <span class="n">_STORE</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;inspection&quot;</span><span class="p">:</span> <span class="n">InspectionResultsStore</span><span class="p">(),</span>
+        <span class="s2">&quot;si-bandit&quot;</span><span class="p">:</span> <span class="n">SIBanditResultsStore</span><span class="p">(),</span>
+        <span class="s2">&quot;si-cloc&quot;</span><span class="p">:</span> <span class="n">SIClocResultsStore</span><span class="p">(),</span>
+        <span class="s2">&quot;solver&quot;</span><span class="p">:</span> <span class="n">SolverResultsStore</span><span class="p">(),</span>
+    <span class="p">}</span>
+    <span class="n">store</span> <span class="o">=</span> <span class="n">_STORE</span><span class="p">[</span><span class="n">store_name</span><span class="p">]</span>
+    <span class="n">store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+
+    <span class="n">counter</span> <span class="o">=</span> <span class="mi">1</span>
+
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Document n. </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">counter</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span>
+
+        <span class="n">report</span> <span class="o">=</span> <span class="n">store</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="o">=</span><span class="n">document_id</span><span class="p">)</span>
+
+        <span class="n">files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">report</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">limit_results</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">counter</span> <span class="o">==</span> <span class="n">max_ids</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">files</span>
+
+        <span class="n">counter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">return</span> <span class="n">files</span><span class="p">,</span> <span class="n">counter</span></div>
 </pre></div>
 
           </div>
