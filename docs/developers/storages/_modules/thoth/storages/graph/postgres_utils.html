@@ -1,0 +1,240 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>thoth.storages.graph.postgres_utils &#8212; Thoth Storages 0.24.0 documentation</title>
+    
+    <link rel="stylesheet" href="../../../../_static/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../../../../',
+        VERSION:     '0.24.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="../../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+    <link rel="top" title="Thoth Storages 0.24.0 documentation" href="../../../../index.html" />
+    <link rel="up" title="Module code" href="../../../index.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head>
+  <body role="document">
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Storages 0.24.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.storages.graph.postgres_utils</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python</span>
+<span class="c1"># Methods from SQLAlchemy utils modified.</span>
+<span class="c1"># TODO: remove once https://github.com/kvesteri/sqlalchemy-utils/pull/372 is merged</span>
+<span class="c1">#</span>
+<span class="c1">###################################################################</span>
+<span class="c1">#  SQLAlchemy utils methods</span>
+<span class="c1"># Copyright (c) 2012, Konsta Vesterinen</span>
+<span class="c1">#</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># Redistribution and use in source and binary forms, with or without</span>
+<span class="c1"># modification, are permitted provided that the following conditions are met:</span>
+<span class="c1">#</span>
+<span class="c1"># * Redistributions of source code must retain the above copyright notice, this</span>
+<span class="c1"># list of conditions and the following disclaimer.</span>
+<span class="c1">#</span>
+<span class="c1"># * Redistributions in binary form must reproduce the above copyright notice,</span>
+<span class="c1"># this list of conditions and the following disclaimer in the documentation</span>
+<span class="c1"># and/or other materials provided with the distribution.</span>
+<span class="c1">#</span>
+<span class="c1"># * The names of the contributors may not be used to endorse or promote products</span>
+<span class="c1"># derived from this software without specific prior written permission.</span>
+<span class="c1">#</span>
+<span class="c1"># THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND</span>
+<span class="c1"># ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED</span>
+<span class="c1"># WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE</span>
+<span class="c1"># DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT,</span>
+<span class="c1"># INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,</span>
+<span class="c1"># BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,</span>
+<span class="c1"># DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF</span>
+<span class="c1"># LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE</span>
+<span class="c1"># OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF</span>
+<span class="c1"># ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</span>
+<span class="c1">#</span>
+<span class="c1">#  See https://github.com/kvesteri/sqlalchemy-utils/blob/master/LICENSE.</span>
+<span class="c1">####################################################################</span>
+<span class="c1">#</span>
+<span class="c1"># Additional changes for project Thoth by Thoth team.</span>
+<span class="c1">#</span>
+
+<span class="sd">&quot;&quot;&quot;Utils for postgresql database.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">copy</span> <span class="kn">import</span> <span class="n">copy</span>
+
+<span class="kn">from</span> <span class="nn">sqlalchemy</span> <span class="kn">import</span> <span class="n">create_engine</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy.engine.url</span> <span class="kn">import</span> <span class="n">make_url</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy.exc</span> <span class="kn">import</span> <span class="n">OperationalError</span><span class="p">,</span> <span class="n">ProgrammingError</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="database_exists"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres_utils.database_exists">[docs]</a><span class="k">def</span> <span class="nf">database_exists</span><span class="p">(</span><span class="n">url</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Check if a database exists.</span>
+<span class="sd">    :param url: A SQLAlchemy engine URL.</span>
+<span class="sd">    Performs backend-specific testing to quickly determine if a database</span>
+<span class="sd">    exists on the server. ::</span>
+<span class="sd">        database_exists(&#39;postgres://postgres@localhost/name&#39;)  #=&gt; False</span>
+<span class="sd">        create_database(&#39;postgres://postgres@localhost/name&#39;)</span>
+<span class="sd">        database_exists(&#39;postgres://postgres@localhost/name&#39;)  #=&gt; True</span>
+<span class="sd">    Supports checking against a constructed URL as well. ::</span>
+<span class="sd">        engine = create_engine(&#39;postgres://postgres@localhost/name&#39;)</span>
+<span class="sd">        database_exists(engine.url)  #=&gt; False</span>
+<span class="sd">        create_database(engine.url)</span>
+<span class="sd">        database_exists(engine.url)  #=&gt; True</span>
+
+<span class="sd">    Modified version from sqlalchemy_utils to take care of one issue.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">get_scalar_result</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">sql</span><span class="p">):</span>
+        <span class="n">result_proxy</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">sql</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">result_proxy</span><span class="o">.</span><span class="n">scalar</span><span class="p">()</span>
+        <span class="n">result_proxy</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+        <span class="n">engine</span><span class="o">.</span><span class="n">dispose</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="n">url</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="n">make_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span>
+    <span class="n">database</span><span class="p">,</span> <span class="n">url</span><span class="o">.</span><span class="n">database</span> <span class="o">=</span> <span class="n">url</span><span class="o">.</span><span class="n">database</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;KNOWLEDGE_GRAPH_DATABASE&#39;</span><span class="p">)</span>
+    <span class="n">engine</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">dialect</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;postgresql&quot;</span><span class="p">:</span>
+        <span class="n">text</span> <span class="o">=</span> <span class="s2">&quot;SELECT 1 FROM pg_database WHERE datname=&#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="n">database</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">get_scalar_result</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">text</span><span class="p">))</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;This implementation is valid only for postgresql dialects&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="create_database"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres_utils.create_database">[docs]</a><span class="k">def</span> <span class="nf">create_database</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf8&quot;</span><span class="p">,</span> <span class="n">template</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Issue the appropriate CREATE DATABASE statement.</span>
+<span class="sd">    :param url: A SQLAlchemy engine URL.</span>
+<span class="sd">    :param encoding: The encoding to create the database as.</span>
+<span class="sd">    :param template:</span>
+<span class="sd">        The name of the template from which to create the new database. At the</span>
+<span class="sd">        moment only supported by PostgreSQL driver.</span>
+<span class="sd">    To create a database, you can pass a simple URL that would have</span>
+<span class="sd">    been passed to ``create_engine``. ::</span>
+<span class="sd">        create_database(&#39;postgres://postgres@localhost/name&#39;)</span>
+<span class="sd">    You may also pass the url from an existing engine. ::</span>
+<span class="sd">        create_database(engine.url)</span>
+<span class="sd">    Has full support for mysql, postgres, and sqlite. In theory,</span>
+<span class="sd">    other database engines should be supported.</span>
+
+<span class="sd">    Modified version from sqlalchemy_utils to take care of one issue.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">url</span> <span class="o">=</span> <span class="n">copy</span><span class="p">(</span><span class="n">make_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span>
+
+    <span class="n">database</span><span class="p">,</span> <span class="n">url</span><span class="o">.</span><span class="n">database</span> <span class="o">=</span> <span class="n">url</span><span class="o">.</span><span class="n">database</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s1">&#39;KNOWLEDGE_GRAPH_DATABASE&#39;</span><span class="p">)</span>
+    <span class="n">engine</span> <span class="o">=</span> <span class="n">create_engine</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="n">result_proxy</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">dialect</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;postgresql&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">engine</span><span class="o">.</span><span class="n">driver</span> <span class="o">==</span> <span class="s2">&quot;psycopg2&quot;</span><span class="p">:</span>
+            <span class="kn">from</span> <span class="nn">psycopg2.extensions</span> <span class="kn">import</span> <span class="n">ISOLATION_LEVEL_AUTOCOMMIT</span>
+
+            <span class="n">engine</span><span class="o">.</span><span class="n">raw_connection</span><span class="p">()</span><span class="o">.</span><span class="n">set_isolation_level</span><span class="p">(</span><span class="n">ISOLATION_LEVEL_AUTOCOMMIT</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">template</span><span class="p">:</span>
+            <span class="n">template</span> <span class="o">=</span> <span class="s2">&quot;template1&quot;</span>
+
+        <span class="n">text</span> <span class="o">=</span> <span class="s2">&quot;CREATE DATABASE </span><span class="si">{0}</span><span class="s2"> ENCODING &#39;</span><span class="si">{1}</span><span class="s2">&#39; TEMPLATE </span><span class="si">{2}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+            <span class="n">quote</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">database</span><span class="p">),</span> <span class="n">encoding</span><span class="p">,</span> <span class="n">quote</span><span class="p">(</span><span class="n">engine</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">result_proxy</span> <span class="o">=</span> <span class="n">engine</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;This implementation is valid only for postgresql dialects&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">result_proxy</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">result_proxy</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="n">engine</span><span class="o">.</span><span class="n">dispose</span><span class="p">()</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation index</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../../../../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
