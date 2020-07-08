@@ -1,0 +1,359 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.build_analyzers.preprocessing &#8212; Thoth Build Analyzers NA documentation</title>
+    <link rel="stylesheet" href="../../../_static/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Build Analyzers NA documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.build_analyzers.preprocessing</h1><div class="highlight"><pre>
+<span></span><span class="c1"># thoth-build-analyzers</span>
+<span class="c1"># Copyright(C) 2019, 2020 Marek Cermak</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Build log preprocessing and feature gathering.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">parse</span>
+
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span><span class="p">,</span> <span class="n">PosixPath</span>
+
+
+<span class="kn">from</span> <span class="nn">astpath</span> <span class="kn">import</span> <span class="n">file_contents_to_xml_ast</span>
+<span class="kn">from</span> <span class="nn">astpath</span> <span class="kn">import</span> <span class="n">file_to_xml_ast</span>
+<span class="kn">from</span> <span class="nn">astpath</span> <span class="kn">import</span> <span class="n">find_in_ast</span>
+<span class="kn">from</span> <span class="nn">astpath</span> <span class="kn">import</span> <span class="n">search</span>
+
+<span class="kn">from</span> <span class="nn">astpath.search</span> <span class="kn">import</span> <span class="n">_tostring_factory</span>
+<span class="kn">from</span> <span class="nn">astpath.search</span> <span class="kn">import</span> <span class="n">_query_factory</span>
+
+<span class="kn">from</span> <span class="nn">thoth.lab</span> <span class="kn">import</span> <span class="n">underscore</span>
+<span class="kn">from</span> <span class="nn">thoth.lab</span> <span class="kn">import</span> <span class="n">convert</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
+
+<span class="kn">from</span> <span class="nn">thoth.build_analyzers.parsing</span> <span class="kn">import</span> <span class="n">parse_log</span>
+
+<span class="n">query</span> <span class="o">=</span> <span class="n">_query_factory</span><span class="p">()</span>
+<span class="n">tostring</span> <span class="o">=</span> <span class="n">_tostring_factory</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="build_log_prepare"><a class="viewcode-back" href="../../../thoth.build_analyzers.html#thoth.build_analyzers.preprocessing.build_log_prepare">[docs]</a><span class="k">def</span> <span class="nf">build_log_prepare</span><span class="p">(</span><span class="n">log</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Process raw build log by lines and output list of log messages.</span>
+
+<span class="sd">    :returns: List[str], list of log messages</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">log_messages</span> <span class="o">=</span> <span class="n">log</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+    <span class="n">log_messages</span> <span class="o">=</span> <span class="p">[</span><span class="n">m</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">log_messages</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">m</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">log_messages</span></div>
+
+
+<div class="viewcode-block" id="build_log_to_dependency_table"><a class="viewcode-back" href="../../../thoth.build_analyzers.html#thoth.build_analyzers.preprocessing.build_log_to_dependency_table">[docs]</a><span class="k">def</span> <span class="nf">build_log_to_dependency_table</span><span class="p">(</span><span class="n">log</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">handlers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Parse raw build log to find software stack and create dependency table.&quot;&quot;&quot;</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">json</span><span class="o">.</span><span class="n">json_normalize</span><span class="p">(</span><span class="n">parse_log</span><span class="p">(</span><span class="n">log</span><span class="p">,</span> <span class="n">handlers</span><span class="o">=</span><span class="n">handlers</span><span class="p">),</span> <span class="n">record_path</span><span class="o">=</span><span class="s2">&quot;result&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">_</span><span class="o">.</span><span class="n">vstack</span><span class="p">(</span><span class="s2">&quot;from&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">_</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="s2">&quot;from&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;package&quot;</span><span class="p">:</span> <span class="s2">&quot;source&quot;</span><span class="p">})</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="s2">&quot;artifact&quot;</span><span class="p">,</span> <span class="s2">&quot;from&quot;</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df</span><span class="o">.</span><span class="n">convert</span><span class="o">.</span><span class="n">to_dependency_table</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="s2">&quot;source&quot;</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="s2">&quot;package&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ast_search_expressions"><a class="viewcode-back" href="../../../thoth.build_analyzers.html#thoth.build_analyzers.preprocessing.ast_search_expressions">[docs]</a><span class="k">def</span> <span class="nf">ast_search_expressions</span><span class="p">(</span>
+    <span class="n">entrypoint</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">PosixPath</span><span class="p">],</span>
+    <span class="n">expressions</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">glob</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;**/*.py&quot;</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Glob through the source AST and extract AST elements and patterns.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">entrypoint</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">entrypoint</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">entrypoint</span><span class="p">)</span>
+
+    <span class="n">expression</span> <span class="o">=</span> <span class="s2">&quot;|&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">expressions</span><span class="p">)</span>
+
+    <span class="n">matching_elements</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">entrypoint</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">glob</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">xml_ast</span> <span class="o">=</span> <span class="n">file_to_xml_ast</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">omit_docstrings</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="n">match</span> <span class="o">=</span> <span class="n">query</span><span class="p">(</span><span class="n">xml_ast</span><span class="p">,</span> <span class="n">expression</span><span class="p">)</span>
+            <span class="n">matching_elements</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">match</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unable to process module &#39;</span><span class="si">{</span><span class="n">module</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+    <span class="n">matching_arguments</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+        <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="p">[</span><span class="n">elt</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s2">&quot;./ancestor-or-self::*[@s][1]/@s&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">elt</span> <span class="ow">in</span> <span class="n">matching_elements</span><span class="p">])</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">matching_elements</span><span class="p">,</span> <span class="n">matching_arguments</span></div>
+
+
+<div class="viewcode-block" id="ast_search_pip"><a class="viewcode-back" href="../../../thoth.build_analyzers.html#thoth.build_analyzers.preprocessing.ast_search_pip">[docs]</a><span class="k">def</span> <span class="nf">ast_search_pip</span><span class="p">(</span><span class="n">entrypoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Search through the source AST and extract patterns for pip.&quot;&quot;&quot;</span>
+    <span class="n">elements</span><span class="p">,</span> <span class="n">arguments</span> <span class="o">=</span> <span class="n">ast_search_expressions</span><span class="p">(</span>
+        <span class="n">entrypoint</span><span class="o">=</span><span class="n">entrypoint</span><span class="p">,</span> <span class="n">expressions</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;//args/Str[string-length(@s) &gt; 5]&quot;</span><span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">clean_pattern_dataframe</span><span class="p">(</span><span class="n">ast_to_pattern_dataframe</span><span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">arguments</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="ast_search_pipenv"><a class="viewcode-back" href="../../../thoth.build_analyzers.html#thoth.build_analyzers.preprocessing.ast_search_pipenv">[docs]</a><span class="k">def</span> <span class="nf">ast_search_pipenv</span><span class="p">(</span><span class="n">entrypoint</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Search through the source AST and extract patterns for pipenv.&quot;&quot;&quot;</span>
+    <span class="n">elements</span><span class="p">,</span> <span class="n">arguments</span> <span class="o">=</span> <span class="n">ast_search_expressions</span><span class="p">(</span>
+        <span class="n">entrypoint</span><span class="o">=</span><span class="n">entrypoint</span><span class="p">,</span> <span class="n">expressions</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;//Str[string-length(@s) &gt; 5]&quot;</span><span class="p">],</span> <span class="n">glob</span><span class="o">=</span><span class="s2">&quot;**/exceptions.py&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">clean_pattern_dataframe</span><span class="p">(</span><span class="n">ast_to_pattern_dataframe</span><span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">arguments</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="ast_to_pattern_dataframe"><a class="viewcode-back" href="../../../thoth.build_analyzers.html#thoth.build_analyzers.preprocessing.ast_to_pattern_dataframe">[docs]</a><span class="k">def</span> <span class="nf">ast_to_pattern_dataframe</span><span class="p">(</span><span class="n">elements</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">patterns</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Convert AST matches into a pattern dataframe.</span>
+
+<span class="sd">    :param elements: list of AST elements corresponding to the patterns</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">elements</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">patterns</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Length of `elements` does not match length of `patterns`, </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">elements</span><span class="p">)</span><span class="si">}</span><span class="s2"> != </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">patterns</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="n">callers</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">caller_attrs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">method_attrs</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">parent_tags</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">elt</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">:</span>
+        <span class="n">parent</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">elt</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s2">&quot;name(./parent::*[1])&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="kc">None</span>
+
+        <span class="n">parent_tags</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
+
+        <span class="n">func</span><span class="p">,</span> <span class="o">=</span> <span class="n">elt</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s2">&quot;./ancestor::Call[1]/func[1]&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span>
+
+        <span class="n">caller</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">func</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">caller</span><span class="p">,</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s2">&quot;./Attribute/*/Name[1]&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span>
+            <span class="n">method</span><span class="p">,</span> <span class="o">=</span> <span class="n">func</span><span class="o">.</span><span class="n">xpath</span><span class="p">(</span><span class="s2">&quot;./Attribute[1]&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span>
+
+        <span class="n">callers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+        <span class="n">caller_attrs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">caller</span><span class="o">.</span><span class="n">attrib</span><span class="p">)</span> <span class="k">if</span> <span class="n">caller</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">method_attrs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">method</span><span class="o">.</span><span class="n">attrib</span><span class="p">)</span> <span class="k">if</span> <span class="n">method</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">patterns</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;pattern&quot;</span><span class="p">])</span>
+
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;parent_tag&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parent_tags</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;caller_attrs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">caller_attrs</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">&quot;method_attrs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">method_attrs</span>
+
+    <span class="n">caller_records</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;caller&quot;</span><span class="p">}</span>
+    <span class="n">method_records</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;attr&quot;</span><span class="p">:</span> <span class="s2">&quot;method&quot;</span><span class="p">}</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="n">df</span><span class="p">,</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">caller_attrs</span><span class="o">.</span><span class="n">_</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">record_paths</span><span class="o">=</span><span class="n">caller_records</span><span class="p">),</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">method_attrs</span><span class="o">.</span><span class="n">_</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">record_paths</span><span class="o">=</span><span class="n">method_records</span><span class="p">),</span>
+        <span class="p">],</span>
+        <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="s2">&quot;caller_attrs&quot;</span><span class="p">,</span> <span class="s2">&quot;method_attrs&quot;</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">drop_duplicates</span><span class="p">(</span><span class="s2">&quot;pattern&quot;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">dropna</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;caller&quot;</span><span class="p">,</span> <span class="s2">&quot;method&quot;</span><span class="p">],</span> <span class="n">how</span><span class="o">=</span><span class="s2">&quot;all&quot;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="clean_pattern_dataframe"><a class="viewcode-back" href="../../../thoth.build_analyzers.html#thoth.build_analyzers.preprocessing.clean_pattern_dataframe">[docs]</a><span class="k">def</span> <span class="nf">clean_pattern_dataframe</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Clean the DataFrame by removing unwanted patterns and reformatting.&quot;&quot;&quot;</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        ( (caller == &quot;logger&quot;) &amp; (method.str.match(&quot;info|debug&quot;)) ) | \</span>
+<span class="sd">        ( (caller == &quot;crayons&quot;) ) | \</span>
+<span class="sd">        ( (method.str.match(&quot;append&quot;)) &amp; (parent_tag.str.match(&quot;value(s)?|args&quot;)) ) | \</span>
+<span class="sd">        ( (method.str.match(&quot;command|format&quot;)) &amp; (parent_tag.str.match(&quot;value(s)?&quot;)) ) | \</span>
+<span class="sd">        ( (method.str.match(&quot;_update|echo&quot;)) )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># check if any log message contains splitlines (important for future comparison)</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">pattern</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)]</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">sub_str</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">row</span><span class="o">.</span><span class="n">pattern</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)):</span>
+            <span class="n">new_row</span> <span class="o">=</span> <span class="n">row</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">new_row</span><span class="o">.</span><span class="n">pattern</span> <span class="o">=</span> <span class="n">sub_str</span>
+
+            <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_row</span><span class="p">)</span>
+
+        <span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+
+    <span class="c1"># simple heuristics, remove all-mighty patterns</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="o">.</span><span class="n">pattern</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;[a-zA-Z]{3,}&quot;</span><span class="p">)]</span>
+        <span class="o">.</span><span class="n">sort_values</span><span class="p">([</span><span class="s2">&quot;caller&quot;</span><span class="p">,</span> <span class="s2">&quot;method&quot;</span><span class="p">],</span> <span class="n">na_position</span><span class="o">=</span><span class="s2">&quot;last&quot;</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="c1"># reformat pattern here to reduce complexity</span>
+    <span class="n">df</span><span class="o">.</span><span class="n">pattern</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">pattern</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">reformat</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">df</span></div>
+
+
+<span class="n">PEP_461_FORMAT_CODES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;c&quot;</span><span class="p">,</span> <span class="s2">&quot;b&quot;</span><span class="p">,</span> <span class="s2">&quot;a&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="s2">&quot;d&quot;</span><span class="p">,</span> <span class="s2">&quot;i&quot;</span><span class="p">,</span> <span class="s2">&quot;o&quot;</span><span class="p">,</span> <span class="s2">&quot;u&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;X&quot;</span><span class="p">,</span> <span class="s2">&quot;e&quot;</span><span class="p">,</span> <span class="s2">&quot;E&quot;</span><span class="p">,</span> <span class="s2">&quot;f&quot;</span><span class="p">,</span> <span class="s2">&quot;F&quot;</span><span class="p">,</span> <span class="s2">&quot;g&quot;</span><span class="p">,</span> <span class="s2">&quot;G&quot;</span><span class="p">}</span>
+
+
+<div class="viewcode-block" id="reformat"><a class="viewcode-back" href="../../../thoth.build_analyzers.html#thoth.build_analyzers.preprocessing.reformat">[docs]</a><span class="k">def</span> <span class="nf">reformat</span><span class="p">(</span><span class="n">string</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>  <span class="c1"># Ignore PyDocStyleBear</span>
+    <span class="sd">&quot;&quot;&quot;Reformat format codes by PEP 461 and PEP 3101 to formatting style defined by `parse` library.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_reformat</span><span class="p">(</span><span class="n">rest</span><span class="p">):</span>
+        <span class="n">span</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?:(?&lt;=\s)|(?&lt;=\W)|(?&lt;=^))(%\w)|(\{.*?\})(?=\s|\W|$)&quot;</span><span class="p">,</span> <span class="n">rest</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">span</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">=</span> <span class="n">span</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">code</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="ow">in</span> <span class="n">PEP_461_FORMAT_CODES</span> <span class="ow">or</span> <span class="n">re</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^\{.*?\}$&quot;</span><span class="p">,</span> <span class="n">code</span><span class="p">):</span>
+                <span class="n">formatted</span> <span class="o">=</span> <span class="n">rest</span><span class="p">[:</span> <span class="n">span</span><span class="o">.</span><span class="n">start</span><span class="p">()]</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">&quot;</span>
+
+                <span class="k">yield</span> <span class="n">formatted</span>
+                <span class="k">yield from</span> <span class="n">_reformat</span><span class="p">(</span><span class="n">rest</span><span class="p">[</span><span class="n">span</span><span class="o">.</span><span class="n">end</span><span class="p">()</span> <span class="p">:])</span>  <span class="c1"># Ignore PycodestyleBear (E203)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">rest</span>
+
+    <span class="n">formatted</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_reformat</span><span class="p">(</span><span class="n">string</span><span class="p">))</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="n">formatted</span></div>
+
+
+<div class="viewcode-block" id="reconstruct_string"><a class="viewcode-back" href="../../../thoth.build_analyzers.html#thoth.build_analyzers.preprocessing.reconstruct_string">[docs]</a><span class="k">def</span> <span class="nf">reconstruct_string</span><span class="p">(</span><span class="n">format_pattern</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">format_string</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Attempt to reconstruct string based on a format pattern.&quot;&quot;&quot;</span>
+    <span class="n">format_pattern</span> <span class="o">=</span> <span class="n">reformat</span><span class="p">(</span><span class="n">format_pattern</span><span class="p">)</span>
+
+    <span class="c1"># hand-coded heuristic to prevent over-match of == versions</span>
+    <span class="k">if</span> <span class="n">format_pattern</span> <span class="o">==</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">==</span><span class="si">{}</span><span class="s2">&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">format_string</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">parsed</span> <span class="o">=</span> <span class="n">parse</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">format_pattern</span><span class="p">,</span> <span class="n">format_string</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">parsed</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">format_string</span>
+
+    <span class="n">reconstructed</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">cut</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">span</span> <span class="ow">in</span> <span class="n">parsed</span><span class="o">.</span><span class="n">spans</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="n">start</span><span class="p">,</span> <span class="n">end</span> <span class="o">=</span> <span class="n">span</span>
+        <span class="n">reconstructed</span> <span class="o">+=</span> <span class="n">format_string</span><span class="p">[</span><span class="n">cut</span><span class="p">:</span><span class="n">start</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2">&quot;</span>
+        <span class="n">cut</span> <span class="o">=</span> <span class="n">end</span>
+
+    <span class="n">reconstructed</span> <span class="o">+=</span> <span class="n">format_string</span><span class="p">[</span><span class="n">cut</span><span class="p">:]</span>
+
+    <span class="k">return</span> <span class="n">reconstructed</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation index</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
