@@ -60,18 +60,85 @@
 <span id="wraps"></span><h1>Wrap pipeline unit type<a class="headerlink" href="#wrap-pipeline-unit-type" title="Permalink to this headline">¶</a></h1>
 <p>The last pipeline unit type is named “<a class="reference internal" href="thoth.adviser.html#thoth.adviser.wrap.Wrap" title="thoth.adviser.wrap.Wrap"><code class="xref py py-class docutils literal notranslate"><span class="pre">wrap</span></code></a>”.
 This pipeline unit is called after a final state is accepted by <a class="reference internal" href="strides.html#strides"><span class="std std-ref">strides</span></a>.</p>
-<p>This pipeline unit was introduce for a sake of completeness. One of the
-possible use cases is registering a callback during Thoth’s adviser runs made
-for experiments (for example <a class="reference external" href="https://github.com/thoth-station/notebooks">Thoth Jupyter Notebook experiments</a>) to let user hook in an action
-once a software stack is resolved (but the software stack resolution pipeline
-is still running).</p>
+<p>The wrap pipeline unit can perform logic on already accepted final state. A
+possible use case for wrap pipeline unit can be addition of another
+justification based on the packages resolved. This is handy if you want to add
+a justification that does not impact stack score or its inclusion to the
+pipeline products (otherwise, a step pipeline unit should be used).</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Raising any exception in a wrap causes the pipeline resolution to halt, with
 a corresponding failure that reports the exception message.</p>
 </div>
+<div class="section" id="main-usage">
+<h2>Main usage<a class="headerlink" href="#main-usage" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Add justification to the final pipeline product without affecting the product
+score or inclusion of the product into the final results</p></li>
+<li><p>Additionally adjust runtime environment recommended back to user</p></li>
+<li><p>Register a callback function that should be called once a certain software stack
+is found</p></li>
+</ul>
+</div>
+<div class="section" id="real-world-examples">
+<h2>Real world examples<a class="headerlink" href="#real-world-examples" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Notify about Intel’s MKL thread configuration for containerized deployments.</p></li>
+<li><p>Recommend using Python 3.8 when running on RHEL 8, shipped <a class="reference external" href="https://developers.redhat.com/blog/2020/06/25/red-hat-enterprise-linux-8-2-brings-faster-python-3-8-run-speeds/">Python 3.8 can add
+some performance improvement</a>.</p></li>
+</ul>
+</div>
+<div class="section" id="an-example-implementation">
+<h2>An example implementation<a class="headerlink" href="#an-example-implementation" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">from</span> <span class="nn">thoth.adviser.state</span> <span class="kn">import</span> <span class="n">State</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.wrap</span> <span class="kn">import</span> <span class="n">Wrap</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">..pipeline_builder</span> <span class="kn">import</span> <span class="n">PipelineBuilderContext</span>
+
+
+<span class="k">class</span> <span class="nc">NoSemanticInterpositionWrap</span><span class="p">(</span><span class="n">Wrap</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A wrap that recommends to switch to Python 3.8 on RHEL 8.2.&quot;&quot;&quot;</span>
+
+    <span class="n">_JUSTIFICATION</span> <span class="o">=</span> <span class="p">[</span>
+      <span class="p">{</span>
+          <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
+          <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;Consider using UBI or RHEL 8.2 with Python 3.8 that has optimized Python interpreter with &quot;</span>
+          <span class="s2">&quot;performance gain up to 30%&quot;</span><span class="p">,</span>
+      <span class="p">}</span>
+  <span class="p">]</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">should_include</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Include this wrap in adviser for RHEL/UBI 8.2.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_included</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_adviser_pipeline</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">builder_context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;rhel&quot;</span><span class="p">,</span> <span class="s2">&quot;ubi&quot;</span><span class="p">)</span>
+            <span class="ow">and</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span> <span class="o">==</span> <span class="s2">&quot;8.2&quot;</span>
+            <span class="ow">and</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span> <span class="o">!=</span> <span class="s2">&quot;3.8&quot;</span>
+        <span class="p">):</span>
+            <span class="k">return</span> <span class="p">{}</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Recommend using Python3.8 on RHEL/UBI 8.2.&quot;&quot;&quot;</span>
+        <span class="n">state</span><span class="o">.</span><span class="n">add_justification</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION</span>
+</pre></div>
+</div>
 <p>The implementation can also provide other methods, such as <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.post_run" title="thoth.adviser.unit.Unit.post_run"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.pre_run</span></code></a>, <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.post_run" title="thoth.adviser.unit.Unit.post_run"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.post_run</span></code></a> or <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.post_run" title="thoth.adviser.unit.Unit.post_run"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.post_run_report</span></code></a> and pipeline unit configuration adjustment.
 See <a class="reference internal" href="unit.html#unit"><span class="std std-ref">unit documentation</span></a> for more info.</p>
+</div>
 </div>
 
 
@@ -79,7 +146,17 @@ See <a class="reference internal" href="unit.html#unit"><span class="std std-ref
         </div>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Wrap pipeline unit type</a><ul>
+<li><a class="reference internal" href="#main-usage">Main usage</a></li>
+<li><a class="reference internal" href="#real-world-examples">Real world examples</a></li>
+<li><a class="reference internal" href="#an-example-implementation">An example implementation</a></li>
+</ul>
+</li>
+</ul>
+<h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation index</a><ul>
       <li>Previous: <a href="strides.html" title="previous chapter">Stride pipeline unit type</a></li>
