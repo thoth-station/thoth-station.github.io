@@ -81,6 +81,7 @@
 <span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
 
 <span class="kn">import</span> <span class="nn">yaml</span>
 <span class="kn">from</span> <span class="nn">texttable</span> <span class="kn">import</span> <span class="n">Texttable</span>
@@ -122,6 +123,7 @@
 
 <div class="viewcode-block" id="handle_cli_exception"><a class="viewcode-back" href="../../thamos.html#thamos.cli.handle_cli_exception">[docs]</a><span class="k">def</span> <span class="nf">handle_cli_exception</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Callable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Callable</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Suppress exception in CLI if debug mode was not turned on.&quot;&quot;&quot;</span>
+    <span class="c1"># noqa</span>
     <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
     <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
         <span class="k">try</span><span class="p">:</span>
@@ -139,15 +141,24 @@
 <span class="k">def</span> <span class="nf">_load_files</span><span class="p">(</span><span class="n">requirements_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
     <span class="sd">&quot;&quot;&quot;Load Pipfile/Pipfile.lock or requirements.in/txt from the current directory.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
-        <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_files</span><span class="p">(</span><span class="n">without_pipfile_lock</span><span class="o">=</span><span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">))</span>
+        <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_files</span><span class="p">(</span>
+            <span class="n">without_pipfile_lock</span><span class="o">=</span><span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
     <span class="k">elif</span> <span class="n">requirements_format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;pip&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-tools&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-compile&quot;</span><span class="p">):</span>
         <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_pip_compile_files</span><span class="p">(</span><span class="n">allow_without_lock</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown configuration option for requirements format: </span><span class="si">{</span><span class="n">requirements_format</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_string</span><span class="p">(),</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unknown configuration option for requirements format: </span><span class="si">{</span><span class="n">requirements_format</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_string</span><span class="p">(),</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span>
 
 
-<span class="k">def</span> <span class="nf">_write_files</span><span class="p">(</span><span class="n">requirements</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">requirements_lock</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">requirements_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="k">def</span> <span class="nf">_write_files</span><span class="p">(</span>
+    <span class="n">requirements</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">requirements_lock</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">requirements_format</span><span class="p">:</span> <span class="nb">str</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Write content of Pipfile/Pipfile.lock or requirements.in/txt to the current directory.&quot;&quot;&quot;</span>
     <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">requirements</span><span class="p">,</span> <span class="n">requirements_lock</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
@@ -231,8 +242,8 @@
     <span class="n">table</span> <span class="o">=</span> <span class="n">Texttable</span><span class="p">(</span><span class="n">max_width</span><span class="o">=</span><span class="n">get_terminal_size</span><span class="p">()</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span>
     <span class="n">table</span><span class="o">.</span><span class="n">set_deco</span><span class="p">(</span><span class="n">Texttable</span><span class="o">.</span><span class="n">HEADER</span> <span class="o">|</span> <span class="n">Texttable</span><span class="o">.</span><span class="n">VLINES</span><span class="p">)</span>
 
-    <span class="n">header</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-    <span class="n">to_remove</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">header</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># type: Set[str]</span>
+    <span class="n">to_remove</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># type: Set[str]</span>
     <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">report</span><span class="p">:</span>
         <span class="n">header</span> <span class="o">=</span> <span class="n">header</span><span class="o">.</span><span class="n">union</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
         <span class="n">to_remove</span> <span class="o">=</span> <span class="n">to_remove</span><span class="o">.</span><span class="n">union</span><span class="p">(</span>
@@ -242,13 +253,13 @@
     <span class="c1"># Remove fields that can be an array - these are addition details that are supressed from the table output.</span>
     <span class="n">header</span> <span class="o">=</span> <span class="n">header</span> <span class="o">-</span> <span class="n">to_remove</span>
 
-    <span class="n">header</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">header</span><span class="p">))</span>
-    <span class="n">table</span><span class="o">.</span><span class="n">set_cols_align</span><span class="p">([</span><span class="n">_TABLE_COLS_ALIGN</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">column</span><span class="p">,</span> <span class="s2">&quot;l&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">header</span><span class="p">])</span>
-    <span class="n">table</span><span class="o">.</span><span class="n">header</span><span class="p">([</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">+</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">header</span><span class="p">])</span>
+    <span class="n">header_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">header</span><span class="p">))</span>
+    <span class="n">table</span><span class="o">.</span><span class="n">set_cols_align</span><span class="p">([</span><span class="n">_TABLE_COLS_ALIGN</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">column</span><span class="p">,</span> <span class="s2">&quot;l&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">header_list</span><span class="p">])</span>
+    <span class="n">table</span><span class="o">.</span><span class="n">header</span><span class="p">([</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">+</span> <span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">header_list</span><span class="p">])</span>
 
     <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">report</span><span class="p">:</span>
         <span class="n">row</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">header</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">header_list</span><span class="p">:</span>
             <span class="n">entry</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">column</span><span class="p">,</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_NO_EMOJI&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
@@ -427,7 +438,9 @@
 <span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Ask Thoth for recommendations on application stack.&quot;&quot;&quot;</span>
     <span class="k">with</span> <span class="n">workdir</span><span class="p">():</span>
-        <span class="n">pipfile</span><span class="p">,</span> <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">_load_files</span><span class="p">(</span><span class="n">requirements_format</span><span class="o">=</span><span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span><span class="p">)</span>
+        <span class="n">pipfile</span><span class="p">,</span> <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">_load_files</span><span class="p">(</span>
+            <span class="n">requirements_format</span><span class="o">=</span><span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span>
+        <span class="p">)</span>
 
         <span class="c1"># In CLI we always call to obtain only the best software stack (count is implicitly set to 1).</span>
         <span class="n">results</span> <span class="o">=</span> <span class="n">thoth_advise</span><span class="p">(</span>
@@ -465,7 +478,10 @@
             <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">]:</span>
                 <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;justification&quot;</span><span class="p">]:</span>
                     <span class="n">_print_header</span><span class="p">(</span><span class="s2">&quot;Recommended stack report&quot;</span><span class="p">)</span>
-                    <span class="n">_print_report</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;justification&quot;</span><span class="p">],</span> <span class="n">json_output</span><span class="o">=</span><span class="n">json_output</span><span class="p">)</span>
+                    <span class="n">_print_report</span><span class="p">(</span>
+                        <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;justification&quot;</span><span class="p">],</span>
+                        <span class="n">json_output</span><span class="o">=</span><span class="n">json_output</span><span class="p">,</span>
+                    <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;No justification was made for the recommended stack&quot;</span><span class="p">)</span>
 
@@ -474,14 +490,16 @@
                 <span class="n">_print_report</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;stack_info&quot;</span><span class="p">],</span> <span class="n">json_output</span><span class="o">=</span><span class="n">json_output</span><span class="p">)</span>
 
             <span class="n">pipfile</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;project&quot;</span><span class="p">][</span><span class="s2">&quot;requirements&quot;</span><span class="p">]</span>
-            <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;project&quot;</span><span class="p">][</span><span class="s2">&quot;requirements_locked&quot;</span><span class="p">]</span>
+            <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;project&quot;</span><span class="p">][</span>
+                <span class="s2">&quot;requirements_locked&quot;</span>
+            <span class="p">]</span>
             <span class="n">_write_configuration</span><span class="p">(</span>
                 <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;advised_runtime_environment&quot;</span><span class="p">],</span>
                 <span class="n">recommendation_type</span><span class="p">,</span>
                 <span class="n">limit_latest_versions</span><span class="p">,</span>
                 <span class="n">dev</span><span class="p">,</span>
             <span class="p">)</span>
-            <span class="n">_write_files</span><span class="p">(</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">pipfile_lock</span><span class="p">,</span> <span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span><span class="p">)</span>
+            <span class="n">_write_files</span><span class="p">(</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">pipfile_lock</span><span class="p">,</span> <span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
 
@@ -520,7 +538,9 @@
     <span class="sd">&quot;&quot;&quot;Check provenance of installed packages.&quot;&quot;&quot;</span>
     <span class="k">with</span> <span class="n">workdir</span><span class="p">():</span>
         <span class="k">if</span> <span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span> <span class="o">!=</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Provenance checks are available only for requirements managed by Pipenv&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Provenance checks are available only for requirements managed by Pipenv&quot;</span>
+            <span class="p">)</span>
 
         <span class="n">pipfile</span><span class="p">,</span> <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">_load_files</span><span class="p">(</span><span class="s2">&quot;pipenv&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">pipfile_lock</span><span class="p">:</span>
@@ -539,9 +559,10 @@
             <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 
         <span class="n">report</span><span class="p">,</span> <span class="n">error</span> <span class="o">=</span> <span class="n">results</span>
-        <span class="n">_print_report</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">json_output</span><span class="o">=</span><span class="n">json_output</span><span class="p">)</span> <span class="k">if</span> <span class="n">report</span> <span class="k">else</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="s2">&quot;Provenance check passed!&quot;</span>
-        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">report</span><span class="p">:</span>
+            <span class="n">_print_report</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">json_output</span><span class="o">=</span><span class="n">json_output</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Provenance check passed!&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">error</span><span class="p">:</span>
             <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
