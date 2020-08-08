@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.lib &#8212; Thamos 0.10.6 documentation</title>
+    <title>thamos.lib &#8212; Thamos 0.11.0 documentation</title>
     <link rel="stylesheet" href="../../_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 0.10.6 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 0.11.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -84,6 +84,7 @@
 <span class="kn">import</span> <span class="nn">pprint</span>
 <span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">import</span> <span class="nn">urllib3</span>
+<span class="kn">import</span> <span class="nn">requests</span>
 
 <span class="kn">from</span> <span class="nn">termcolor</span> <span class="kn">import</span> <span class="n">colored</span>
 <span class="kn">from</span> <span class="nn">yaspin</span> <span class="kn">import</span> <span class="n">yaspin</span>
@@ -119,6 +120,11 @@
 <span class="n">_RETRY_ON_ERROR_COUNT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_RETRY_ON_ERROR_COUNT&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
 <span class="n">_RETRY_ON_ERROR_SLEEP</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_RETRY_ON_ERROR_SLEEP&quot;</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">))</span>
 <span class="n">_THAMOS_TIMEOUT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_TIMEOUT&quot;</span><span class="p">,</span> <span class="mi">2000</span><span class="p">))</span>
+<span class="n">_SOURCE</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;adviser&quot;</span><span class="p">:</span> <span class="s2">&quot;advise/python&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;provenance&quot;</span><span class="p">:</span> <span class="s2">&quot;provenance/python&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;analyze&quot;</span><span class="p">:</span> <span class="s2">&quot;analyze&quot;</span><span class="p">,</span>
+<span class="p">}</span>
 
 
 <div class="viewcode-block" id="with_api_client"><a class="viewcode-back" href="../../thamos.html#thamos.lib.with_api_client">[docs]</a><span class="k">def</span> <span class="nf">with_api_client</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Callable</span><span class="p">):</span>
@@ -131,9 +137,7 @@
         <span class="k">if</span> <span class="ow">not</span> <span class="n">host</span><span class="p">:</span>
             <span class="n">thoth_config</span><span class="o">.</span><span class="n">load_config</span><span class="p">()</span>
             <span class="n">host</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;host&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">config</span><span class="o">.</span><span class="n">host</span>
-
         <span class="n">thoth_config</span><span class="o">.</span><span class="n">api_discovery</span><span class="p">(</span><span class="n">host</span><span class="p">)</span>
-
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Using API: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">api_url</span><span class="p">)</span>
         <span class="n">config</span><span class="o">.</span><span class="n">host</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">api_url</span>
         <span class="n">config</span><span class="o">.</span><span class="n">verify_ssl</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">tls_verify</span>
@@ -150,6 +154,28 @@
         <span class="k">return</span> <span class="n">result</span>
 
     <span class="k">return</span> <span class="n">wrapper</span></div>
+
+
+<div class="viewcode-block" id="is_analysis_ready"><a class="viewcode-back" href="../../thamos.html#thamos.lib.is_analysis_ready">[docs]</a><span class="k">def</span> <span class="nf">is_analysis_ready</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Handle the the multiple response types available while asking for result of a anaylsis result.&quot;&quot;&quot;</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">Configuration</span><span class="p">()</span>
+    <span class="n">host</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">explicit_host</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">host</span><span class="p">:</span>
+        <span class="n">thoth_config</span><span class="o">.</span><span class="n">load_config</span><span class="p">()</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;host&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">config</span><span class="o">.</span><span class="n">host</span>
+    <span class="n">source</span> <span class="o">=</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">source_url</span> <span class="o">=</span> <span class="n">_SOURCE</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;https://</span><span class="si">{</span><span class="n">host</span><span class="si">}</span><span class="s2">/api/v1/</span><span class="si">{</span><span class="n">source_url</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">analysis_id</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">202</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="c1"># Return true if result is ready.</span>
+    <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">200</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ApiException</span><span class="p">(</span><span class="n">http_resp</span><span class="o">=</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">False</span></div>
 
 
 <span class="k">def</span> <span class="nf">_wait_for_analysis</span><span class="p">(</span><span class="n">status_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -197,13 +223,13 @@
                 <span class="k">continue</span>
 
             <span class="n">retries</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># Reset counter as we obtained a valid response.</span>
-            <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">finished_at</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">response</span><span class="p">:</span>
                 <span class="k">break</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                 <span class="s2">&quot;Waiting for </span><span class="si">%r</span><span class="s2"> to finish for </span><span class="si">%g</span><span class="s2"> seconds (state: </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
                 <span class="n">analysis_id</span><span class="p">,</span>
                 <span class="n">sleep_time</span><span class="p">,</span>
-                <span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">state</span><span class="p">,</span>
+                <span class="n">response</span><span class="p">,</span>
             <span class="p">)</span>
 
             <span class="n">sleep</span><span class="p">(</span><span class="n">sleep_time</span><span class="p">)</span>
@@ -438,8 +464,8 @@
 
     <span class="k">if</span> <span class="n">nowait</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
-
-    <span class="n">_wait_for_analysis</span><span class="p">(</span><span class="n">api_instance</span><span class="o">.</span><span class="n">get_advise_python_status</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
+    <span class="c1"># We call custom status function for advise until swagger client supports mulitple response codes.</span>
+    <span class="n">_wait_for_analysis</span><span class="p">(</span><span class="n">is_analysis_ready</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Retrieving adviser result for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
     <span class="n">response</span> <span class="o">=</span> <span class="n">_retrieve_analysis_result</span><span class="p">(</span>
         <span class="n">api_instance</span><span class="o">.</span><span class="n">get_advise_python</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
@@ -540,7 +566,7 @@
     <span class="k">if</span> <span class="n">nowait</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
 
-    <span class="n">_wait_for_analysis</span><span class="p">(</span><span class="n">api_instance</span><span class="o">.</span><span class="n">get_provenance_python_status</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
+    <span class="n">_wait_for_analysis</span><span class="p">(</span><span class="n">is_analysis_ready</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Retrieving provenance check result for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
     <span class="n">response</span> <span class="o">=</span> <span class="n">_retrieve_analysis_result</span><span class="p">(</span>
         <span class="n">api_instance</span><span class="o">.</span><span class="n">get_provenance_python</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
@@ -620,7 +646,7 @@
     <span class="k">if</span> <span class="n">nowait</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
 
-    <span class="n">_wait_for_analysis</span><span class="p">(</span><span class="n">api_instance</span><span class="o">.</span><span class="n">get_analyze_status</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
+    <span class="n">_wait_for_analysis</span><span class="p">(</span><span class="n">is_analysis_ready</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
         <span class="s2">&quot;Retrieving image analysis result result for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
     <span class="p">)</span>
