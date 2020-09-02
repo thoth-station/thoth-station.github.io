@@ -70,13 +70,15 @@
 <span class="sd">&quot;&quot;&quot;Score based on security indicators aggregated.&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 
+<span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
 
 <span class="kn">from</span> <span class="nn">..enums</span> <span class="kn">import</span> <span class="n">RecommendationType</span>
@@ -92,8 +94,11 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="SecurityIndicatorStep"><a class="viewcode-back" href="../../../../thoth.adviser.steps.html#thoth.adviser.steps.security_indicators.SecurityIndicatorStep">[docs]</a><span class="k">class</span> <span class="nc">SecurityIndicatorStep</span><span class="p">(</span><span class="n">Step</span><span class="p">):</span>
+<div class="viewcode-block" id="SecurityIndicatorStep"><a class="viewcode-back" href="../../../../thoth.adviser.steps.html#thoth.adviser.steps.security_indicators.SecurityIndicatorStep">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">SecurityIndicatorStep</span><span class="p">(</span><span class="n">Step</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;A step that scores a state based on security info aggregated.&quot;&quot;&quot;</span>
+
+    <span class="n">_logged_packages</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">set</span><span class="p">),</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
     <span class="n">CONFIGURATION_DEFAULT</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">&quot;high_confidence_weight&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
@@ -104,6 +109,10 @@
         <span class="s2">&quot;low_severity_weight&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
         <span class="s2">&quot;si_reward_weight&quot;</span><span class="p">:</span> <span class="mf">0.5</span><span class="p">,</span>
     <span class="p">}</span>
+
+<div class="viewcode-block" id="SecurityIndicatorStep.pre_run"><a class="viewcode-back" href="../../../../thoth.adviser.steps.html#thoth.adviser.steps.security_indicators.SecurityIndicatorStep.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Initialize this pipeline step before running the pipeline.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_logged_packages</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="SecurityIndicatorStep.should_include"><a class="viewcode-back" href="../../../../thoth.adviser.steps.html#thoth.adviser.steps.security_indicators.SecurityIndicatorStep.should_include">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">should_include</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
@@ -137,12 +146,15 @@
 
         <span class="k">if</span> <span class="n">s_info</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="o">==</span> <span class="n">RecommendationType</span><span class="o">.</span><span class="n">SECURITY</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                    <span class="s2">&quot;No security info for </span><span class="si">%s</span><span class="s2">===</span><span class="si">%s</span><span class="s2"> on </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
-                    <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                    <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
-                    <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
-                <span class="p">)</span>
+                <span class="n">package_version_tuple</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple_locked</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">package_version_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_logged_packages</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_logged_packages</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">package_version_tuple</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;No security info for </span><span class="si">%s</span><span class="s2">===</span><span class="si">%s</span><span class="s2"> on </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
+                        <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+                    <span class="p">)</span>
                 <span class="k">raise</span> <span class="n">NotAcceptable</span>
             <span class="k">return</span> <span class="p">(</span>
                 <span class="mi">0</span><span class="p">,</span>
