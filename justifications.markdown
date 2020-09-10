@@ -11,7 +11,7 @@ Here you can find a list of all available justifications as can be produced by
 Thoth's recommendation engine:
 
 <ul>
-  {% for justification in site.justifications %}
+  {% for justification in site.j %}
       <h3><a href="{{ justification.url }}">{{ justification.title }}</a></h3>
   {% endfor %}
 </ul>
