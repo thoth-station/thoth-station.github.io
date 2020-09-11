@@ -5,7 +5,7 @@
 layout: home
 ---
 
-<h1>Justifications</h1>
+<h1>Recommendations</h1>
 
 Here you can find a list of all available justifications as can be produced by
 Thoth's recommendation engine:
