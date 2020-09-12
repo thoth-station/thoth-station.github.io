@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.25.7 documentation</title>
+    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.25.8 documentation</title>
     
     <link rel="stylesheet" href="../../../../_static/nameko.css" type="text/css" />
     <link rel="stylesheet" href="../../../../_static/pygments.css" type="text/css" />
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../../../../',
-        VERSION:     '0.25.7',
+        VERSION:     '0.25.8',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="../../../../_static/doctools.js"></script>
     <link rel="index" title="Index" href="../../../../genindex.html" />
     <link rel="search" title="Search" href="../../../../search.html" />
-    <link rel="top" title="Thoth Storages 0.25.7 documentation" href="../../../../index.html" />
+    <link rel="top" title="Thoth Storages 0.25.8 documentation" href="../../../../index.html" />
     <link rel="up" title="Module code" href="../../../index.html" />
 
    
@@ -53,7 +53,7 @@
         <li class="right" >
           <a href="../../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Storages 0.25.7 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Storages 0.25.8 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -1658,6 +1658,53 @@
 
             <span class="k">return</span> <span class="n">query</span><span class="o">.</span><span class="n">count</span><span class="p">()</span></div>
 
+    <span class="c1"># SI Analyzed Python Packages</span>
+
+    <span class="k">def</span> <span class="nf">_construct_si_analyzed_python_package_versions_query</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">,</span> <span class="n">index_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Construct query for packages analyzed by solver and analyzed by SI.&quot;&quot;&quot;</span>
+        <span class="n">index_url</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="o">.</span><span class="n">normalize_python_index_url</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="p">)</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+            <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span><span class="o">.</span><span class="n">isnot</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span>
+            <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span><span class="o">.</span><span class="n">isnot</span><span class="p">(</span><span class="kc">None</span><span class="p">),</span>
+            <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">enabled</span><span class="o">.</span><span class="n">is_</span><span class="p">(</span><span class="kc">True</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">index_url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">)</span>
+
+        <span class="c1"># We find all rows that are same in PythonPackageVersion and SIAggregated table.</span>
+        <span class="n">conditions</span> <span class="o">=</span> <span class="p">[</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">id</span> <span class="o">==</span> <span class="n">SIAggregated</span><span class="o">.</span><span class="n">python_package_version_id</span><span class="p">]</span>
+
+        <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">exists</span><span class="p">()</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">and_</span><span class="p">(</span><span class="o">*</span><span class="n">conditions</span><span class="p">)))</span>
+
+        <span class="k">return</span> <span class="n">query</span>
+
+<div class="viewcode-block" id="GraphDatabase.get_si_analyzed_python_package_versions_count_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_si_analyzed_python_package_versions_count_all">[docs]</a>    <span class="k">def</span> <span class="nf">get_si_analyzed_python_package_versions_count_all</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">index_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">distinct</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get SI analyzed Python package versions number in Thoth Database.&quot;&quot;&quot;</span>
+        <span class="n">index_url</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="o">.</span><span class="n">normalize_python_index_url</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_si_analyzed_python_package_versions_query</span><span class="p">(</span>
+                <span class="n">session</span><span class="p">,</span> <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span>
+            <span class="p">)</span>
+
+            <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
+                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
+                <span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
+                <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">distinct</span><span class="p">:</span>
+                <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
+
+            <span class="k">return</span> <span class="n">query</span><span class="o">.</span><span class="n">count</span><span class="p">()</span></div>
+
     <span class="c1"># Analyzed Python Packages</span>
 
     <span class="k">def</span> <span class="nf">_construct_analyzed_python_package_versions_query</span><span class="p">(</span>
@@ -2087,8 +2134,28 @@
                 <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
 
             <span class="k">return</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()</span></div>
-    
-    
+
+<div class="viewcode-block" id="GraphDatabase.get_si_unanalyzed_python_package_versions_count_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_si_unanalyzed_python_package_versions_count_all">[docs]</a>    <span class="k">def</span> <span class="nf">get_si_unanalyzed_python_package_versions_count_all</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">index_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">distinct</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get SI unanalyzed Python package versions number in Thoth Database.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_si_unanalyzed_python_package_versions_query</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
+
+            <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
+                <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_name</span><span class="p">,</span>
+                <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span><span class="p">,</span>
+                <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">distinct</span><span class="p">:</span>
+                <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">distinct</span><span class="p">()</span>
+
+            <span class="k">return</span> <span class="n">query</span><span class="o">.</span><span class="n">count</span><span class="p">()</span></div>
+
     <span class="k">def</span> <span class="nf">_construct_unanalyzed_python_package_versions_query</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">,</span>
@@ -2401,6 +2468,7 @@
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersionEntity</span><span class="o">.</span><span class="n">package_version</span> <span class="o">==</span> <span class="n">package_version</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">index_url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">index_url</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="o">.</span><span class="n">normalize_python_index_url</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">)</span>
 
         <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">SecurityIndicatorAggregatedRun</span><span class="p">)</span>
@@ -2526,6 +2594,7 @@
         <span class="n">package_name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
         <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">normalize_python_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
         <span class="n">os_version</span> <span class="o">=</span> <span class="n">OpenShift</span><span class="o">.</span><span class="n">normalize_os_version</span><span class="p">(</span><span class="n">os_name</span><span class="p">,</span> <span class="n">os_version</span><span class="p">)</span>
+        <span class="n">index_url</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="o">.</span><span class="n">normalize_python_index_url</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
 
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
             <span class="n">query</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="p">)</span><span class="o">.</span><span class="n">filter_by</span><span class="p">(</span>
