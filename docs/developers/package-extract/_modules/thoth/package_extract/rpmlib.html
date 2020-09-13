@@ -1,0 +1,181 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.package_extract.rpmlib &#8212; Thoth Package Extract 1.0.1 documentation</title>
+    <link rel="stylesheet" href="../../..//assets/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="../../..//assets/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../..//assets/documentation_options.js"></script>
+    <script type="text/javascript" src="../../..//assets/jquery.js"></script>
+    <script type="text/javascript" src="../../..//assets/underscore.js"></script>
+    <script type="text/javascript" src="../../..//assets/doctools.js"></script>
+    <script type="text/javascript" src="../../..//assets/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Package Extract 1.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.package_extract.rpmlib</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Functionality copied from kobo.</span>
+
+<span class="sd">Even though copying code is not nice at all, this is better to have copied. Assuming naming</span>
+<span class="sd">is mature and stable enough, it should be safe to have them there.</span>
+
+<span class="sd">The original code can be found at:</span>
+<span class="sd">  https://github.com/release-engineering/kobo/blob/master/kobo/rpmlib.py</span>
+
+<span class="sd">Note we used code from Koji before, but that looks to be broken in some cases.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="parse_nvra"><a class="viewcode-back" href="../../../thoth.package_extract.html#thoth.package_extract.rpmlib.parse_nvra">[docs]</a><span class="k">def</span> <span class="nf">parse_nvra</span><span class="p">(</span><span class="n">nvra</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Split N-V-R.A[.rpm] into a dictionary.</span>
+
+<span class="sd">    @param nvra: N-V-R:E.A[.rpm], E:N-V-R.A[.rpm], N-V-R.A[.rpm]:E or N-E:V-R.A[.rpm] string</span>
+<span class="sd">    @type nvra: str</span>
+<span class="sd">    @return: {name, version, release, epoch, arch}</span>
+<span class="sd">    @rtype: dict</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;/&quot;</span> <span class="ow">in</span> <span class="n">nvra</span><span class="p">:</span>
+        <span class="n">nvra</span> <span class="o">=</span> <span class="n">nvra</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">epoch</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+        <span class="c1"># run this twice to parse N-V-R.A.rpm:E and N-V-R.A:E.rpm</span>
+        <span class="k">if</span> <span class="n">nvra</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.rpm&quot;</span><span class="p">):</span>
+            <span class="c1"># strip .rpm suffix</span>
+            <span class="n">nvra</span> <span class="o">=</span> <span class="n">nvra</span><span class="p">[:</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># split epoch (if exists)</span>
+            <span class="n">nvra</span><span class="p">,</span> <span class="n">epoch</span> <span class="o">=</span> <span class="n">split_nvr_epoch</span><span class="p">(</span><span class="n">nvra</span><span class="p">)</span>
+
+    <span class="n">nvra_parts</span> <span class="o">=</span> <span class="n">nvra</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">nvra_parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid NVRA: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">nvra</span><span class="p">)</span>
+
+    <span class="n">nvr</span><span class="p">,</span> <span class="n">arch</span> <span class="o">=</span> <span class="n">nvra_parts</span>
+    <span class="k">if</span> <span class="s2">&quot;-&quot;</span> <span class="ow">in</span> <span class="n">arch</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid arch &#39;</span><span class="si">%s</span><span class="s2">&#39; in &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">arch</span><span class="p">,</span> <span class="n">nvra</span><span class="p">))</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">parse_nvr</span><span class="p">(</span><span class="n">nvr</span><span class="p">)</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">&quot;arch&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">arch</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">&quot;src&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">arch</span> <span class="o">==</span> <span class="s2">&quot;src&quot;</span>
+    <span class="k">if</span> <span class="n">epoch</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+        <span class="n">result</span><span class="p">[</span><span class="s2">&quot;epoch&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">epoch</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="parse_nvr"><a class="viewcode-back" href="../../../thoth.package_extract.html#thoth.package_extract.rpmlib.parse_nvr">[docs]</a><span class="k">def</span> <span class="nf">parse_nvr</span><span class="p">(</span><span class="n">nvre</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Split N-V-R into a dictionary.</span>
+
+<span class="sd">    @param nvre: N-V-R:E, E:N-V-R or N-E:V-R string</span>
+<span class="sd">    @type nvre: str</span>
+<span class="sd">    @return: {name, version, release, epoch}</span>
+<span class="sd">    @rtype: dict</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;/&quot;</span> <span class="ow">in</span> <span class="n">nvre</span><span class="p">:</span>
+        <span class="n">nvre</span> <span class="o">=</span> <span class="n">nvre</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="n">nvr</span><span class="p">,</span> <span class="n">epoch</span> <span class="o">=</span> <span class="n">split_nvr_epoch</span><span class="p">(</span><span class="n">nvre</span><span class="p">)</span>
+
+    <span class="n">nvr_parts</span> <span class="o">=</span> <span class="n">nvr</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">nvr_parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid NVR: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">nvr</span><span class="p">)</span>
+
+    <span class="c1"># parse E:V</span>
+    <span class="k">if</span> <span class="n">epoch</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span> <span class="ow">and</span> <span class="s2">&quot;:&quot;</span> <span class="ow">in</span> <span class="n">nvr_parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="n">epoch</span><span class="p">,</span> <span class="n">nvr_parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">nvr_parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># check if epoch is empty or numeric</span>
+    <span class="k">if</span> <span class="n">epoch</span> <span class="o">!=</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="nb">int</span><span class="p">(</span><span class="n">epoch</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid epoch &#39;</span><span class="si">%s</span><span class="s2">&#39; in &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">epoch</span><span class="p">,</span> <span class="n">nvr</span><span class="p">))</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">([</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;version&quot;</span><span class="p">,</span> <span class="s2">&quot;release&quot;</span><span class="p">],</span> <span class="n">nvr_parts</span><span class="p">))</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">&quot;epoch&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">epoch</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="split_nvr_epoch"><a class="viewcode-back" href="../../../thoth.package_extract.html#thoth.package_extract.rpmlib.split_nvr_epoch">[docs]</a><span class="k">def</span> <span class="nf">split_nvr_epoch</span><span class="p">(</span><span class="n">nvre</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Split nvre to N-V-R and E.</span>
+
+<span class="sd">    @param nvre: E:N-V-R or N-V-R:E string</span>
+<span class="sd">    @type nvre: str</span>
+<span class="sd">    @return: (N-V-R, E)</span>
+<span class="sd">    @rtype: (str, str)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;:&quot;</span> <span class="ow">in</span> <span class="n">nvre</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">nvre</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Invalid NVRE: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">nvre</span><span class="p">)</span>
+
+        <span class="n">nvr</span><span class="p">,</span> <span class="n">epoch</span> <span class="o">=</span> <span class="n">nvre</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="s2">&quot;-&quot;</span> <span class="ow">in</span> <span class="n">epoch</span><span class="p">:</span>
+            <span class="k">if</span> <span class="s2">&quot;-&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">nvr</span><span class="p">:</span>
+                <span class="c1"># switch nvr with epoch</span>
+                <span class="n">nvr</span><span class="p">,</span> <span class="n">epoch</span> <span class="o">=</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">nvr</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># it&#39;s probably N-E:V-R format, handle it after the split</span>
+                <span class="n">nvr</span><span class="p">,</span> <span class="n">epoch</span> <span class="o">=</span> <span class="n">nvre</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">nvr</span><span class="p">,</span> <span class="n">epoch</span> <span class="o">=</span> <span class="n">nvre</span><span class="p">,</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">nvr</span><span class="p">,</span> <span class="n">epoch</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation index</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+  
+  </body>
+</html>
