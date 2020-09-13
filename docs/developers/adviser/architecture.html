@@ -1,0 +1,394 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Thoth’s architecture &#8212; Thoth Adviser 0.16.0 documentation</title>
+    <link rel="stylesheet" href="/assets/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="/assets/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/jquery.js"></script>
+    <script type="text/javascript" src="/assets/underscore.js"></script>
+    <script type="text/javascript" src="/assets/doctools.js"></script>
+    <script type="text/javascript" src="/assets/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Configuring and setting up adviser in a cluster" href="deployment.html" />
+    <link rel="prev" title="Developer’s guide to Thoth" href="developers_guide.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="deployment.html" title="Configuring and setting up adviser in a cluster"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="developers_guide.html" title="Developer’s guide to Thoth"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.16.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="thoth-s-architecture">
+<span id="architecture"></span><h1>Thoth’s architecture<a class="headerlink" href="#thoth-s-architecture" title="Permalink to this headline">¶</a></h1>
+<p>In this section, the reader gets a notion about Thoth architecture, requirements
+for deployment and main Thoth’s components.</p>
+<p>The whole deployment is divided into multiple namespaces (or OpenShift
+projects) - <code class="docutils literal notranslate"><span class="pre">thoth-frontend</span></code>, <code class="docutils literal notranslate"><span class="pre">thoth-middletier</span></code>, <code class="docutils literal notranslate"><span class="pre">thoth-backend</span></code>,
+<code class="docutils literal notranslate"><span class="pre">inspection-api</span></code>, <code class="docutils literal notranslate"><span class="pre">inspection</span></code>, <code class="docutils literal notranslate"><span class="pre">thoth-graph</span></code> namespace and
+<code class="docutils literal notranslate"><span class="pre">thoth-infra</span></code> namespace.</p>
+<a class="reference external image-reference" href="/assets/architecture.png"><img alt="Architecture overview diagram." src="_images/architecture.png" /></a>
+<p>Some of the components are deployed multiple times. They serve the same
+purpose, but are parametrized - e.g. based on the namespace they operate on.
+For example <code class="docutils literal notranslate"><span class="pre">cleanup-job</span></code>, responsible for cleaning a namespace, is deployed
+into <code class="docutils literal notranslate"><span class="pre">thoth-frontend-stage</span></code> two times to clean resources in
+<code class="docutils literal notranslate"><span class="pre">thoth-middletier</span></code> and <code class="docutils literal notranslate"><span class="pre">thoth-backend</span></code>. This is shown in the architecture
+overview as a rectangle with curly braces donating the namespace.</p>
+<p>The main reason behind splitting the application into multiple namespaces are
+workloads.  Thoth is running different type of one-time workloads based on an
+trigger - for example a single <code class="docutils literal notranslate"><span class="pre">adviser</span></code> instance is created as per user
+request. The workload is is then scheduled into a separate namespace (backend,
+in case of adviser) and the given namespace acts as a pool of resources that
+are available to be used for workloads. Other namespaces, for example frontend,
+can be still used to scale, build, re-deploy or manage components.</p>
+<div class="section" id="infra-namespace">
+<h2>Infra Namespace<a class="headerlink" href="#infra-namespace" title="Permalink to this headline">¶</a></h2>
+<p>This namespace is separated for “infrastructure” related bits - for example all
+the OpenShift templates are provisioned into this namespace. Also, the
+<a class="reference external" href="https://github.com/thoth-station/thoth-ops">thoth-ops</a> (the link might be to
+a private repo available only for Thoth developers) container responsible for
+managing a Thoth deployment is created in this namespace.</p>
+</div>
+<div class="section" id="frontend-namespace">
+<h2>Frontend Namespace<a class="headerlink" href="#frontend-namespace" title="Permalink to this headline">¶</a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">thoth-frontend</span></code> is used as a management namespace. Services running in
+this namespace have usually assigned a service account for running and managing
+pods that are available inside the <code class="docutils literal notranslate"><span class="pre">thoth-middletier</span></code> and <code class="docutils literal notranslate"><span class="pre">thoth-backend</span></code>
+namespaces.</p>
+<p>A user can interact with the user-facing API that is the key interaction point
+for users or bots. <a class="reference external" href="https://github.com/thoth-station/user-api">The user-facing API</a> specifies its endpoints using
+Swagger/OpenAPI specification. See <a class="reference external" href="https://github.com/thoth-station/thamos">Thamos repo and documentation - a library
+and CLI for interacting with Thoth</a>
+and <a class="reference external" href="https://github.com/thoth-station/user-api">the user API service repo</a>
+itself for more info. You can also find more info in the <a class="reference internal" href="integration.html#integration"><span class="std std-ref">integration</span></a> section.</p>
+<p>Besides user API, there are run periodically CronJobs that keep application in
+sync and operational:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/thoth-station/cleanup-job">cleanup-job</a> - a job
+responsible for cleaning up resources left in the cluster</p></li>
+<li><p><a class="reference external" href="https://github.com/thoth-station/graph-refresh-job">graph-refresh-job</a> - -
+a job responsible for scheduling analyses of packages that were not yet
+analyzed</p></li>
+<li><p><a class="reference external" href="https://github.com/thoth-station/graph-sync-job">graph-sync-job</a> - a job
+responsible for syncing data in a JSON format persisted on Ceph to the Thoth’s
+knowledge graph database</p></li>
+<li><p><a class="reference external" href="https://github.com/thoth-station/package-releases-job">package-releases-job</a> - a job responsible
+for tracking new releases on Python’s package index (the public one is
+<a class="reference external" href="https://pypi.org">PyPI.org</a>, see also
+<a class="reference external" href="https://tensorflow.pypi.thoth-station.ninja/">AICoE index</a>)</p></li>
+<li><p><a class="reference external" href="https://github.com/thoth-station/cve-update-job">cve-update-job</a> - a job
+responsible for gathering CVE information about packages</p></li>
+<li><p><a class="reference external" href="https://github.com/thoth-station/workload-operator">workload-operator</a> -
+an OpenShift operator responsible for scheduling jobs into namespaces, it
+respects allocated resources dedicated for the namespace in which jobs run</p></li>
+<li><p><a class="reference external" href="https://github.com/thoth-station/graph-sync-operator">graph-sync-operator</a>
+- an OpenShift operator responsible for scheduling graph-sync-jobs that sync
+results of analyzer job runs into Thoth’s knowledge graph</p></li>
+</ul>
+</div>
+<div class="section" id="middletier-namespace">
+<h2>Middletier Namespace<a class="headerlink" href="#middletier-namespace" title="Permalink to this headline">¶</a></h2>
+<p>The middletier namespace is used for analyzes and actual resource hungry tasks
+that compute results for Thoth’s knowledge graph. This namespace was separated
+from the frontend namespace to guarantee application responsibility. All the
+pods that require computing results for the knowledge graph are scheduled in
+this namespace. This namespace has an allocated pool of resources for such
+un-predicable amount of computational pods needed for this purpose (so pods are
+not scheduled besides running user API possibly making user API
+non-responsive).</p>
+<p>A special service - <a class="reference external" href="https://github.com/thoth-station/result-api">result API</a>
+abstracts away any database operations (that can be possibly dangerous when
+executing an untrusted code in Thoth’s solvers). Each analyzer that is run in
+the middletier namespace serialises its results to a structured JSON format and
+these results are submitted to the user API service that stores results in the
+Ceph object storage. All results computed by Thoth are first stored in a JSON
+format for later analyses and making the graph instance fully recoverable and
+reconfigurable based on previous results.</p>
+<p>Currently, there are run following analyzers in the <code class="docutils literal notranslate"><span class="pre">middletier</span></code> namespace:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/thoth-station/package-extract">package-extract</a> - an
+analyzer responsible for extracting packages from runtime/buildtime
+environments (container images)</p></li>
+<li><p><a class="reference external" href="https://github.com/thoth-station/solver">solver</a> - an analyzer run to
+gather information about dependencies between packages (on which packages the
+given package depends on?, what versions satisfy version ranges?) and gathers
+observations such as whether the given package is installable into the given
+environment and if it is present on a Python package index</p></li>
+<li><p><a class="reference external" href="https://github.com/thoth-station/dependency-monkey">dependency-monkey</a> -
+an analyzer that dynamically constructs package stacks and submits them to
+<a class="reference external" href="https://github.com/thoth-station/amun-api">Amun</a> for dynamic analysis (can
+be the given stack installed?, what are runtime observations - e.g.
+performance index?) (this is currently WIP)</p></li>
+</ul>
+</div>
+<div class="section" id="backend-namespace">
+<h2>Backend Namespace<a class="headerlink" href="#backend-namespace" title="Permalink to this headline">¶</a></h2>
+<p>The backend part of application is used for executing code that, based on
+gathered information from analyzers run in the middletier namespace, compute
+results for actual Thoth users (bots or humans).</p>
+<p>This namespace has, as in the case of middletier namespace, allocated pool of
+resources. Each time a user requests a recommendation, pods are dynamically
+created in this namespace to compute results.</p>
+<p>As of now, there are run following analyzers to compute recommendations for
+a user:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/thoth-station/adviser">adviser</a> - a recommendation
+engine computing stack level recommendations for a user for the given runtime
+environment</p></li>
+<li><p><a class="reference external" href="https://github.com/thoth-station/adviser">provenance-checker</a> - an
+analyzer that checks for provenance (origin) of packages so that a user uses
+correct packages from correct package sources (Python indexes) - note that
+Python <a class="reference internal" href="compatibility.html#compatibility"><span class="std std-ref">packaging format does not guarantee this - neither  Pipenv nor pip
+itself</span></a>! (the implementation now lies in the <a class="reference external" href="https://github.com/thoth-station/adviser">adviser repo</a>)</p></li>
+</ul>
+</div>
+<div class="section" id="id1">
+<h2>Amun<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>Amun is a standalone project within Thoth - it’s aim is to act as an execution
+engine. Based on requests coming in from Thoth itself (dependency-monkey
+jobs), it can build the requested application (create builds and image streams)
+on requested runtime environment (a container base image with optionally
+additional native packages installed in) and execute the supplied testsuite to
+verify whether the given application stack works on targeted hardware (also
+part of the dependency-monkey request). The result of Amun API are
+“observations” from inspection jobs (build and run inspections). These
+observations are subsequently synced into the knowledge graph as part of
+graph-sync-job.</p>
+<p>For more information, see <a class="reference external" href="https://github.com/thoth-station/amun-api">Amun API repository</a> and autogenerated <a class="reference external" href="https://github.com/thoth-station/amun-client">Amun client</a>. See also <a class="reference external" href="https://github.com/thoth-station/performance">the performance
+repo</a> for scripts used for
+performance related inspections.</p>
+</div>
+<div class="section" id="graph-namespace">
+<h2>Graph Namespace<a class="headerlink" href="#graph-namespace" title="Permalink to this headline">¶</a></h2>
+<p>A separate namespace was created for database related deployments. Components
+running in this namespace:</p>
+<ul class="simple">
+<li><p>Thoth’s knowledge graph - a <a class="reference external" href="https://www.postgresql.org/">PostgreSQL database</a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pgbouncer</span></code> - a <a class="reference external" href="https://www.pgbouncer.org/">PostgreSQL bouncer</a> to recycle
+and manage connections to the database - all the components talk to this component
+when a query is performed</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pgweb</span></code> - a <a class="reference external" href="https://sosedoff.github.io/pgweb/">web interface</a> to interact with
+Thoth’s knowledge graph</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">postgresql-metrics-exporter</span></code> - PostgreSQL related metrics (see Grafana
+dashboards section) for the main database observability</p></li>
+</ul>
+</div>
+<div class="section" id="thamos">
+<h2>Thamos<a class="headerlink" href="#thamos" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://thoth-station.ninja/docs/developers/thamos">Thamos</a> is a CLI tool
+created for end-users of Thoth. Thamos offers a simple command line interface
+to consume Thoth’s advises (recommendations) and Thoth’s provenance checks both
+done against data stored in the knowledge graph. The tool packs in an
+automatically generated Python client library from User API OpenAPI
+specification The library can be used to integrate with Thoth. See <a class="reference external" href="https://thoth-station.ninja/docs/developers/thamos">Thamos
+repository for documentation and an example usage</a>.</p>
+</div>
+<div class="section" id="kebechet">
+<h2>Kebechet<a class="headerlink" href="#kebechet" title="Permalink to this headline">¶</a></h2>
+<p>Another consumer of Thoth’s data is a bot called <a class="reference external" href="https://github.com/thoth-station/kebechet">Kebechet</a> that operates directly on
+repositories on hosted on GitHub or GitLab and it opens pull requests or issues
+automatically for users. See <a class="reference internal" href="integration.html#integration"><span class="std std-ref">integration documentation for more
+info</span></a>.</p>
+</div>
+<div class="section" id="build-watcher">
+<h2>Build Watcher<a class="headerlink" href="#build-watcher" title="Permalink to this headline">¶</a></h2>
+<p>This component was designed to automatically watch for cluster events - wait
+for OpenShift builds to finish and submit the resulting container image
+produced to Thoth for analysis. As the container image registry is usually
+cluster internal, without any route exposed to the world, build-watcher can
+also cooperate with external registries. Documentation can be found in <a class="reference external" href="https://github.com/thoth-station/build-watcher">the
+README file in the GitHub project</a>.</p>
+</div>
+<div class="section" id="grafana-dashboards">
+<h2>Grafana dashboards<a class="headerlink" href="#grafana-dashboards" title="Permalink to this headline">¶</a></h2>
+<p>To guarantee application observability, there were created <a class="reference external" href="https://grafana.com/">Grafana</a> dashboards. Thoth related metrics are aggregated by
+a component called “metrics exporter”. These metrics are visualized in multiple
+dashboards. To observe knowledge graph database, <a class="reference external" href="https://github.com/wrouesnel/postgres_exporter">postgresql-metrics-exporter</a> component was deployed.</p>
+</div>
+</div>
+<div class="section" id="a-brief-history-of-thoth">
+<h1>A brief history of Thoth<a class="headerlink" href="#a-brief-history-of-thoth" title="Permalink to this headline">¶</a></h1>
+<p>Thoth started as an experiment in <a class="reference external" href="https://github.com/aicoe">AICoE</a> - a team
+called “AI Center of Excellence” in Red Hat’s office of the CTO. During development,
+the main database was exchanged multiple times. Initially, there was used
+<a class="reference external" href="https://janusgraph.org/">JanusGraph database</a>. Even thought the JanusGraph database
+served its purpose (storing graph related data), given the number of requests
+performed by the application, JanusGraph did not scale well. Also, maintainability of
+the JanusGraph instance was not satisfying given the team size (2 developers).
+The next database used, <a class="reference external" href="https://dgraph.io/">Dgraph</a> addressed most of the issues
+and led to a cooperation between Thoth team and AIOps team - you can <a class="reference external" href="https://next.redhat.com/2019/11/18/prometheus-anomaly-detection/">find more details
+in this article</a>.
+Unfortunately, we reached scalability issues of Dgraph instance and were forced to look
+for another solution that would serve the main database purpose:</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The term “graph” is used in Thoth’s sources all over the place. This term was
+adopted as a “graph database” was initially used. Even though the main
+database is not graph database anymore, Thoth’s knowledge base can still be
+seen as a graph knowledge base - a database storing graph data not
+necessarily in a graph form.</p>
+</div>
+<p>Another reason behind switching away from graph databases was Python ecosystem
+size. The main query for obtaining dependencies (in the adviser and Dependency
+Monkey implementation) initially retrieved the whole dependency graph at one
+shot - this solution did not scale well for larger software stacks (such as
+TensorFlow) and we were encountering serialization issues - when JanusGraph, as
+well as Dgraph were used. The query had to be broken down into multiple requests
+into Thoth’s knowledge base. At the end, we ended up with a query that could be
+easily transformed into an SQL query with 3 joins.</p>
+<p>Another part of Thoth, that was rewritten multiple times, is the core
+recommendation algorithm. Initially, adviser and Dependency Monkey loaded the
+whole dependency graph into memory and then, operations on a weighted N-ary
+dependency graph were made. These operations guaranteed resolution of higher
+scored packages faster during dependency graph traversals that were made to
+resolve software stacks. This implementation was then rewritten into C/C++ to
+gain performance. Unfortunately, the approach had to be abandoned given the
+number of requests needed to be performed to obtain large software stacks (in
+case of a TensorFlow stack, 2.5k requests were made just to obtain the
+dependency graph that required a lot of time just to perform data transfer).
+Considering <a class="reference external" href="https://stackoverflow.blog/2017/09/06/incredible-growth-python/">how Python ecosystem is growing</a>, this
+solution would not scale well in the future.</p>
+<p>All the above let to a transition to a more stochastic approach - the
+implementation design of Thoth’s adviser supports this fact with <a class="reference internal" href="resolver.html#resolver"><span class="std std-ref">resolver</span></a>, <a class="reference internal" href="predictor.html#predictor"><span class="std std-ref">predictor</span></a> abstractions and a <a class="reference internal" href="pipeline.html#pipeline"><span class="std std-ref">stack
+resolution pipeline</span></a> used for scoring and producing highly optimized
+software stacks.</p>
+<div class="section" id="a-note-on-argo-workflows">
+<h2>A note on Argo workflows<a class="headerlink" href="#a-note-on-argo-workflows" title="Permalink to this headline">¶</a></h2>
+<p>There are ongoing efforts to port deployment to run Argo workflows. This way,
+some of the components will be replaced by Argo capabilities, notably:</p>
+<ul class="simple">
+<li><p>result-api - Argo has S3 support for managing produced artifact uploads</p></li>
+<li><p>workload-operator</p></li>
+<li><p>graph-sync-scheduler</p></li>
+</ul>
+</div>
+</div>
+<div class="section" id="requirements-for-thoth-deployment">
+<h1>Requirements for Thoth deployment<a class="headerlink" href="#requirements-for-thoth-deployment" title="Permalink to this headline">¶</a></h1>
+<p>All the related Ansible playbooks for provisioning Thoth are present in the
+<a class="reference external" href="https://github.com/thoth-station/thoth-ops">thoth-ops</a> repository (might require
+developer’s access).</p>
+<p>Main requirements for a proper cluster deployment:</p>
+<ul class="simple">
+<li><p>middletier, backend and inspection namespaces should have restricted
+<a class="reference external" href="https://kubernetes.io/docs/concepts/policy/resource-quotas/">namespace resources allocated</a> when it comes
+to CPU, memory or number of pods that can run in the namespace</p></li>
+<li><p>network of the graph namespace should be joint with frontend, middletier and
+backend namespace as pods running in these namespaces require access to
+Thoth’s knowledge graph instance</p></li>
+<li><p><a class="reference external" href="https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/">custom resources</a>
+related to Argo for <a class="reference external" href="http://argo.io/">Argo workflows</a></p></li>
+<li><p>optionally but recommended, solver pods can have network policy set up to
+restrict network access - this restriction is created as solver jobs execute
+possibly untrusted software coming from the Internet (PyPI packages)</p></li>
+</ul>
+<p>Follow <a class="reference external" href="https://github.com/thoth-station/thoth-ops">documentation and Ansible playbooks in thoth-ops repository</a> for more info as well as the <a class="reference external" href="https://github.com/thoth-station/core">core
+repository</a>.</p>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Thoth’s architecture</a><ul>
+<li><a class="reference internal" href="#infra-namespace">Infra Namespace</a></li>
+<li><a class="reference internal" href="#frontend-namespace">Frontend Namespace</a></li>
+<li><a class="reference internal" href="#middletier-namespace">Middletier Namespace</a></li>
+<li><a class="reference internal" href="#backend-namespace">Backend Namespace</a></li>
+<li><a class="reference internal" href="#id1">Amun</a></li>
+<li><a class="reference internal" href="#graph-namespace">Graph Namespace</a></li>
+<li><a class="reference internal" href="#thamos">Thamos</a></li>
+<li><a class="reference internal" href="#kebechet">Kebechet</a></li>
+<li><a class="reference internal" href="#build-watcher">Build Watcher</a></li>
+<li><a class="reference internal" href="#grafana-dashboards">Grafana dashboards</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#a-brief-history-of-thoth">A brief history of Thoth</a><ul>
+<li><a class="reference internal" href="#a-note-on-argo-workflows">A note on Argo workflows</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#requirements-for-thoth-deployment">Requirements for Thoth deployment</a></li>
+</ul>
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation index</a><ul>
+      <li>Previous: <a href="developers_guide.html" title="previous chapter">Developer’s guide to Thoth</a></li>
+      <li>Next: <a href="deployment.html" title="next chapter">Configuring and setting up adviser in a cluster</a></li>
+  </ul></li>
+</ul>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/architecture.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>

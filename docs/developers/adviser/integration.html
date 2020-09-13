@@ -1,0 +1,259 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Integrating with Thoth &#8212; Thoth Adviser 0.16.0 documentation</title>
+    <link rel="stylesheet" href="/assets/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="/assets/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/jquery.js"></script>
+    <script type="text/javascript" src="/assets/underscore.js"></script>
+    <script type="text/javascript" src="/assets/doctools.js"></script>
+    <script type="text/javascript" src="/assets/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Thoth’s adviser recommendation format" href="compatibility.html" />
+    <link rel="prev" title="Introduction to Thoth’s adviser principles" href="introduction.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="compatibility.html" title="Thoth’s adviser recommendation format"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="introduction.html" title="Introduction to Thoth’s adviser principles"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.16.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="integrating-with-thoth">
+<span id="integration"></span><h1>Integrating with Thoth<a class="headerlink" href="#integrating-with-thoth" title="Permalink to this headline">¶</a></h1>
+<p>Project Thoth can guide you on your software stacks. To consume Thoth’s
+recommendations, there are multiple ways on how to integrate:</p>
+<ul class="simple">
+<li><p>Command line interface - Thamos CLI</p></li>
+<li><p>Kebechet (GitHub application)</p></li>
+<li><p>Jupyter Notebooks</p></li>
+<li><p>OpenShift s2i build process</p></li>
+<li><p>Thamos library (not fully supported yet as API might change)</p></li>
+</ul>
+<div class="section" id="pre-requirements-for-your-project">
+<h2>Pre-requirements for your project<a class="headerlink" href="#pre-requirements-for-your-project" title="Permalink to this headline">¶</a></h2>
+<p>To let Thoth manage your Python application, your application has to use
+<a class="reference external" href="https://pipenv.readthedocs.io/">Pipenv</a> to manage virtual environment and
+application dependencies. Pipenv’s two main files, <code class="docutils literal notranslate"><span class="pre">Pipfile</span></code> and
+<code class="docutils literal notranslate"><span class="pre">Pipfile.lock</span></code>, has to be placed in the root of your Python application
+directory.</p>
+<p>If you use <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>, the easiest way how to convert to Pipenv’s
+<code class="docutils literal notranslate"><span class="pre">Pipfile</span></code> and <code class="docutils literal notranslate"><span class="pre">Pipfile.lock</span></code> is to run the following command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pipenv install --requirements requirements.txt</span>
+</pre></div>
+</div>
+<p>And add both file produced, <code class="docutils literal notranslate"><span class="pre">Pipfile</span></code> and <code class="docutils literal notranslate"><span class="pre">Pipfile.lock</span></code>, into your Git
+repository.</p>
+<p>It’s also possible to use <a class="reference external" href="https://pip.pypa.io/en/stable/user_guide/">pip</a>
+format as well as format used by
+<a class="reference external" href="https://pypi.org/project/pip-tools/">pip-tools</a>. To use these formats,
+you will need to adjust <code class="docutils literal notranslate"><span class="pre">requirements_format</span></code> configuration option in your
+<code class="docutils literal notranslate"><span class="pre">.thoth.yaml</span></code> configuration file.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It’s recommended to use Pipenv if possible. Pipenv introduces more consistent
+files that track Python package indexes used as well as artifact hashes in the
+lock file explicitly.</p>
+</div>
+<p>By switching to <code class="docutils literal notranslate"><span class="pre">pip</span></code>/<code class="docutils literal notranslate"><span class="pre">pip-compile</span></code> file format the behaviour of file lookup
+is following (sorted based on priority):</p>
+<ul class="simple">
+<li><p>if <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> and <code class="docutils literal notranslate"><span class="pre">requirements.in</span></code> files are present,
+<code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> file is used as a lockfile and <code class="docutils literal notranslate"><span class="pre">requirements.in</span></code> states
+direct dependencies (<code class="docutils literal notranslate"><span class="pre">pip-tools</span></code> behavior)</p></li>
+<li><p>if just <code class="docutils literal notranslate"><span class="pre">requirements.in</span></code> file is present, it is used as a file
+containing direct dependencies (<code class="docutils literal notranslate"><span class="pre">pip-tools</span></code> behaviour)</p></li>
+<li><p>if just <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> file is present, it is used as a file
+containing direct dependencies (raw <code class="docutils literal notranslate"><span class="pre">pip</span></code> behaviour)</p></li>
+</ul>
+<p>Thoth’s output of <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> uses implicitly hashes of artifacts -
+equivalent to <code class="docutils literal notranslate"><span class="pre">pip-compile</span> <span class="pre">--generate-hashes</span></code>. It is required to state artifact
+hashes if <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> is treated as a lockfile.</p>
+</div>
+<div class="section" id="command-line-interface-thamos-cli">
+<h2>Command Line Interface - Thamos CLI<a class="headerlink" href="#command-line-interface-thamos-cli" title="Permalink to this headline">¶</a></h2>
+<p>The easiest way how to get recommendations from Thoth service is to install
+<a class="reference external" href="https://thoth-station.ninja/docs/developers/thamos">Thamos</a> (Thoth’s CLI and
+library):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pip3 install -U thamos</span>
+</pre></div>
+</div>
+<p>And configure your project to use Thoth’s recommendations and ask for them:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd your/project/path</span>
+<span class="go">thamos config</span>
+<span class="go">thamos advise</span>
+</pre></div>
+</div>
+<p>Before you ask for an advise, make sure your Pipenv’s files <code class="docutils literal notranslate"><span class="pre">Pipfile</span></code> and
+optionally <code class="docutils literal notranslate"><span class="pre">Pipfile.lock</span></code> are present in the root directory of your project:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ls -la your/project/path</span>
+<span class="go">..</span>
+<span class="go">.thoth.yaml</span>
+<span class="go">..</span>
+<span class="go">Pipfile</span>
+<span class="go">Pipfile.lock</span>
+<span class="go">..</span>
+</pre></div>
+</div>
+<p>Once Thoth responds back with recommendations, you can install your
+dependencies using:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pipenv install --deploy --dev</span>
+</pre></div>
+</div>
+<p>Please follow <a class="reference external" href="https://thoth-station.ninja/docs/developers/thamos">Thamos documentation for more info</a>. Also check
+<a class="reference external" href="https://github.com/thoth-station/cli-examples">thoth-station/cli-examples repository</a>
+that demonstrates an example application that using Thamos CLI.</p>
+</div>
+<div class="section" id="openshift-python-s2i-build-process">
+<h2>OpenShift Python s2i build process<a class="headerlink" href="#openshift-python-s2i-build-process" title="Permalink to this headline">¶</a></h2>
+<p>Thoth can be used in <a class="reference external" href="https://docs.openshift.com/container-platform/3.11/using_images/s2i_images/python.html">OpenShift’s s2i process</a>
+where it can produce recommendations targeting your specific hardware
+configuration you use to run your application inside the cluster (e.g. specific
+GPU available in the cluster).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Check <a class="reference external" href="https://github.com/thoth-station/s2i-example-migration">thoth-station/s2i-example-migration</a> with a
+step-by-step tutorial (also with a pre-recorded screencast with a
+voice-over) on how to port an already existing Python s2i application to
+Thoth.</p>
+</div>
+<p>You can find a list of base images which you can use with Thoth in <a class="reference external" href="https://github.com/thoth-station/s2i-thoth">s2i-thoth
+repository</a> with detailed
+instructions on how to use Thoth in the OpenShift’s s2i process. The container
+images are hosted at <a class="reference external" href="https://quay.io/organization/thoth-station">quay.io/organization/thoth-station</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You can use a tool called <a href="#id1"><span class="problematic" id="id2">`thoth-s2i &lt;https://github.com/thoth-station/s2i`_</span></a>
+that can automatically migrate your existing s2i application to use Thoth.</p>
+</div>
+<p>Thoth’s s2i container images can be configured using environment variables
+supplied to the build config:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">THOTH_ADVISE</span></code> - always use the recommended stack by Thoth (even if the
+lock file is present in the repo)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">THOTH_PROVENANCE_CHECK</span></code> - verify stack provenance - the provenance check
+is triggered only if the lock file is not comming from Thoth’s recommendation
+engine (otherwise the stack has already verified provenance)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">THOTH_ASSEMBLE_DEBUG</span></code> - run s2i’s assemble script in verbose mode</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">THOTH_DRY_RUN</span></code> - submit stack to Thoth’s recommendation engine but do not
+use the recommended lock file, use the lock file present in the repo instead</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">THOTH_FROM_MASTER</span></code> - Use Thamos from git instead of a PyPI release - handy
+if the released Thamos has a bug which was fixed in the master branch</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">THOTH_HOST</span></code> - Thoth’s host to reach out to for recommendations (defaults
+to prod deployment at khemenu.thoth-station.ninja)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">THOTH_ERROR_FALLBACK</span></code> - fallback to the lock file present in the
+repository if the submitted Thoth analysis fails</p></li>
+</ul>
+<p>See also configuration options for Thoth’s client present in <a class="reference external" href="https://thoth-station.ninja/docs/developers/thamos/">Thamos
+documentation</a>.</p>
+<p>An example of such application can be found on <a class="reference external" href="https://github.com/thoth-station/s2i-example">GitHub  - s2i TensorFlow
+example</a>.</p>
+<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; height: auto;">
+    <iframe src="https://www.youtube.com/embed/FtW1PAuI3nk" frameborder="0" allowfullscreen style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></iframe>
+</div></div>
+<div class="section" id="kebechet-github-application">
+<h2>Kebechet - GitHub application<a class="headerlink" href="#kebechet-github-application" title="Permalink to this headline">¶</a></h2>
+<p>TODO: write a summary</p>
+</div>
+<div class="section" id="jupyter-notebooks">
+<h2>Jupyter Notebooks<a class="headerlink" href="#jupyter-notebooks" title="Permalink to this headline">¶</a></h2>
+<p>TODO: write a summary</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Integrating with Thoth</a><ul>
+<li><a class="reference internal" href="#pre-requirements-for-your-project">Pre-requirements for your project</a></li>
+<li><a class="reference internal" href="#command-line-interface-thamos-cli">Command Line Interface - Thamos CLI</a></li>
+<li><a class="reference internal" href="#openshift-python-s2i-build-process">OpenShift Python s2i build process</a></li>
+<li><a class="reference internal" href="#kebechet-github-application">Kebechet - GitHub application</a></li>
+<li><a class="reference internal" href="#jupyter-notebooks">Jupyter Notebooks</a></li>
+</ul>
+</li>
+</ul>
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation index</a><ul>
+      <li>Previous: <a href="introduction.html" title="previous chapter">Introduction to Thoth’s adviser principles</a></li>
+      <li>Next: <a href="compatibility.html" title="next chapter">Thoth’s adviser recommendation format</a></li>
+  </ul></li>
+</ul>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/integration.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>

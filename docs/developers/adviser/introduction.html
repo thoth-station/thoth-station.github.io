@@ -1,0 +1,324 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Introduction to Thoth’s adviser principles &#8212; Thoth Adviser 0.16.0 documentation</title>
+    <link rel="stylesheet" href="/assets/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="/assets/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/jquery.js"></script>
+    <script type="text/javascript" src="/assets/underscore.js"></script>
+    <script type="text/javascript" src="/assets/doctools.js"></script>
+    <script type="text/javascript" src="/assets/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Integrating with Thoth" href="integration.html" />
+    <link rel="prev" title="Welcome to Thoth’s adviser documentation" href="index.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="integration.html" title="Integrating with Thoth"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="index.html" title="Welcome to Thoth’s adviser documentation"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.16.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="introduction-to-thoth-s-adviser-principles">
+<span id="introduction"></span><h1>Introduction to Thoth’s adviser principles<a class="headerlink" href="#introduction-to-thoth-s-adviser-principles" title="Permalink to this headline">¶</a></h1>
+<p>In the upcoming section you can find discussion and intuition behind Thoth’s
+adviser logic and nomenclature used in Thoth repositories, sources and
+documentation.</p>
+<div class="section" id="intuition-behind-thoth-s-recommendations">
+<h2>Intuition behind Thoth’s recommendations<a class="headerlink" href="#intuition-behind-thoth-s-recommendations" title="Permalink to this headline">¶</a></h2>
+<p>Let’s consider an application that has two dependencies - a package called
+<code class="docutils literal notranslate"><span class="pre">simplelib</span></code> and <code class="docutils literal notranslate"><span class="pre">anotherlib</span></code>. These dependencies can be installed in
+different versions and do not require any additional packages to be installed.
+Let’s have a function that scores an application based on “how good it is” when
+different versions of <code class="docutils literal notranslate"><span class="pre">simplelib</span></code> and <code class="docutils literal notranslate"><span class="pre">anotherlib</span></code> are used. The semantics
+for “how good” can be different, but one can imagine scoring based on
+performance, security vulnerabilities present and/or application misbehaviour
+(or any other scoring you can come up with).</p>
+<p>If we create all the combinations of <code class="docutils literal notranslate"><span class="pre">simplelib</span></code> and <code class="docutils literal notranslate"><span class="pre">anotherlib</span></code> that can
+be produced and we score these combinations using our scoring function we get a
+discrete results as shown on the following figure:</p>
+<a class="reference external image-reference" href="/assets/state_space.png"><img alt="A discrete state space with with results of the scoring function." src="_images/state_space.png" /></a>
+<p>By interpolating these values we get a surface as shown on the next figure, this
+visualization is also more intuitive:</p>
+<a class="reference external image-reference" href="/assets/state_space_interpolated.png"><img alt="Interpolated discrete values in the state space forming a surface." src="_images/state_space_interpolated.png" /></a>
+<p>As can be seen, we get different score based on different versions of
+<code class="docutils literal notranslate"><span class="pre">simplelib</span></code> and <code class="docutils literal notranslate"><span class="pre">anotherlib</span></code> combinations. Thoth’s adviser, when computing
+recommendations, tries to find the highest values of the scoring function - the
+highest spikes present (assuming the higher number of score, the better
+software stack is).</p>
+<a class="reference external image-reference" href="/assets/state_space_spikes.png"><img alt="Spikes present in the state space." src="_images/state_space_spikes.png" /></a>
+<p>Thoth’s <a class="reference internal" href="resolver.html#resolver"><span class="std std-ref">resolver</span></a> can produce all the combinations of packages,
+considering Python ecosystem resolution, and can be guided using
+<a class="reference internal" href="predictor.html#predictor"><span class="std std-ref">predictor</span></a> to find high values of score faster:</p>
+<a class="reference external image-reference" href="/assets/state_space_guided.png"><img alt="Guiding resolver using predictor to resolver higher rated scores faster." src="_images/state_space_guided.png" /></a>
+<p>Considering real-world applications, software stacks can be formed out of
+multiple packages coming in different versions. Packages are introduced into a
+software stack based on dependency requirements of direct or indirect
+dependencies that can be restricted using version range specifications (making
+some of the combinations invalid). The shown 3D figures above show scoring
+function for two different packages in a software stack. This scoring function
+can be generalized to n-dimensional space when a software stack is made out of
+n-1 packages (at most) and n-th dimension is always result of the scoring
+function used.</p>
+<p>Thoth’s <a class="reference internal" href="resolver.html#resolver"><span class="std std-ref">resolver</span></a> approach of resolving software stacks is
+to expand dependency graphs (lazily), instead of directly implementing
+<a class="reference external" href="https://en.wikipedia.org/wiki/Boolean_satisfiability_problem">3SAT problem</a>
+as in case of other resolvers. See <a class="reference internal" href="resolver.html#resolver"><span class="std std-ref">resolver</span></a> documentation
+for more info.</p>
+</div>
+<div class="section" id="prediction-based-resolution-using-reinforcement-learning">
+<span id="introduction-rl"></span><h2>Prediction-based resolution using reinforcement learning<a class="headerlink" href="#prediction-based-resolution-using-reinforcement-learning" title="Permalink to this headline">¶</a></h2>
+<p>As stated above, Thoth’s adviser does not implement <a class="reference external" href="https://en.wikipedia.org/wiki/Boolean_satisfiability_problem">3SAT problem</a> as many
+resolvers do. Instead, the whole resolution is seen as a <a class="reference external" href="https://en.wikipedia.org/wiki/Markov_decision_process">Markov Decision
+Process (MDP)</a>.
+Intuitively, any (not necessary fully resolved) software stack can be
+seen as a state in an MDP and satisfies Markov property:</p>
+<blockquote>
+<div><p>Any future resolution of resolver’s state depends only upon the present
+state, not on the sequence of events (resolution of dependencies) that
+preceded it.</p>
+</div></blockquote>
+<p>A fully resolved software stack that satisfy all the requirements of all the
+dependencies present in the software stack then represents a terminal state in
+an MDP. Finding the best possible software stack (a terminal state with the
+highest score) then corresponds to solving the given MDP.</p>
+<p>The whole design of adviser’s resolution can be seen as a framework for
+writing predictors for prediction based resolution.</p>
+<p>More formally:</p>
+<ul class="simple">
+<li><p>let <em>S</em> be a finite set of states in which the resolution can be in -
+partially but also fully resolved software stacks</p></li>
+<li><p>let <em>A</em> be a finite set of actions, <em>A</em><sub>s</sub> be a finite state of
+actions from a state <em>s</em></p></li>
+<li><p>let <em>R</em><sub>a</sub><em>(s, s’)</em> be expected immediate reward received after
+transitioning from state <em>s</em> to state <em>s’</em> by taking action <em>a</em> following
+some policy π.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The state space as described and shown in the previous section corresponds to
+the score in a terminal state (cumulative score) - when both libraries
+<code class="docutils literal notranslate"><span class="pre">simplelib</span></code> and <code class="docutils literal notranslate"><span class="pre">anotherlib</span></code> are resolved and present in fully pinned
+down software stacks and there are no more unresolved dependencies (no more
+requirements introduced by resolving these two libraries).</p>
+<p>In otherwords, the function plotted corresponds to <a class="reference external" href="https://en.wikipedia.org/wiki/Bellman_equation">Bellman equation</a> for all terminal states
+following a policy during resolution.</p>
+</div>
+<p>Each entry in the state transition function in the MDP corresponds to a
+step that is performed by resolver, by taking an unresolved dependency
+and resolving it.</p>
+<p>Pipeline units called <a class="reference internal" href="steps.html#steps"><span class="std std-ref">steps</span></a> then act like a critic that scores
+the given action taken (compute immediate reward signal).</p>
+<p>For a more illustrative example, let’s suppose that the resolver is taking an
+action in some state s<sub>n</sub>. Let this state be described by unresolved,
+resolved dependencies and its current score (based on Bellman equation).</p>
+<p><em>Resolved dependencies:</em></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">flask==1.1.1</span></code></p></li>
+</ul>
+<p><em>Unresolved dependencies:</em></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">click==6.7</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">click==7.0</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">jinja2==2.10.2</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">jinja2==2.10.3</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">werkzeug==0.15.1</span></code></p></li>
+</ul>
+<p><em>Score:</em> 0.5</p>
+<a class="reference external image-reference" href="/assets/mdp.png"><img alt="An illustrative MDP described in the text." class="align-center" src="_images/mdp.png" /></a>
+<p>We resolve an unresolved dependency - let’s say we take action s<sub>n</sub> a<sub>2</sub> and resolve <code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code>, we retrieve an immediate reward
+0.33 and we end up in state s<sub>n + 3</sub>. This action is scored by all
+pipeline units of type <a class="reference internal" href="steps.html#steps"><span class="std std-ref">step</span></a> - a sum of their scores - note that
+this transition can be also invalidated by any of the step pipeline unit present
+in the current pipeline configuration.</p>
+<p>The new state created is described as follows:</p>
+<p><em>Resolved dependencies:</em></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">flask==1.1.1</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code></p></li>
+</ul>
+<p><em>Unresolved dependencies:</em></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">click==6.7</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">click==7.0</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">jinja2==2.10.2</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">jinja2==2.10.3</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">werkzeug==0.15.1</span></code></p></li>
+<li><p>+ all the direct dependencies of <code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code> respecting
+their version range specification.</p></li>
+</ul>
+<p><em>Score:</em> 0.83</p>
+<p>Direct dependencies of <code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code> added to unresolved dependencies
+are filtered based on <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieve pipeline units</span></a> present in the current
+pipeline configuration. Note that sieves can make the given transition invalid if
+they remove all versions for a specific package. As an example, let’s say
+<code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code> depends on <code class="docutils literal notranslate"><span class="pre">daiquiri</span></code> in versions <code class="docutils literal notranslate"><span class="pre">1.0</span></code>, <code class="docutils literal notranslate"><span class="pre">2.0</span></code> or
+<code class="docutils literal notranslate"><span class="pre">3.0</span></code>. If pipeline sieves remove all the versions of <code class="docutils literal notranslate"><span class="pre">daiquiri</span></code>, dependency
+sub-graph of <code class="docutils literal notranslate"><span class="pre">itsdangerous==1.1.0</span></code> cannot be satisfied - hence the action
+s<sub>n</sub> a<sub>2</sub> is invalid.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If there would be any other version of <code class="docutils literal notranslate"><span class="pre">itsdangerous</span></code> in the unresolved
+dependencies listing, it would be removed (as well as its whole dependency
+sub-graph) as package of type <code class="docutils literal notranslate"><span class="pre">itsdangerous</span></code> is already present in the
+current state respecting requirements.</p>
+</div>
+<p>As can be seen, the main role of sieves is to filter out invalid future actions in
+the upcoming resolver rounds, without considering any possible state the resolver
+could end up with (state independent filtering).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If the given action from a state leads to invalid transition, the predictor
+instance receives reward signal equal to <code class="docutils literal notranslate"><span class="pre">math.nan</span></code>.</p>
+</div>
+<p>If a valid transition leads to a state that has no unresolved dependencies,
+the given state is final (terminal state in case of MDP terminology) and it
+represents a fully pinned down software stack.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If the given action from a state leads to a final state (<em>terminal state</em>), the
+predictor instance receives a reward signal equal to <code class="docutils literal notranslate"><span class="pre">math.inf</span></code>.</p>
+</div>
+</div>
+<div class="section" id="nomenclature">
+<h2>Nomenclature<a class="headerlink" href="#nomenclature" title="Permalink to this headline">¶</a></h2>
+<p>In adviser docs but also in other Thoth repositories, one can find the following
+terms:</p>
+<ul class="simple">
+<li><p>Boolean satisfiability problem - <a class="reference external" href="https://en.wikipedia.org/wiki/Boolean_satisfiability_problem">3SAT problem</a></p></li>
+<li><p>initial state - state of resolution in resolver that is made out of resolved direct dependencies into a concrete version coming from a Python package index</p></li>
+<li><p>state - generally speaking any resolver state</p></li>
+<li><p>final state - a state that has no more packages left for resolution (resolved packages form fully resolved software stack) and can become a pipeline product</p></li>
+<li><p>state space - a space formed out of all the possible resolver states</p></li>
+<li><p>direct dependencies - declared direct dependencies of an application (directly used in the application)</p></li>
+<li><p>transitive dependencies - all the direct and indirect dependencies of an application - <a class="reference external" href="https://en.wikipedia.org/wiki/Transitive_relation">see transitive relation for more info</a></p></li>
+<li><p>library usage - result of a static source code analysis done by <a class="reference external" href="https://github.com/thoth-station/invectio">Thoth’s Invectio</a> which keeps track of libraries and library symbols used in the user’s source code</p></li>
+<li><p>runtime environment - hardware and software environment</p></li>
+<li><p>software environment - native packages, Python interpreter version and other software available when running an application (might be seen as a container image)</p></li>
+<li><p>hardware environment - hardware used to run an application - for example information about CPU/GPU used</p></li>
+<li><p>lockfile - a file containing all the packages resolved to a specific version - e.g. <code class="docutils literal notranslate"><span class="pre">Pipfile.lock</span></code></p></li>
+<li><p>project - an abstraction used to describe user’s application with direct dependencies, optional lockfile and information about hardware and software environments used</p></li>
+<li><p>resolver - an abstraction that can resolve software stacks based on resolution as defined in the Python ecosystem and based on stack generation pipeline</p></li>
+<li><p>predictor - an abstraction that helps resolver resolve software stacks faster by guiding during resolution - see <a class="reference internal" href="predictor.html#predictor"><span class="std std-ref">predictor for more info</span></a></p></li>
+<li><p>pipeline - in Thoth’s context, a stack resolution pipeline is used to generate and score Python software stacks for certain quality - see <a class="reference internal" href="pipeline.html#pipeline"><span class="std std-ref">pipeline for more info</span></a></p></li>
+<li><p>pipeline units - boot, sieve, step, stride, wrap</p></li>
+<li><p>dependency monkey - one of Thoth’s components - Dependency Monkey can generate all the combinations of a software stacks and, optionally, submit them to Amun for additional verification, testing and observation aggregation</p></li>
+<li><p>Bellman equation - see <a class="reference external" href="https://en.wikipedia.org/wiki/Bellman_equation">Bellman equation</a></p></li>
+<li><p>Markov decision process - <a class="reference external" href="https://en.wikipedia.org/wiki/Markov_decision_process">Markov decision process</a></p></li>
+<li><p>Markov property - <a class="reference external" href="https://en.wikipedia.org/wiki/Markov_property">Markov property</a></p></li>
+<li><p>Thoth - one of the ancient Egyptian deities</p></li>
+<li><p>Thoth-Station - see <a class="reference external" href="https://expanse.fandom.com/wiki/Thoth_Station">Thoth Station</a></p></li>
+<li><p>Amun - an executor used in Thoth to verify, install and run applications - see <a class="reference external" href="https://github.com/thoth-station/amun-api">Amun repository for more info</a></p></li>
+<li><p>performance indicator - a test that is performed on a part of a library to aggregate performance characteristics - see <a class="reference external" href="https://github.com/thoth-station/performance">performance repo for more info</a></p></li>
+<li><p>provenance checks - checks for provenance of installed packages - checks on their integrity and source</p></li>
+<li><p>(Python) software stack - a fully pinned down (resolved) software stack made out of Python packages (direct and transitive ones) needed to run a Python application</p></li>
+<li><p>Argo - workflow management used in Thoth to <a class="reference external" href="https://argoproj.github.io/">run workflows in an OpenShift cluster</a></p></li>
+<li><p>adviser - one of the main components in Thoth that can resolve software stacks - see <a class="reference external" href="https://github.com/thoth-station/adviser">adviser repository</a></p></li>
+<li><p>solver - one of the main components in Thoth that pre-computes information about dependencies and other metadata for Thoth’s recommendation engine - see <a class="reference external" href="https://github.com/thoth-station/solver">solver repo</a></p></li>
+<li><p>OpenShift s2i (source-to-image) - a build process defined in OpenShift for building applications - see <a class="reference external" href="https://docs.openshift.com/enterprise/3.0/architecture/core_concepts/builds_and_image_streams.html#source-build">Source-to-Image (S2I) Build</a></p></li>
+<li><p>Jupyter Notebooks - see <a class="reference external" href="https://jupyter.org/">jupyter.org</a> and also <a class="reference external" href="https://github.com/thoth-station/notebooks">Thoth related Jupyter Notebooks with experiments</a></p></li>
+<li><p>Thamos - a CLI for integrating with Thoth - see <a class="reference internal" href="integration.html#integration"><span class="std std-ref">integration</span></a> and <a class="reference external" href="http://github.com/thoth-station/thamos">Thamos repository on GitHub</a></p></li>
+<li><p>pip - see <a class="reference external" href="https://en.wikipedia.org/wiki/Pip_(package_manager)">pip</a></p></li>
+<li><p>Pipenv - see <a class="reference external" href="https://pipenv.kennethreitz.org/">Pipenv docs</a></p></li>
+<li><p>Adaptive Simulated Annealing - see <a class="reference external" href="https://en.wikipedia.org/wiki/Simulated_annealing">Simulated Annealing</a> and <a class="reference external" href="https://en.wikipedia.org/wiki/Adaptive_simulated_annealing">Adaptive Simulated Annealing</a></p></li>
+<li><p>Python triplet - a triplet made out of package name, package version (locked down) and a URL to Python package index from where the Python package came from</p></li>
+<li><p>Python package index - a repository of Python packages that is compliant with <a class="reference external" href="https://www.python.org/dev/peps/pep-0503/">PEP-503</a> - an example can be <a class="reference external" href="https://pypi.org">PyPI</a> or <a class="reference external" href="https://tensorflow.pypi.thoth-station.ninja/">AICoE index</a></p></li>
+</ul>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Introduction to Thoth’s adviser principles</a><ul>
+<li><a class="reference internal" href="#intuition-behind-thoth-s-recommendations">Intuition behind Thoth’s recommendations</a></li>
+<li><a class="reference internal" href="#prediction-based-resolution-using-reinforcement-learning">Prediction-based resolution using reinforcement learning</a></li>
+<li><a class="reference internal" href="#nomenclature">Nomenclature</a></li>
+</ul>
+</li>
+</ul>
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation index</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">Welcome to Thoth’s adviser documentation</a></li>
+      <li>Next: <a href="integration.html" title="next chapter">Integrating with Thoth</a></li>
+  </ul></li>
+</ul>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/introduction.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
