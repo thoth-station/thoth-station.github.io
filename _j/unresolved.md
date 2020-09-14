@@ -8,7 +8,7 @@ The resolution was terminated as direct dependencies could not be resolved.
 
 To resolve a software stack, Thoth aggregates information packages published on
 Python package indexes. This message happens when Thoth has not solved a direct
-dependency a user's stack requires. As the direct dependency was not analyzed
+dependency required by user's stack. As the direct dependency was not analyzed
 yet, Thoth cannot resolve the dependency graph to deliver a pinned down
 software stack.
 
