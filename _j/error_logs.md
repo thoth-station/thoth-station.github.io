@@ -2,7 +2,7 @@
 title: Resolution was terminated based on errors encountered see logs for more info 
 ---
 
-An error occurred during the resolution process. Most probably, no resutls
+An error occurred during the resolution process. Most probably, no results
 would be produced in such cases.
 
 ## Issue description
