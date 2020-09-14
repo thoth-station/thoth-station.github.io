@@ -1,0 +1,622 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.lab.security &#8212; Thoth lab 0.2.6 documentation</title>
+    <link rel="stylesheet" href="../../../_static/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth lab 0.2.6 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.lab.security</h1><div class="highlight"><pre>
+<span></span><span class="c1"># thoth-lab</span>
+<span class="c1"># Copyright(C) 2020 Francesco Murdaca</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Security results processing and analysis.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">json</span>
+
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span>
+
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="kn">from</span> <span class="nn">plotly</span> <span class="kn">import</span> <span class="n">graph_objs</span> <span class="k">as</span> <span class="n">go</span>
+<span class="kn">from</span> <span class="nn">plotly.offline</span> <span class="kn">import</span> <span class="n">iplot</span>
+
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Source</span>
+
+<span class="kn">from</span> <span class="nn">.common</span> <span class="kn">import</span> <span class="n">aggregate_thoth_results</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;thoth.lab.security&quot;</span><span class="p">)</span>
+
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SecurityIndicators"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators">[docs]</a><span class="k">class</span> <span class="nc">SecurityIndicators</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Class of methods used to analyze Security Indicators (SI).&quot;&quot;&quot;</span>
+
+    <span class="c1"># SI-bandit</span>
+
+<div class="viewcode-block" id="SecurityIndicators.aggregate_security_indicator_bandit_results"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.aggregate_security_indicator_bandit_results">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">aggregate_security_indicator_bandit_results</span><span class="p">(</span>
+        <span class="n">limit_results</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">max_ids</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+        <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">security_indicator_bandit_repo_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;security/si-bandit&quot;</span><span class="p">),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Aggregate si_bandit results from jsons stored in Ceph or locally from `si_bandit` repo.</span>
+
+<span class="sd">        :param limit_results: reduce the number of si_bandit reports ids considered to `max_ids` to test analysis</span>
+<span class="sd">        :param max_ids: maximum number of si_bandit reports ids considered</span>
+<span class="sd">        :param is_local: flag to retreive the dataset locally or from S3 (credentials are required)</span>
+<span class="sd">        :param si_bandit_repo_path: path to retrieve the si_bandit dataset locally and `is_local` is set to True</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">security_indicator_bandit_reports</span> <span class="o">=</span> <span class="n">aggregate_thoth_results</span><span class="p">(</span>
+            <span class="n">limit_results</span><span class="o">=</span><span class="n">limit_results</span><span class="p">,</span>
+            <span class="n">max_ids</span><span class="o">=</span><span class="n">max_ids</span><span class="p">,</span>
+            <span class="n">is_local</span><span class="o">=</span><span class="n">is_local</span><span class="p">,</span>
+            <span class="n">repo_path</span><span class="o">=</span><span class="n">security_indicator_bandit_repo_path</span><span class="p">,</span>
+            <span class="n">store_name</span><span class="o">=</span><span class="s2">&quot;si-bandit&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">security_indicator_bandit_reports</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.extract_data_from_si_bandit_metadata"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.extract_data_from_si_bandit_metadata">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">extract_data_from_si_bandit_metadata</span><span class="p">(</span><span class="n">report_metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Extract data from si-bandit report metadata.&quot;&quot;&quot;</span>
+        <span class="n">extracted_metadata</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;datetime&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;datetime&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;analyzer&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;analyzer&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;analyzer_version&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;analyzer_version&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;document_id&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;document_id&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;si-bandit&quot;</span><span class="p">][</span><span class="s2">&quot;package_name&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;si-bandit&quot;</span><span class="p">][</span><span class="s2">&quot;package_version&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;package_index&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;si-bandit&quot;</span><span class="p">][</span><span class="s2">&quot;package_index&quot;</span><span class="p">],</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">extracted_metadata</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.create_si_bandit_metadata_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.create_si_bandit_metadata_dataframe">[docs]</a>    <span class="k">def</span> <span class="nf">create_si_bandit_metadata_dataframe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">si_bandit_report</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create si-bandit report metadata dataframe.&quot;&quot;&quot;</span>
+        <span class="n">metadata_si_bandit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract_data_from_si_bandit_metadata</span><span class="p">(</span><span class="n">report_metadata</span><span class="o">=</span><span class="n">si_bandit_report</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">])</span>
+        <span class="n">metadata_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">metadata_si_bandit</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">metadata_df</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.extract_severity_confidence_info"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.extract_severity_confidence_info">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">extract_severity_confidence_info</span><span class="p">(</span>
+        <span class="n">si_bandit_report</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">filters_files</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Extract severity and confidence from result metrics.&quot;&quot;&quot;</span>
+        <span class="n">extracted_info</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">summary_files</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;number_of_analyzed_files&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;number_of_files_with_severities&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;number_of_filtered_files&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">filters_files</span><span class="p">:</span>
+            <span class="n">filters_files</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">si_bandit_report_result_metrics_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">si_bandit_report</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;metrics&quot;</span><span class="p">])</span>
+        <span class="n">si_bandit_report_result_results_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">si_bandit_report</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;results&quot;</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="s2">&quot;filename&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">si_bandit_report_result_results_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">extracted_info</span><span class="p">,</span> <span class="n">summary_files</span>
+
+        <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">si_bandit_report_result_metrics_df</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">values</span><span class="p">:</span>
+            <span class="c1"># Filter tests/ file</span>
+            <span class="k">if</span> <span class="n">file</span> <span class="o">!=</span> <span class="s2">&quot;_totals&quot;</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">filter_</span> <span class="ow">in</span> <span class="n">file</span> <span class="k">for</span> <span class="n">filter_</span> <span class="ow">in</span> <span class="n">filters_files</span><span class="p">):</span>
+
+                <span class="n">analysis</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="n">analysis</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">file</span>
+
+                <span class="n">analysis</span><span class="p">[</span><span class="s2">&quot;SEVERITY.LOW&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;CONFIDENCE.LOW&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="s2">&quot;CONFIDENCE.MEDIUM&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="s2">&quot;CONFIDENCE.HIGH&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="s2">&quot;CONFIDENCE.UNDEFINED&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="p">}</span>
+                <span class="n">analysis</span><span class="p">[</span><span class="s2">&quot;SEVERITY.MEDIUM&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;CONFIDENCE.LOW&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="s2">&quot;CONFIDENCE.MEDIUM&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="s2">&quot;CONFIDENCE.HIGH&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="s2">&quot;CONFIDENCE.UNDEFINED&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="p">}</span>
+                <span class="n">analysis</span><span class="p">[</span><span class="s2">&quot;SEVERITY.HIGH&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;CONFIDENCE.LOW&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="s2">&quot;CONFIDENCE.MEDIUM&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="s2">&quot;CONFIDENCE.HIGH&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                    <span class="s2">&quot;CONFIDENCE.UNDEFINED&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+                <span class="p">}</span>
+
+                <span class="n">subset_df</span> <span class="o">=</span> <span class="n">si_bandit_report_result_results_df</span><span class="p">[</span>
+                    <span class="n">si_bandit_report_result_results_df</span><span class="p">[</span><span class="s2">&quot;filename&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span> <span class="o">==</span> <span class="n">file</span>
+                <span class="p">]</span>
+                <span class="k">if</span> <span class="n">subset_df</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="c1"># check if there are severities for the file</span>
+
+                    <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">subset_df</span><span class="p">[[</span><span class="s2">&quot;issue_confidence&quot;</span><span class="p">,</span> <span class="s2">&quot;issue_severity&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+                        <span class="n">analysis</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;SEVERITY.</span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;issue_confidence&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">][</span><span class="sa">f</span><span class="s2">&quot;CONFIDENCE.</span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;issue_severity&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                    <span class="n">summary_files</span><span class="p">[</span><span class="s2">&quot;number_of_files_with_severities&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="n">summary_files</span><span class="p">[</span><span class="s2">&quot;number_of_analyzed_files&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+                <span class="n">extracted_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">analysis</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">file</span> <span class="o">!=</span> <span class="s2">&quot;_totals&quot;</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">filter_</span> <span class="ow">in</span> <span class="n">file</span> <span class="k">for</span> <span class="n">filter_</span> <span class="ow">in</span> <span class="n">filters_files</span><span class="p">):</span>
+                <span class="n">summary_files</span><span class="p">[</span><span class="s2">&quot;number_of_filtered_files&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">extracted_info</span><span class="p">,</span> <span class="n">summary_files</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.create_security_confidence_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.create_security_confidence_dataframe">[docs]</a>    <span class="k">def</span> <span class="nf">create_security_confidence_dataframe</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">si_bandit_report</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">filters_files</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Create Security/Confidence dataframe for si-bandit report.&quot;&quot;&quot;</span>
+        <span class="n">results_sec_conf</span><span class="p">,</span> <span class="n">summary_files</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract_severity_confidence_info</span><span class="p">(</span>
+            <span class="n">si_bandit_report</span><span class="o">=</span><span class="n">si_bandit_report</span><span class="p">,</span> <span class="n">filters_files</span><span class="o">=</span><span class="n">filters_files</span>
+        <span class="p">)</span>
+
+        <span class="n">summary_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">results_sec_conf</span><span class="p">:</span>
+            <span class="n">summary_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">json_normalize</span><span class="p">(</span><span class="n">results_sec_conf</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;__&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">summary_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">json_normalize</span><span class="p">(</span><span class="n">results_sec_conf</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;__&quot;</span><span class="p">)</span>
+
+        <span class="n">summary_df</span><span class="p">[</span><span class="s2">&quot;_total_severity&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">summary_df</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">sec_conf_df</span> <span class="o">=</span> <span class="n">summary_df</span><span class="o">.</span><span class="n">transpose</span><span class="p">()</span>
+        <span class="n">sec_conf_df</span><span class="p">[</span><span class="s2">&quot;_total&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sec_conf_df</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">sec_conf_df</span><span class="p">,</span> <span class="n">summary_files</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.produce_si_bandit_report_summary_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.produce_si_bandit_report_summary_dataframe">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">produce_si_bandit_report_summary_dataframe</span><span class="p">(</span>
+        <span class="n">metadata_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">si_bandit_sec_conf_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">summary_files</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create si-bandit report summary dataframe.&quot;&quot;&quot;</span>
+        <span class="n">subset_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">si_bandit_sec_conf_df</span><span class="p">[</span><span class="s2">&quot;_total&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()])</span>
+        <span class="n">report_summary_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">metadata_df</span><span class="p">,</span> <span class="n">subset_df</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">report_summary_df</span><span class="p">[</span><span class="s2">&quot;number_of_files_with_severities&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span>
+            <span class="n">summary_files</span><span class="p">[</span><span class="s2">&quot;number_of_files_with_severities&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+        <span class="n">report_summary_df</span><span class="p">[</span><span class="s2">&quot;number_of_analyzed_files&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">summary_files</span><span class="p">[</span><span class="s2">&quot;number_of_analyzed_files&quot;</span><span class="p">])</span>
+        <span class="n">report_summary_df</span><span class="p">[</span><span class="s2">&quot;number_of_filtered_files&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">summary_files</span><span class="p">[</span><span class="s2">&quot;number_of_filtered_files&quot;</span><span class="p">])</span>
+        <span class="n">report_summary_df</span><span class="p">[</span><span class="s2">&quot;number_of_files_total&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span>
+            <span class="n">summary_files</span><span class="p">[</span><span class="s2">&quot;number_of_filtered_files&quot;</span><span class="p">]</span>
+        <span class="p">)</span> <span class="o">+</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">summary_files</span><span class="p">[</span><span class="s2">&quot;number_of_analyzed_files&quot;</span><span class="p">])</span>
+        <span class="n">report_summary_df</span><span class="p">[</span><span class="s2">&quot;_total_severity&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">report_summary_df</span><span class="p">[</span><span class="s2">&quot;_total_severity&quot;</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">report_summary_df</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.add_release_date"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.add_release_date">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">add_release_date</span><span class="p">(</span><span class="n">metadata_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add release date to metadata.&quot;&quot;&quot;</span>
+        <span class="n">package_name</span> <span class="o">=</span> <span class="n">metadata_df</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">package_version</span> <span class="o">=</span> <span class="n">metadata_df</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">package_index</span> <span class="o">=</span> <span class="n">metadata_df</span><span class="p">[</span><span class="s2">&quot;package_index&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;consider index </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_index</span><span class="p">)</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">Source</span><span class="p">(</span><span class="n">package_index</span><span class="p">)</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Obtaining </span><span class="si">%r</span><span class="s2"> versions&quot;</span><span class="p">,</span> <span class="n">package_name</span><span class="p">)</span>
+
+        <span class="n">release_date</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">get_package_release_date</span><span class="p">(</span><span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span><span class="o">=</span><span class="n">package_version</span><span class="p">)</span>
+        <span class="n">metadata_df</span><span class="p">[</span><span class="s2">&quot;release_date&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Timestamp</span><span class="p">(</span><span class="n">release_date</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;s&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">metadata_df</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.create_si_bandit_final_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.create_si_bandit_final_dataframe">[docs]</a>    <span class="k">def</span> <span class="nf">create_si_bandit_final_dataframe</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">si_bandit_reports</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span>
+        <span class="n">use_external_source_data</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">filters_files</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create final si-bandit dataframe.&quot;&quot;&quot;</span>
+        <span class="n">counter</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">final_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+        <span class="n">total_reports</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">si_bandit_reports</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">si_bandit_report</span> <span class="ow">in</span> <span class="n">si_bandit_reports</span><span class="p">:</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analyzing SI-bandit report: </span><span class="si">{</span><span class="n">counter</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total_reports</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="c1"># Create metadata dataframe</span>
+            <span class="n">metadata_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_si_bandit_metadata_dataframe</span><span class="p">(</span><span class="n">si_bandit_report</span><span class="o">=</span><span class="n">si_bandit_report</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analyzing package_name: </span><span class="si">{</span><span class="n">metadata_df</span><span class="p">[</span><span class="s1">&#39;package_name&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analyzing package_version: </span><span class="si">{</span><span class="n">metadata_df</span><span class="p">[</span><span class="s1">&#39;package_version&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analyzing package_index: </span><span class="si">{</span><span class="n">metadata_df</span><span class="p">[</span><span class="s1">&#39;package_index&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">use_external_source_data</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">metadata_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_release_date</span><span class="p">(</span><span class="n">metadata_df</span><span class="o">=</span><span class="n">metadata_df</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                    <span class="k">pass</span>
+
+            <span class="c1"># Create Security/Confidence dataframe</span>
+            <span class="n">security_confidence_df</span><span class="p">,</span> <span class="n">summary_files</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_security_confidence_dataframe</span><span class="p">(</span>
+                <span class="n">si_bandit_report</span><span class="o">=</span><span class="n">si_bandit_report</span><span class="p">,</span> <span class="n">filters_files</span><span class="o">=</span><span class="n">filters_files</span>
+            <span class="p">)</span>
+
+            <span class="n">si_bandit_report_summary_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">produce_si_bandit_report_summary_dataframe</span><span class="p">(</span>
+                <span class="n">metadata_df</span><span class="o">=</span><span class="n">metadata_df</span><span class="p">,</span> <span class="n">si_bandit_sec_conf_df</span><span class="o">=</span><span class="n">security_confidence_df</span><span class="p">,</span> <span class="n">summary_files</span><span class="o">=</span><span class="n">summary_files</span>
+            <span class="p">)</span>
+
+            <span class="n">final_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">final_df</span><span class="p">,</span> <span class="n">si_bandit_report_summary_df</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+            <span class="n">counter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">final_df</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.create_package_releases_vulnerabilities_trend"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.create_package_releases_vulnerabilities_trend">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">create_package_releases_vulnerabilities_trend</span><span class="p">(</span>
+        <span class="n">si_bandit_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span>
+        <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">package_index</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">security_infos</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">show_vulnerability_data</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Plot vulnerabilites trend for a Python package from a certain index.</span>
+
+<span class="sd">        :param si_bandit_df: pandas dataframe given by &#39;create_si_bandit_final_dataframe&#39; method</span>
+<span class="sd">        with `use_external_source_data` set to True.</span>
+<span class="sd">        :param package_name: Python Package name filter</span>
+<span class="sd">        :param package_index: Python Package index filter</span>
+<span class="sd">        :param security_infos: list of info to be visualized in the plot</span>
+<span class="sd">        :param show_vulnerability_data: show all data regarding vulnerabilites if set to True</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">package_summary_df</span> <span class="o">=</span> <span class="n">si_bandit_df</span><span class="p">[</span>
+            <span class="p">(</span><span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;package_index&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">package_index</span><span class="p">)</span>
+        <span class="p">]</span>
+
+        <span class="n">package_summary_df</span> <span class="o">=</span> <span class="n">package_summary_df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;release_date&quot;</span><span class="p">],</span> <span class="n">ascending</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">X</span> <span class="o">=</span> <span class="n">package_summary_df</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">show_vulnerability_data</span><span class="p">:</span>
+
+            <span class="n">vulnerabilites_classes</span> <span class="o">=</span> <span class="p">[</span><span class="n">col</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">package_summary_df</span> <span class="k">if</span> <span class="n">col</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;SEVERITY.&quot;</span><span class="p">)]</span>
+
+            <span class="k">for</span> <span class="n">vulnerability_class</span> <span class="ow">in</span> <span class="n">vulnerabilites_classes</span><span class="p">:</span>
+
+                <span class="n">subset_df</span> <span class="o">=</span> <span class="n">package_summary_df</span><span class="p">[[</span><span class="n">vulnerability_class</span><span class="p">]]</span>
+                <span class="k">if</span> <span class="n">subset_df</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+                    <span class="n">Z</span> <span class="o">=</span> <span class="p">[</span><span class="n">z</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">z</span> <span class="ow">in</span> <span class="n">subset_df</span><span class="o">.</span><span class="n">values</span><span class="p">]</span>
+
+                    <span class="n">trace</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+                        <span class="n">x</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">Z</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers+lines&quot;</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">opacity</span><span class="o">=</span><span class="mf">0.8</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">vulnerability_class</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+
+                    <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">trace</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">security_infos</span><span class="p">:</span>
+            <span class="n">security_infos</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;_total_severity&quot;</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">security_info</span> <span class="ow">in</span> <span class="n">security_infos</span><span class="p">:</span>
+            <span class="n">subset_df</span> <span class="o">=</span> <span class="n">package_summary_df</span><span class="p">[[</span><span class="n">security_info</span><span class="p">]]</span>
+            <span class="n">Z</span> <span class="o">=</span> <span class="p">[</span><span class="n">z</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">z</span> <span class="ow">in</span> <span class="n">subset_df</span><span class="o">.</span><span class="n">values</span><span class="p">]</span>
+
+            <span class="n">trace</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+                <span class="n">x</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">Z</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers+lines&quot;</span><span class="p">,</span> <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">opacity</span><span class="o">=</span><span class="mf">0.8</span><span class="p">),</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">security_info</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+            <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">trace</span><span class="p">)</span>
+
+        <span class="n">layout</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Layout</span><span class="p">(</span>
+            <span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;SI analysis for </span><span class="si">{</span><span class="n">package_name</span><span class="si">}</span><span class="s2"> from </span><span class="si">{</span><span class="n">package_index</span><span class="si">}</span><span class="s2"> using SI-bandit&quot;</span><span class="p">,</span>
+            <span class="n">xaxis</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Releases&quot;</span><span class="p">),</span>
+            <span class="n">yaxis</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Security scores and sub_scores&quot;</span><span class="p">),</span>
+            <span class="n">showlegend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">legend</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">orientation</span><span class="o">=</span><span class="s2">&quot;h&quot;</span><span class="p">,</span> <span class="n">y</span><span class="o">=-</span><span class="mf">0.7</span><span class="p">,</span> <span class="n">yanchor</span><span class="o">=</span><span class="s2">&quot;top&quot;</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">fig</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Figure</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">layout</span><span class="o">=</span><span class="n">layout</span><span class="p">)</span>
+
+        <span class="n">iplot</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;scatter-colorscale&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.create_vulnerabilities_plot"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.create_vulnerabilities_plot">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">create_vulnerabilities_plot</span><span class="p">(</span>
+        <span class="n">security_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">security_infos</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">show_vulnerability_data</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Plot vulnerabilites trend for a Python package from a certain index.</span>
+
+<span class="sd">        :param security_df: pandas dataframe given by &#39;create_si_bandit_final_dataframe&#39; method</span>
+<span class="sd">        with `use_external_source_data` set to True.</span>
+<span class="sd">        :param security_infos: list of info to be visualized in the plot</span>
+<span class="sd">        :param show_vulnerability_data: show all data regarding vulnerabilites if set to True</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">security_infos</span><span class="p">:</span>
+            <span class="n">security_infos</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;_total_severity&quot;</span><span class="p">]</span>
+
+        <span class="n">packages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">vulnerabilites</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">total_severities</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">security_infos</span><span class="p">:</span>
+            <span class="n">vulnerabilites</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">security_df</span><span class="p">[[</span><span class="s2">&quot;package_name&quot;</span><span class="p">,</span> <span class="s2">&quot;package_version&quot;</span><span class="p">,</span> <span class="s2">&quot;package_index&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="n">security_infos</span><span class="p">]</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="n">package_name</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span>
+            <span class="n">package_version</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]</span>
+            <span class="n">package_index</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s2">&quot;package_index&quot;</span><span class="p">]</span>
+
+            <span class="n">packages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">package_name</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">package_version</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">package_index</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">security_infos</span><span class="p">:</span>
+                <span class="n">vulnerabilites</span><span class="p">[</span><span class="n">column</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">column</span><span class="p">])</span>
+
+        <span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">vulnerability_class</span> <span class="ow">in</span> <span class="n">vulnerabilites</span><span class="p">:</span>
+            <span class="n">trace</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Scatter</span><span class="p">(</span>
+                <span class="n">x</span><span class="o">=</span><span class="n">packages</span><span class="p">,</span>
+                <span class="n">y</span><span class="o">=</span><span class="n">vulnerabilites</span><span class="p">[</span><span class="n">vulnerability_class</span><span class="p">],</span>
+                <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;markers&quot;</span><span class="p">,</span>
+                <span class="n">marker</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">opacity</span><span class="o">=</span><span class="mf">0.8</span><span class="p">),</span>
+                <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">vulnerability_class</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">trace</span><span class="p">)</span>
+
+        <span class="n">layout</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Layout</span><span class="p">(</span>
+            <span class="n">title</span><span class="o">=</span><span class="s2">&quot;SI analysis for Python packages using SI-bandit&quot;</span><span class="p">,</span>
+            <span class="n">xaxis</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;{package_name-package_version-package_index}&quot;</span><span class="p">),</span>
+            <span class="n">showlegend</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">fig</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Figure</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">layout</span><span class="o">=</span><span class="n">layout</span><span class="p">)</span>
+
+        <span class="n">iplot</span><span class="p">(</span><span class="n">fig</span><span class="p">,</span> <span class="n">filename</span><span class="o">=</span><span class="s2">&quot;scatter-colorscale&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.define_si_scores"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.define_si_scores">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">define_si_scores</span><span class="p">(</span><span class="n">si_bandit_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">():</span>
+        <span class="sd">&quot;&quot;&quot;Define security scores from si bandit outputs.</span>
+
+<span class="sd">        WARNING: It depends on all data considered.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">HIGH_CONFIDENCE_WEIGHT</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">MEDIUM_CONFIDENCE_WEIGHT</span> <span class="o">=</span> <span class="mf">0.5</span>
+        <span class="n">LOW_CONFIDENCE_WEIGHT</span> <span class="o">=</span> <span class="mf">0.1</span>
+
+        <span class="n">q_min_max_scaler</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">security</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;LOW&quot;</span><span class="p">,</span> <span class="s2">&quot;MEDIUM&quot;</span><span class="p">,</span> <span class="s2">&quot;HIGH&quot;</span><span class="p">]:</span>
+            <span class="k">for</span> <span class="n">confidence</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;LOW&quot;</span><span class="p">,</span> <span class="s2">&quot;MEDIUM&quot;</span><span class="p">,</span> <span class="s2">&quot;HIGH&quot;</span><span class="p">]:</span>
+
+                <span class="n">q</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;SEVERITY.</span><span class="si">{</span><span class="n">security</span><span class="si">}</span><span class="s2">__CONFIDENCE.</span><span class="si">{</span><span class="n">confidence</span><span class="si">}</span><span class="s2">&quot;</span>
+
+                <span class="n">min_max_scaler</span> <span class="o">=</span> <span class="p">(</span><span class="n">si_bandit_df</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">-</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="n">q</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">())</span> <span class="o">/</span> <span class="p">(</span>
+                    <span class="n">si_bandit_df</span><span class="p">[</span><span class="n">q</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="n">q</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+                <span class="p">)</span>
+
+                <span class="n">si_bandit_df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">q</span><span class="si">}</span><span class="s2">_scaled&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">min_max_scaler</span>
+
+        <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.HIGH.sub_score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.HIGH__CONFIDENCE.HIGH&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">HIGH_CONFIDENCE_WEIGHT</span>
+            <span class="o">+</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.HIGH__CONFIDENCE.MEDIUM&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">MEDIUM_CONFIDENCE_WEIGHT</span>
+            <span class="o">+</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.HIGH__CONFIDENCE.LOW&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">LOW_CONFIDENCE_WEIGHT</span>
+        <span class="p">)</span> <span class="o">/</span> <span class="mi">3</span>
+
+        <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.MEDIUM.sub_score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.MEDIUM__CONFIDENCE.HIGH_scaled&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">HIGH_CONFIDENCE_WEIGHT</span>
+            <span class="o">+</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.MEDIUM__CONFIDENCE.MEDIUM_scaled&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">MEDIUM_CONFIDENCE_WEIGHT</span>
+            <span class="o">+</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.MEDIUM__CONFIDENCE.LOW_scaled&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">LOW_CONFIDENCE_WEIGHT</span>
+        <span class="p">)</span> <span class="o">/</span> <span class="mi">3</span>
+
+        <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.LOW.sub_score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.LOW__CONFIDENCE.HIGH_scaled&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">HIGH_CONFIDENCE_WEIGHT</span>
+            <span class="o">+</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.LOW__CONFIDENCE.MEDIUM_scaled&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">MEDIUM_CONFIDENCE_WEIGHT</span>
+            <span class="o">+</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.LOW__CONFIDENCE.LOW_scaled&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">LOW_CONFIDENCE_WEIGHT</span>
+        <span class="p">)</span> <span class="o">/</span> <span class="mi">3</span>
+
+        <span class="n">HIGH_SEVERITY_WEIGHT</span> <span class="o">=</span> <span class="mi">100</span>
+        <span class="n">MEDIUM_SEVERITY_WEIGHT</span> <span class="o">=</span> <span class="mi">10</span>
+        <span class="n">LOW_SEVERITY_WEIGHT</span> <span class="o">=</span> <span class="mi">1</span>
+
+        <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.score&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.HIGH.sub_score&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">HIGH_SEVERITY_WEIGHT</span>
+            <span class="o">+</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.MEDIUM.sub_score&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">MEDIUM_SEVERITY_WEIGHT</span>
+            <span class="o">+</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.LOW.sub_score&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">LOW_SEVERITY_WEIGHT</span>
+        <span class="p">)</span> <span class="o">/</span> <span class="mi">3</span>
+
+        <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.score.normalized&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;SEVERITY.score&quot;</span><span class="p">]</span> <span class="o">/</span> <span class="n">si_bandit_df</span><span class="p">[</span><span class="s2">&quot;number_of_analyzed_files&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">si_bandit_df</span></div>
+
+    <span class="c1"># SI-cloc</span>
+
+<div class="viewcode-block" id="SecurityIndicators.aggregate_security_indicator_cloc_results"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.aggregate_security_indicator_cloc_results">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">aggregate_security_indicator_cloc_results</span><span class="p">(</span>
+        <span class="n">limit_results</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">max_ids</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+        <span class="n">is_local</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">security_indicator_cloc_repo_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;security/si-cloc&quot;</span><span class="p">),</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Aggregate si_cloc results from jsons stored in Ceph or locally from `si_cloc` repo.</span>
+
+<span class="sd">        :param limit_results: reduce the number of si_cloc reports ids considered to `max_ids` to test analysis</span>
+<span class="sd">        :param max_ids: maximum number of si_cloc reports ids considered</span>
+<span class="sd">        :param is_local: flag to retreive the dataset locally or from S3 (credentials are required)</span>
+<span class="sd">        :param si_cloc_repo_path: path to retrieve the si_cloc dataset locally and `is_local` is set to True</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">security_indicator_cloc_reports</span> <span class="o">=</span> <span class="n">aggregate_thoth_results</span><span class="p">(</span>
+            <span class="n">limit_results</span><span class="o">=</span><span class="n">limit_results</span><span class="p">,</span>
+            <span class="n">max_ids</span><span class="o">=</span><span class="n">max_ids</span><span class="p">,</span>
+            <span class="n">is_local</span><span class="o">=</span><span class="n">is_local</span><span class="p">,</span>
+            <span class="n">repo_path</span><span class="o">=</span><span class="n">security_indicator_cloc_repo_path</span><span class="p">,</span>
+            <span class="n">store_name</span><span class="o">=</span><span class="s2">&quot;si-cloc&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">security_indicator_cloc_reports</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.extract_data_from_si_cloc_metadata"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.extract_data_from_si_cloc_metadata">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">extract_data_from_si_cloc_metadata</span><span class="p">(</span><span class="n">report_metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Extract data from si-cloc report metadata.&quot;&quot;&quot;</span>
+        <span class="n">extracted_metadata</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;datetime&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;datetime&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;analyzer&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;analyzer&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;analyzer_version&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;analyzer_version&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;document_id&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;document_id&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;app.py&quot;</span><span class="p">][</span><span class="s2">&quot;package_name&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;app.py&quot;</span><span class="p">][</span><span class="s2">&quot;package_version&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;package_index&quot;</span><span class="p">:</span> <span class="n">report_metadata</span><span class="p">[</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;app.py&quot;</span><span class="p">][</span><span class="s2">&quot;package_index&quot;</span><span class="p">],</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">extracted_metadata</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.create_si_cloc_metadata_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.create_si_cloc_metadata_dataframe">[docs]</a>    <span class="k">def</span> <span class="nf">create_si_cloc_metadata_dataframe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">si_cloc_report</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create si-cloc report metadata dataframe.&quot;&quot;&quot;</span>
+        <span class="n">metadata_si_cloc</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">extract_data_from_si_cloc_metadata</span><span class="p">(</span><span class="n">report_metadata</span><span class="o">=</span><span class="n">si_cloc_report</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">])</span>
+        <span class="n">metadata_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">([</span><span class="n">metadata_si_cloc</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">metadata_df</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.create_si_cloc_results_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.create_si_cloc_results_dataframe">[docs]</a>    <span class="k">def</span> <span class="nf">create_si_cloc_results_dataframe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">si_cloc_report</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create si-cloc report results dataframe.&quot;&quot;&quot;</span>
+        <span class="n">results</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">si_cloc_report</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="o">!=</span> <span class="s2">&quot;header&quot;</span><span class="p">}</span>
+        <span class="n">results</span><span class="p">[</span><span class="s2">&quot;SUM&quot;</span><span class="p">][</span><span class="s2">&quot;n_lines&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">si_cloc_report</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;header&quot;</span><span class="p">][</span><span class="s2">&quot;n_lines&quot;</span><span class="p">]</span>
+        <span class="n">results_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">json_normalize</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">results_df</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.produce_si_cloc_report_summary_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.produce_si_cloc_report_summary_dataframe">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">produce_si_cloc_report_summary_dataframe</span><span class="p">(</span>
+        <span class="n">metadata_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">cloc_results_df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create si-cloc report summary dataframe.&quot;&quot;&quot;</span>
+        <span class="n">report_summary_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">metadata_df</span><span class="p">,</span> <span class="n">cloc_results_df</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">report_summary_df</span></div>
+
+<div class="viewcode-block" id="SecurityIndicators.create_si_cloc_final_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.security.SecurityIndicators.create_si_cloc_final_dataframe">[docs]</a>    <span class="k">def</span> <span class="nf">create_si_cloc_final_dataframe</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">si_cloc_reports</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create final si-cloc dataframe.&quot;&quot;&quot;</span>
+        <span class="n">counter</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="n">total_reports</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">si_cloc_reports</span><span class="p">)</span>
+
+        <span class="n">final_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">si_cloc_report</span> <span class="ow">in</span> <span class="n">si_cloc_reports</span><span class="p">:</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analyzing SI-cloc report: </span><span class="si">{</span><span class="n">counter</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">total_reports</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Create metadata dataframe</span>
+            <span class="n">metadata_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_si_cloc_metadata_dataframe</span><span class="p">(</span><span class="n">si_cloc_report</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analyzing package_name: </span><span class="si">{</span><span class="n">metadata_df</span><span class="p">[</span><span class="s1">&#39;package_name&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analyzing package_version: </span><span class="si">{</span><span class="n">metadata_df</span><span class="p">[</span><span class="s1">&#39;package_version&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Analyzing package_index: </span><span class="si">{</span><span class="n">metadata_df</span><span class="p">[</span><span class="s1">&#39;package_index&#39;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Create Security/Confidence dataframe</span>
+            <span class="n">cloc_results_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_si_cloc_results_dataframe</span><span class="p">(</span><span class="n">si_cloc_report</span><span class="o">=</span><span class="n">si_cloc_report</span><span class="p">)</span>
+
+            <span class="n">si_cloc_report_summary_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">produce_si_cloc_report_summary_dataframe</span><span class="p">(</span>
+                <span class="n">metadata_df</span><span class="o">=</span><span class="n">metadata_df</span><span class="p">,</span> <span class="n">cloc_results_df</span><span class="o">=</span><span class="n">cloc_results_df</span>
+            <span class="p">)</span>
+
+            <span class="n">final_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">final_df</span><span class="p">,</span> <span class="n">si_cloc_report_summary_df</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+            <span class="n">counter</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">final_df</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation index</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
