@@ -4,8 +4,7 @@ title: Consider adjusting ``OMP_NUM_THREADS`` environment variable for container
 
 Consider adjusting ``OMP_NUM_THREADS`` environment variable for containerized
 deployments, one or more libraries use Intel's MKL that does not detect
-correctly one or more libraries use Intel's MKL that does not detect correctly
-resource allocation in the cluster resource allocation in the cluster.
+correctly resource allocation in the cluster.
 
 ## Issue description
 
