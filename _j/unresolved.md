@@ -28,7 +28,7 @@ This message is not specific to any concrete package.
 Get back to Thoth in a while. Thoth backend analyzes the software to provide
 recommendations.
 
-Note this can happen also when the package requested is not available on PyPI
+Note that this can happen also when the requested package is not available on PyPI
 (e.g. typo), or no longer available as it was deleted by package maintainers.
 
 ## Pipeline units
