@@ -12,7 +12,7 @@ dependency a user's stack requires. As the direct dependency was not analyzed
 yet, Thoth cannot resolve the dependency graph to deliver a pinned down
 software stack.
 
-On the backend side, this prioritizes analyses of the missing package so that
+On the backend side, this prioritizes analysis of the missing package so that
 users can receive recommendations as soon as possible.
 
 ## Affected packages:
