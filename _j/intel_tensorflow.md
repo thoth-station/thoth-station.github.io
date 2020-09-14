@@ -12,6 +12,7 @@ Intel's distribution of TensorFlow can improve performance of machine learning m
 
  * [``intel-tensorflow``][2]
  * [``tensorflow``][3]
+ * [``tensorflow-cpu``][5]
 
 ## Severity
 
@@ -20,7 +21,7 @@ Intel's distribution of TensorFlow can improve performance of machine learning m
 ## Issue fix
 
 Use the optimized [``intel-tensorflow`` Python package available on PyPI][2]
-instead of the upstream [``tensorflow``][3].
+instead of the upstream [``tensorflow``][3] or [``tensorflow-cpu``][5].
 
 ## Pipeline units
 
@@ -49,3 +50,4 @@ instead of the upstream [``tensorflow``][3].
 [2]: https://pypi.org/project/intel-tensorflow/
 [3]: https://pypi.org/project/tensorflow/
 [4]: https://github.com/thoth-station/dependency-monkey-zoo/tree/master/tensorflow/inspection-2020-08-21
+[5]: https://pypi.org/project/tensorflow-cpu/
