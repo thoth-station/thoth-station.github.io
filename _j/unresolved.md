@@ -17,7 +17,7 @@ users can receive recommendations as soon as possible.
 
 ## Affected packages:
 
-This message is not specific to any concrete package.
+This message is not specific to any specific package.
 
 ## Severity
 
