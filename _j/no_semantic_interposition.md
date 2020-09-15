@@ -32,6 +32,9 @@ Use UBI8 or RHEL8 container images shipped with Pytho 3.8.
 
 This message can be produced for all the recommendation types.
 
+See [this document that describes recommendation
+types](http://thoth-station.ninja/recommendation-types).
+
 ## Inspections
 
  * [inspection-2020-08-21][2]

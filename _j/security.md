@@ -34,6 +34,9 @@ performed.
  * security
  * stable
 
+See [this document that describes recommendation types
+listed](http://thoth-station.ninja/recommendation-types).
+
 ## Related
 
  * [bandit][1]

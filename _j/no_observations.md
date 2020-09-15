@@ -42,3 +42,6 @@ This is not an issue.
 ## Recommendation types
 
 This message can be produced for all the recommendation types.
+
+See [this document that describes recommendation
+types](http://thoth-station.ninja/recommendation-types).

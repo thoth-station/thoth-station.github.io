@@ -39,6 +39,9 @@ This message is not specific to any pipeline unit.
 
 This message is not specific to any recommendation type.
 
+See [this document that describes recommendation
+types](http://thoth-station.ninja/recommendation-types).
+
 ## Related
 
  * [Thoth solver][1]

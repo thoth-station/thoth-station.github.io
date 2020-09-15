@@ -39,6 +39,9 @@ to number of CPUs allocated for the container.
  * stable
  * testing
  
+See [this document that describes recommendation types
+listed](http://thoth-station.ninja/recommendation-types).
+ 
 ## Related
 
  * [OpenMP documentation][1]

@@ -33,6 +33,9 @@ This error or warning can occur for all the pipeline units.
 
 This error or warning can occur for all the recommendation types.
 
+See [this document that describes recommendation
+types](http://thoth-station.ninja/recommendation-types).
+
 ## Related
 
  * [Configuring adviser (operational aspect)][1]

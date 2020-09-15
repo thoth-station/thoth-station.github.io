@@ -34,6 +34,9 @@ instead of the upstream [``tensorflow``][3] or [``tensorflow-cpu``][5].
  * secure
  * stable
  * testing
+ 
+See [this document that describes recommendation types
+listed](http://thoth-station.ninja/recommendation-types).
 
 ## Inspections
 

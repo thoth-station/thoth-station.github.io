@@ -32,6 +32,9 @@ artifact installed.
  * testing
  * security
 
+See [this document that describes recommendation types
+listed](http://thoth-station.ninja/recommendation-types).
+
 ## Related
 
  * [AICoE index with optimized TensorFlow builds][1]
