@@ -1,0 +1,234 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.package_extract.handlers.yum &#8212; Thoth Package Extract 1.0.1 documentation</title>
+    <link rel="stylesheet" href="..//assets/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="..//assets/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="..//assets/documentation_options.js"></script>
+    <script type="text/javascript" src="..//assets/jquery.js"></script>
+    <script type="text/javascript" src="..//assets/underscore.js"></script>
+    <script type="text/javascript" src="..//assets/doctools.js"></script>
+    <script type="text/javascript" src="..//assets/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Package Extract 1.0.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.package_extract.handlers.yum</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-package-extract</span>
+<span class="c1"># Copyright(C) 2018, 2019, 2020 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Handle output of yum command - parse installed packages.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">typing</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+
+<span class="kn">from</span> <span class="nn">.base</span> <span class="kn">import</span> <span class="n">HandlerBase</span>
+
+<span class="n">_RE_EPOCH_VERSION</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;([0-9]+):(.+)&quot;</span><span class="p">)</span>
+<span class="n">_RE_DEPENDENCY</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span>
+    <span class="sa">r</span><span class="s2">&quot;--&gt; Processing Dependency: &quot;</span>
+    <span class="sa">r</span><span class="s2">&quot;([a-zA-Z_\-.():/0-9&gt;=&lt; ]+) for package: ([a-zA-Z_\-.():0-9]+)&quot;</span>
+<span class="p">)</span>
+
+<span class="n">_LOG</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="YUM"><a class="viewcode-back" href="../../../../thoth.package_extract.handlers.html#thoth.package_extract.handlers.yum.YUM">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span>
+<span class="k">class</span> <span class="nc">YUM</span><span class="p">(</span><span class="n">HandlerBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Handle extracting packages from build logs - yum installer.&quot;&quot;&quot;</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_parse_yum_table_heading</span><span class="p">(</span><span class="n">lines</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">start_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Parse yum table heading, return increment for which there should be done proceeding.&quot;&quot;&quot;</span>
+        <span class="n">header_items</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Package&quot;</span><span class="p">,</span> <span class="s2">&quot;Arch&quot;</span><span class="p">,</span> <span class="s2">&quot;Version&quot;</span><span class="p">,</span> <span class="s2">&quot;Repository&quot;</span><span class="p">,</span> <span class="s2">&quot;Size&quot;</span><span class="p">]</span>
+        <span class="n">heading</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="n">start_index</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">item</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">heading</span> <span class="o">!=</span> <span class="n">header_items</span><span class="p">:</span>
+            <span class="c1"># yum can break table into multiple lines for some reason - this can be inconsistent</span>
+            <span class="c1"># regardless of terminal size in a single run</span>
+            <span class="n">second_line</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="n">start_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">item</span><span class="p">]</span>
+            <span class="n">heading</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">second_line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">heading</span> <span class="o">!=</span> <span class="n">header_items</span><span class="p">:</span>
+                <span class="k">return</span> <span class="mi">0</span>
+
+            <span class="k">return</span> <span class="mi">2</span>
+
+        <span class="k">return</span> <span class="mi">1</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_parse_yum_table</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">lines</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">start_index</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Parse installed packages from a table reported by yum installer.&quot;&quot;&quot;</span>
+        <span class="n">table_offset</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_parse_yum_table_heading</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">start_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">table_offset</span><span class="p">:</span>
+            <span class="n">_LOG</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Unable to parse heading for yum table, skipping (line was: </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">lines</span><span class="p">[</span><span class="n">start_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="p">[],</span> <span class="mi">0</span>
+
+        <span class="n">start_index</span> <span class="o">+=</span> <span class="n">table_offset</span>
+
+        <span class="k">if</span> <span class="n">lines</span><span class="p">[</span><span class="n">start_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">80</span><span class="p">:</span>
+            <span class="n">_LOG</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Unable to find table start, giving up (line was: </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">lines</span><span class="p">[</span><span class="n">start_index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="p">[],</span> <span class="mi">0</span>
+
+        <span class="k">if</span> <span class="n">lines</span><span class="p">[</span><span class="n">start_index</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Installing:&quot;</span><span class="p">):</span>
+            <span class="n">upgrading</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">elif</span> <span class="n">lines</span><span class="p">[</span><span class="n">start_index</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Upgrading:&quot;</span><span class="p">):</span>
+            <span class="n">upgrading</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOG</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Unable to find table start with &#39;Installing&#39;, giving up (line was: </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">lines</span><span class="p">[</span><span class="n">start_index</span> <span class="o">+</span> <span class="mi">2</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="p">[],</span> <span class="mi">0</span>
+
+        <span class="n">reported_packages</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">index_increment</span> <span class="o">=</span> <span class="n">start_index</span> <span class="o">+</span> <span class="mi">3</span>
+        <span class="n">is_dependency</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">while</span> <span class="n">index_increment</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">):</span>
+            <span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">lines</span><span class="p">[</span><span class="n">index_increment</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">item</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">lines</span><span class="p">[</span><span class="n">index_increment</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span> <span class="o">==</span> <span class="mi">6</span><span class="p">:</span>
+                <span class="n">epoch</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="n">version</span> <span class="o">=</span> <span class="n">items</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+                <span class="n">match</span> <span class="o">=</span> <span class="n">_RE_EPOCH_VERSION</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                    <span class="n">epoch</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+                    <span class="n">version</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+
+                <span class="c1"># Number of items is 5 but yum reports size with a space between size and unit (e.g. &#39;1.5 M&#39;)</span>
+                <span class="n">reported_packages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                        <span class="s2">&quot;arch&quot;</span><span class="p">:</span> <span class="n">items</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                        <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">version</span><span class="p">,</span>
+                        <span class="s2">&quot;epoch&quot;</span><span class="p">:</span> <span class="n">epoch</span><span class="p">,</span>
+                        <span class="s2">&quot;repository&quot;</span><span class="p">:</span> <span class="n">items</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span>
+                        <span class="s2">&quot;size&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">items</span><span class="p">[</span><span class="mi">4</span><span class="p">:]),</span>
+                        <span class="s2">&quot;dependency&quot;</span><span class="p">:</span> <span class="n">is_dependency</span><span class="p">,</span>
+                        <span class="s2">&quot;upgrading&quot;</span><span class="p">:</span> <span class="n">upgrading</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+                <span class="n">_LOG</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Found installed package report: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">reported_packages</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="k">elif</span> <span class="n">lines</span><span class="p">[</span><span class="n">index_increment</span><span class="p">]</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span>
+                <span class="p">(</span><span class="s2">&quot;Installing dependencies:&quot;</span><span class="p">,</span> <span class="s2">&quot;Installing for dependencies:&quot;</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="k">if</span> <span class="n">is_dependency</span><span class="p">:</span>
+                    <span class="n">_LOG</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;Dependency listing heading was already present in the output, seen again&quot;</span>
+                    <span class="p">)</span>
+                <span class="n">is_dependency</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="n">lines</span><span class="p">[</span><span class="n">index_increment</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">80</span><span class="p">:</span>
+                <span class="n">_LOG</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Found table ending, finished installed packages parsing&quot;</span><span class="p">)</span>
+                <span class="n">index_increment</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">break</span>
+
+            <span class="n">index_increment</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">reported_packages</span><span class="p">,</span> <span class="n">index_increment</span>
+
+<div class="viewcode-block" id="YUM.run"><a class="viewcode-back" href="../../../../thoth.package_extract.handlers.html#thoth.package_extract.handlers.yum.YUM.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Find and parse installed packages and their versions from a build log.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">lines</span> <span class="o">=</span> <span class="n">input_text</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">while</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">):</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="n">lines</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+            <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="c1"># TODO: parsing lines like &#39;--&gt; Processing Dependency&#39; can result in a malformed package name</span>
+            <span class="c1"># For example line:</span>
+            <span class="c1"># --&gt; Processing Dependency: perl(Pod::Escapes) &gt;= 1.04 for package: 1:perl-Pod-Simple-3.28-4.el7.noarch</span>
+            <span class="c1"># results in installing perl-Pod-Escapes. Do we want to parse such lines to keep pkgs with direct deps?</span>
+            <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">80</span><span class="p">):</span>
+                <span class="n">installed_packages</span><span class="p">,</span> <span class="n">table_end_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parse_yum_table</span><span class="p">(</span><span class="n">lines</span><span class="p">,</span> <span class="n">index</span><span class="p">)</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">installed_packages</span><span class="p">)</span>
+                <span class="n">index</span> <span class="o">+=</span> <span class="n">table_end_idx</span> <span class="ow">or</span> <span class="mi">1</span>  <span class="c1"># on errors move to the next line</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">result</span></div></div>
+
+
+<span class="n">HandlerBase</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">YUM</span><span class="p">)</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation index</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+  
+  </body>
+</html>

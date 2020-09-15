@@ -1,0 +1,206 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.solver.python.base &#8212; Thoth Solver 1.6.2 documentation</title>
+    <link rel="stylesheet" href="..//assets/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="..//assets/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="..//assets/documentation_options.js"></script>
+    <script type="text/javascript" src="..//assets/jquery.js"></script>
+    <script type="text/javascript" src="..//assets/underscore.js"></script>
+    <script type="text/javascript" src="..//assets/doctools.js"></script>
+    <script type="text/javascript" src="..//assets/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Solver 1.6.2 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.solver.python.base</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-solver</span>
+<span class="c1"># Copyright(C) 2018, 2019, 2020 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Classes for resolving dependencies as specified in each ecosystem.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">import</span> <span class="nn">abc</span>
+
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Source</span>
+
+<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="kn">import</span> <span class="n">NoReleasesFound</span>
+<span class="kn">from</span> <span class="nn">..exceptions</span> <span class="kn">import</span> <span class="n">SolverException</span>
+<span class="kn">from</span> <span class="nn">.._typing</span> <span class="kn">import</span> <span class="n">MYPY_CHECK_RUNNING</span>
+
+<span class="k">if</span> <span class="n">MYPY_CHECK_RUNNING</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Dict</span>
+    <span class="kn">from</span> <span class="nn">packaging.requirements</span> <span class="kn">import</span> <span class="n">Requirement</span>
+
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="ReleasesFetcher"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.ReleasesFetcher">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">ReleasesFetcher</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;A base class for fetching package releases.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ReleasesFetcher.fetch_releases"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.ReleasesFetcher.fetch_releases">[docs]</a>    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">fetch_releases</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package</span><span class="p">):</span>  <span class="c1"># type: (str) -&gt; Tuple[str, List[Tuple[str, str]]]</span>
+        <span class="sd">&quot;&quot;&quot;Abstract method for getting list of releases versions.&quot;&quot;&quot;</span></div>
+
+<div class="viewcode-block" id="ReleasesFetcher.index_url"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.ReleasesFetcher.index_url">[docs]</a>    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">index_url</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>  <span class="c1"># type: () -&gt; str</span>
+        <span class="sd">&quot;&quot;&quot;Get URL to index from where releases are fetched.&quot;&quot;&quot;</span></div></div>
+
+
+<div class="viewcode-block" id="DependencyParser"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.DependencyParser">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">DependencyParser</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Base class for Dependency parsing.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="DependencyParser.parse"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.DependencyParser.parse">[docs]</a>    <span class="nd">@abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">specs</span><span class="p">):</span>  <span class="c1"># type: (List[str]) -&gt; List[Requirement]</span>
+        <span class="sd">&quot;&quot;&quot;Abstract method for dependency parsing.&quot;&quot;&quot;</span></div></div>
+
+
+<div class="viewcode-block" id="Solver"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.Solver">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">Solver</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Base class for resolving dependencies.&quot;&quot;&quot;</span>
+
+    <span class="n">dependency_parser</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">DependencyParser</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">releases_fetcher</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">ReleasesFetcher</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Solver.solve"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.Solver.solve">[docs]</a>    <span class="k">def</span> <span class="nf">solve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">,</span> <span class="n">graceful</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>  <span class="c1"># type: (List[str], bool) -&gt; Dict[str, List[Tuple[str, str]]]</span>
+        <span class="sd">&quot;&quot;&quot;Solve `dependencies` against a repository.&quot;&quot;&quot;</span>
+        <span class="n">solved</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, List[Tuple[str, str]]]</span>
+        <span class="k">for</span> <span class="n">dep</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dependency_parser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">dependencies</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Fetching releases for: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dep</span><span class="p">)</span>
+
+            <span class="n">name</span><span class="p">,</span> <span class="n">releases</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">releases_fetcher</span><span class="o">.</span><span class="n">fetch_releases</span><span class="p">(</span><span class="n">dep</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">solved</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">SolverException</span><span class="p">(</span><span class="s2">&quot;Dependency: </span><span class="si">{}</span><span class="s2"> is listed multiple times&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">name</span><span class="p">))</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">releases</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">graceful</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;No releases found for package </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dep</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">NoReleasesFound</span><span class="p">(</span><span class="s2">&quot;No releases found for package </span><span class="si">{!r}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">dep</span><span class="o">.</span><span class="n">name</span><span class="p">))</span>
+
+            <span class="n">solved</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">release</span> <span class="ow">in</span> <span class="n">releases</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">release</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">dep</span><span class="o">.</span><span class="n">specifier</span><span class="p">:</span>
+                    <span class="n">solved</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">release</span><span class="p">)</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;  matching: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">solved</span><span class="p">[</span><span class="n">name</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">solved</span></div></div>
+
+
+<div class="viewcode-block" id="get_ecosystem_solver"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.get_ecosystem_solver">[docs]</a><span class="k">def</span> <span class="nf">get_ecosystem_solver</span><span class="p">(</span><span class="n">ecosystem_name</span><span class="p">):</span>  <span class="c1"># type: (str) -&gt; Solver</span>
+    <span class="sd">&quot;&quot;&quot;Get Solver subclass instance for particular ecosystem.</span>
+
+<span class="sd">    :param ecosystem_name: name of ecosystem for which solver should be get</span>
+<span class="sd">    :return: Solver</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">.python_solver</span> <span class="kn">import</span> <span class="n">PythonSolver</span>
+    <span class="kn">from</span> <span class="nn">.python_solver</span> <span class="kn">import</span> <span class="n">PythonReleasesFetcher</span>
+    <span class="kn">from</span> <span class="nn">.python_solver</span> <span class="kn">import</span> <span class="n">PythonDependencyParser</span>
+
+    <span class="k">if</span> <span class="n">ecosystem_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;pypi&quot;</span><span class="p">:</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">Source</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="s2">&quot;https://pypi.org/simple&quot;</span><span class="p">,</span> <span class="n">warehouse_api_url</span><span class="o">=</span><span class="s2">&quot;https://pypi.org/pypi&quot;</span><span class="p">,</span> <span class="n">warehouse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">PythonSolver</span><span class="p">(</span>
+            <span class="n">dependency_parser</span><span class="o">=</span><span class="n">PythonDependencyParser</span><span class="p">(),</span> <span class="n">releases_fetcher</span><span class="o">=</span><span class="n">PythonReleasesFetcher</span><span class="p">(</span><span class="n">source</span><span class="o">=</span><span class="n">source</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Unknown ecosystem: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">ecosystem_name</span><span class="p">))</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation index</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
