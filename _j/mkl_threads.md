@@ -1,5 +1,5 @@
 ---
-title: Consider adjusting ``OMP_NUM_THREADS`` environment variable for containerized deployments
+title: Consider adjusting OMP_NUM_THREADS environment variable for containerized deployments
 ---
 
 Consider adjusting ``OMP_NUM_THREADS`` environment variable for containerized
