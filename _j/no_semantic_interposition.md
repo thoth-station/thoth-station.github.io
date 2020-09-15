@@ -26,7 +26,7 @@ Use UBI8 or RHEL8 container images shipped with Pytho 3.8.
 
 ## Pipeline units
 
- * NoSemanticInterpositionWrap
+ * [NoSemanticInterpositionWrap](https://thoth-station.ninja/docs/developers/adviser/thoth.adviser.wraps.html#module-thoth.adviser.wraps.no_semantic_interposition)
 
 ## Recommendation types
 
