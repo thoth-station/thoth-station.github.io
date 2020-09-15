@@ -29,7 +29,7 @@ to number of CPUs allocated for the container.
 
 ## Pipeline units
 
- * MKLThreadsWrap
+ * [MKLThreadsWrap](https://thoth-station.ninja/docs/developers/adviser/thoth.adviser.wraps.html#module-thoth.adviser.wraps.mkl_threads)
 
 ## Recommendation types
 

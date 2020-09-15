@@ -23,7 +23,7 @@ artifact installed.
 
 ## Pipeline units
 
- * TensorFlowAVX2Steps
+ * [TensorFlowAVX2Step](https://thoth-station.ninja/docs/developers/adviser/thoth.adviser.steps.html#thoth.adviser.steps.TensorFlowAVX2Step)
 
 ## Recommendation types
 

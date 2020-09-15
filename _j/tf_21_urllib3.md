@@ -69,7 +69,7 @@ Resolver penalizes resolution ``tensorflow==2.1`` with ``urllib3>=1.2<=1.5``.
 
 ## Pipeline units
 
- * TensorFlow21Urllib3Step
+ * [TensorFlow21Urllib3Step](https://thoth-station.ninja/docs/developers/adviser/thoth.adviser.steps.html#module-thoth.adviser.steps.tensorflow_21_urllib3)
 
 ## Recommendation types
 

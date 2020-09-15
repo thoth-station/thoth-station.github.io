@@ -27,7 +27,7 @@ performed.
 
 ## Pipeline units
 
- * SecurityIndicatorStep
+ * [SecurityIndicatorStep](https://thoth-station.ninja/docs/developers/adviser/thoth.adviser.steps.html#module-thoth.adviser.steps.security_indicators)
 
 ## Recommendation types
 

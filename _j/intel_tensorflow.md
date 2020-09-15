@@ -25,7 +25,7 @@ instead of the upstream [``tensorflow``][3] or [``tensorflow-cpu``][5].
 
 ## Pipeline units
 
- * IntelTensorFlowWrap
+* [IntelTensorFlowWrap](https://thoth-station.ninja/docs/developers/adviser/thoth.adviser.wraps.html#module-thoth.adviser.wraps.intel_tensorflow)
 
 ## Recommendation types
 
