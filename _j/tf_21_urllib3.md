@@ -79,6 +79,9 @@ All, except latest:
  * security
  * stable
  * testing
+ 
+See [this document that describes recommendation types
+listed](http://thoth-station.ninja/recommendation-types).
 
 ## Inspections
 

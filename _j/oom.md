@@ -28,6 +28,9 @@ Use a smaller software stack or [adjust adviser configuration in deployment][1].
 
 This error can occur for all the recommendation types.
 
+See [this document that describes recommendation
+types](http://thoth-station.ninja/recommendation-types).
+
 ## Related
 
  * [Configuring adviser (operational aspect)][1]

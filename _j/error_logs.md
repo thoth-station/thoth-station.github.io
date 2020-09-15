@@ -42,6 +42,9 @@ to any concrete pipeline unit.
 
 The error can apply to any recommendation type.
 
+See [this document that describes recommendation
+types](http://thoth-station.ninja/recommendation-types).
+
 ## Related
 
  * [thoth-station/adviser issue tracker][1]
