@@ -65,7 +65,7 @@ ImportError: cannot import name 'range'
 
 ## Issue fix
 
-Resolver penalizes resolution ``tensorflow==2.1`` with ``urllib3>=1.2<=1.5``.
+Resolver does not accept resolution ``tensorflow==2.1`` with ``urllib3>=1.2<=1.5``.
 
 ## Pipeline units
 
