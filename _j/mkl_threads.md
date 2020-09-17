@@ -38,10 +38,16 @@ to number of CPUs allocated for the container.
  * secure
  * stable
  * testing
- 
+
 See [this document that describes recommendation types
 listed](http://thoth-station.ninja/recommendation-types).
  
+## Advised manifest changes
+
+Patch manifest for the deployed component (e.g. ``Job``, ``Deployment``,
+``DeploymentConfig`` or any other) so that ``OMP_NUM_THREADS`` is set to number
+of CPUs requested for the container run.
+
 ## Related
 
  * [OpenMP documentation][1]
