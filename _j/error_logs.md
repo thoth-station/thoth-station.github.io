@@ -28,7 +28,10 @@ thamos logs
 Or directly from API endpoints:
 
 ```console
-curl -X GET --header 'Content-Type: application/json' --header 'Accept: application/json' "https://khemenu.thoth-station.ninja/api/v1/advise/python/<adviser-id>/log"
+curl -X GET \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  "https://khemenu.thoth-station.ninja/api/v1/advise/python/<adviser-id>/log"
 ```
 
 You can submit the issue report to the [thoth-station/adviser issue tracker][1].
