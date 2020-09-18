@@ -19,8 +19,11 @@ thamos log
 
 Or access the API endpoint:
 
-```curl
-curl -X GET --header 'Content-Type: application/json' --header 'Accept: application/json' "https://khemenu.thoth-station.ninja/api/v1/advise/python/<adviser-id>/log"
+```console
+curl -X GET \
+  --header 'Content-Type: application/json' \
+  --header 'Accept: application/json' \
+  "https://khemenu.thoth-station.ninja/api/v1/advise/python/<adviser-id>/log"
 ```
 
 ## Affected packages:
