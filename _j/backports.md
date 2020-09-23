@@ -53,9 +53,19 @@ listed](http://thoth-station.ninja/recommendation-types).
  * [``importlib-metadata`` package][importlib_metadata]
  * [``importlib-resources`` package][importlib_resources]
  * [``mock`` package][mock]
+ * [Python enum module][py_enum]
+ * [Python functools module][py_functools]
+ * [Python importlib.metadata][py_importlib_metadata]
+ * [Python importlib.resources][py_importlib_resources]
+ * [Python unittest.mock][py_mock]
 
 [enum34]: https://pypi.org/project/enum34
 [functools32]: https://pypi.org/project/functools32
 [importlib_metadata]: https://pypi.org/project/importlib-metadata
 [importlib_resources]: https://pypi.org/project/importlib-resources
 [mock]: https://pypi.org/project/mock
+[py_enum]: https://docs.python.org/3/library/enum.html
+[py_functools]: https://docs.python.org/3/library/functools.html
+[py_importlib_metadata]: https://docs.python.org/3/library/importlib.metadata.html
+[py_importlib_resources]: https://docs.python.org/3/library/importlib.html#module-importlib.resources
+[py_mock]: https://docs.python.org/3/library/unittest.mock.html
