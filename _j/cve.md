@@ -14,7 +14,7 @@ If the recommendation type is set to secure, the recommendation engine always
 tries to find a CVE-free software stack.
 
 The recommendation engine uses [PyUP Safety DB][2] which gets periodically
-updated.
+updated on the recommendation engine side.
 
 ## Affected packages:
 
