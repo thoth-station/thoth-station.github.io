@@ -26,6 +26,8 @@ export THAMOS_NO_USER_STACK=1
 thamos advise
 ```
 
+**WARNING:** Resolver does not check if the supplied stack is valid.
+
 ## Affected packages:
 
 This informative message is not related to any specific package.
