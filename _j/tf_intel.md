@@ -30,6 +30,7 @@ stated for the tensorflow dependency.
 ## Pipeline units
 
  * [IntelTensorFlowPseudonym](https://thoth-station.ninja/docs/developers/adviser/thoth.adviser.pseudonyms.html#thoth.adviser.pseudonyms.IntelTensorFlowPseudonym)
+ * [IntelTensorFlowCPUPseudonym](https://thoth-station.ninja/docs/developers/adviser/thoth.adviser.pseudonyms.html#thoth.adviser.pseudonyms.IntelTensorFlowCPUPseudonym)
 
 ## Recommendation types
 
