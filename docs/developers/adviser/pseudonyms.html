@@ -1,0 +1,232 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Pseudonym pipeline unit type &#8212; Thoth Adviser 0.18.0 documentation</title>
+    <link rel="stylesheet" href="/assets/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="/assets/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/jquery.js"></script>
+    <script type="text/javascript" src="/assets/underscore.js"></script>
+    <script type="text/javascript" src="/assets/doctools.js"></script>
+    <script type="text/javascript" src="/assets/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Sieve pipeline unit type" href="sieves.html" />
+    <link rel="prev" title="Boot pipeline unit type" href="boots.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="sieves.html" title="Sieve pipeline unit type"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="boots.html" title="Boot pipeline unit type"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.18.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="pseudonym-pipeline-unit-type">
+<span id="pseudonyms"></span><h1>Pseudonym pipeline unit type<a class="headerlink" href="#pseudonym-pipeline-unit-type" title="Permalink to this headline">¶</a></h1>
+<p>This pipeline unit was introduced to provide “pseudonym” functionality. This
+functionality is handy if you would like to create an alternative to the
+package in the software stack. This alternative can be considered on package
+name level or version level. Cross-index resolution (index level alternative)
+is guaranteed by the resolution logic.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Try to avoid creating alternatives if they do not produce valid alternatives
+or they result in too many new states. This has significant performance
+impact in the resolution process.</p>
+</div>
+<p>Each pseudonym is uniquely identified by <code class="docutils literal notranslate"><span class="pre">Pseudonym.PACKAGE_NAME</span></code> string that
+corresponds to the package name for which the pipeline unit should be called.
+This is an optimization to the resolution process.</p>
+<div class="section" id="main-usage">
+<h2>Main usage<a class="headerlink" href="#main-usage" title="Permalink to this headline">¶</a></h2>
+<ul>
+<li><p>Adding “aliases” to the software stack.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>An example could be <code class="docutils literal notranslate"><span class="pre">intel-tensorflow</span></code> package that provides the same
+functionality as <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code>, hence <code class="docutils literal notranslate"><span class="pre">intel-tensorflow</span></code> can be
+considered as a valid alternative to the resolution process.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Substituting versions that are not valid given the version range
+specification declared by dependencies.</p></li>
+</ul>
+</div>
+<div class="section" id="real-world-examples">
+<h2>Real world examples<a class="headerlink" href="#real-world-examples" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><ul class="simple">
+<li><p>Substitute all <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> packages in the software stack with their
+<code class="docutils literal notranslate"><span class="pre">intel-tensorflow</span></code> counterparts.</p></li>
+<li><p>Add TensorFlow in version 2.1.0 to the stack where TensorFlow in version
+2.2.0 would be resolved even though the application states
+TensorFlow==2.1.0 as a dependency - suitable for Dependency Monkey runs or
+performing “post-release” fixes in version range specifications.</p></li>
+</ul>
+</div></blockquote>
+</div>
+<div class="section" id="an-example-implementation">
+<h2>An example implementation<a class="headerlink" href="#an-example-implementation" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
+
+<span class="kn">from</span> <span class="nn">..pseudonym</span> <span class="kn">import</span> <span class="n">Pseudonym</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">..pipeline_builder</span> <span class="kn">import</span> <span class="n">PipelineBuilderContext</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TensorFlowPseudonym</span><span class="p">(</span><span class="n">Pseudonym</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A TensorFlow pseudonym.&quot;&quot;&quot;</span>
+
+    <span class="n">PACKAGE_NAME</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;tensorflow&quot;</span>
+
+    <span class="n">_pseudonyms</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Initialize this pipeline unit before each run.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">should_include</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Register self.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_adviser_pipeline</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_included</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{}</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Map TensorFlow packages to intel-tensorflow alternatives.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span> <span class="o">!=</span> <span class="s2">&quot;https://pypi.org/simple&quot;</span><span class="p">:</span>
+            <span class="c1"># Adjust only for PyPI index.</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Be lazy with queries to the database.</span>
+            <span class="n">runtime_environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_solved_python_package_versions_all</span><span class="p">(</span>
+                <span class="n">package_name</span><span class="o">=</span><span class="s2">&quot;intel-tensorflow&quot;</span><span class="p">,</span>
+                <span class="n">package_version</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">index_url</span><span class="o">=</span><span class="s2">&quot;https://pypi.org/simple&quot;</span><span class="p">,</span>
+                <span class="n">count</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">os_name</span><span class="o">=</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="n">os_version</span><span class="o">=</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                <span class="n">python_version</span><span class="o">=</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
+                <span class="n">distinct</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">is_missing</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)}</span>
+
+        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="s2">&quot;intel-tensorflow&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span> <span class="s2">&quot;https://pypi.org/simple&quot;</span>
+</pre></div>
+</div>
+<p>The implementation can also provide other methods, such as <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.post_run" title="thoth.adviser.unit.Unit.post_run"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.pre_run</span></code></a>, <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.post_run" title="thoth.adviser.unit.Unit.post_run"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.post_run</span></code></a> or <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.post_run" title="thoth.adviser.unit.Unit.post_run"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.post_run_report</span></code></a> and pipeline unit configuration adjustment.
+See <a class="reference internal" href="unit.html#unit"><span class="std std-ref">unit documentation</span></a> for more info.</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Pseudonym pipeline unit type</a><ul>
+<li><a class="reference internal" href="#main-usage">Main usage</a></li>
+<li><a class="reference internal" href="#real-world-examples">Real world examples</a></li>
+<li><a class="reference internal" href="#an-example-implementation">An example implementation</a></li>
+</ul>
+</li>
+</ul>
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation index</a><ul>
+      <li>Previous: <a href="boots.html" title="previous chapter">Boot pipeline unit type</a></li>
+      <li>Next: <a href="sieves.html" title="next chapter">Sieve pipeline unit type</a></li>
+  </ul></li>
+</ul>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="sources/pseudonyms.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
