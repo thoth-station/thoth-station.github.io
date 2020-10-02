@@ -187,11 +187,11 @@ increases verbosity of <code class="docutils literal notranslate"><span class="p
 you can setup logging only for a specific module inside a package by using for
 example:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">cd</span> adviser/
-<span class="gp">$</span> <span class="nv">THOTH_LOG_STORAGES_GRAPH_DGRAPH</span><span class="o">=</span>DEBUG <span class="nv">THOTH_LOG_ADVISER</span><span class="o">=</span>WARNING <span class="nv">PYTHONPATH</span><span class="o">=</span>../python pipenv run ./thoth-adviser provenance --requirements ./Pipfile --requirements-locked ./Pipfile.lock --files
+<span class="gp">$</span> <span class="nv">THOTH_LOG_STORAGES_GRAPH_POSTGRES</span><span class="o">=</span>DEBUG <span class="nv">THOTH_LOG_ADVISER</span><span class="o">=</span>WARNING <span class="nv">PYTHONPATH</span><span class="o">=</span>../python pipenv run ./thoth-adviser provenance --requirements ./Pipfile --requirements-locked ./Pipfile.lock --files
 </pre></div>
 </div>
-<p>By exporting <code class="docutils literal notranslate"><span class="pre">THOTH_LOG_STORAGES_GRAPH_DGRAPH</span></code> environment variable, you set
-debug log level for file <code class="docutils literal notranslate"><span class="pre">thoth/storages/graph/postgres.py</span></code> provided by
+<p>By exporting <code class="docutils literal notranslate"><span class="pre">THOTH_LOG_STORAGES_GRAPH_POSTGRES</span></code> environment variable, you
+set debug log level for file <code class="docutils literal notranslate"><span class="pre">thoth/storages/graph/postgres.py</span></code> provided by
 <code class="docutils literal notranslate"><span class="pre">thoth-storages</span></code> package. This way you can debug and inspect behavior only
 for certain parts of the application. If a module has underscore in its name,
 the environment variable has to have double underscores to explicitly escape it
@@ -216,9 +216,9 @@ we follow the pattern of <code class="docutils literal notranslate"><span class=
 Some of the older deployments were <cite>thoth-test-core</cite>, <cite>thoth-core-upshift-stage</cite>,</p>
 <blockquote>
 <div><p>and etc. These can be found in ceph bucket.</p>
+</div></blockquote>
 <p>__Disclaimer__: Older deployments would be deprecated and removed. Please check
 the existence of the deployment in ceph before using.</p>
-</div></blockquote>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">export</span> <span class="nv">THOTH_DEPLOYMENT_NAME</span><span class="o">=</span>ocp-stage
 </pre></div>
 </div>
@@ -249,19 +249,11 @@ where you would like to operate in:</p>
 picked from OpenShift’s/Kubernetes config). You should see a courtesy warning
 by <code class="docutils literal notranslate"><span class="pre">thoth-common</span></code> that you are running your application locally.</p>
 <p>To run an application from sources present in the local directory (for example
-with changes you have made), you can use the following command to upload
-sources to OpenShift and start a build:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> <span class="nb">cd</span> adviser/
-<span class="gp">$</span> oc start-build adviser --from-dir<span class="o">=</span>. -n &lt;namespace&gt;
-</pre></div>
-</div>
-<p>You will see (for example in the OpenShift console) that the build was
-triggered from sources.</p>
-<p>To see available builds (that match component name), issue the following once
-you are logged in and present in the right project:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$</span> oc get builds
-</pre></div>
-</div>
+with changes you have made), you can open a pull request and issue <code class="docutils literal notranslate"><span class="pre">/deploy</span></code>
+command as a comment to the pull request opened.</p>
+<blockquote>
+<div><p>$ oc get builds</p>
+</div></blockquote>
 <p>If you would like to test application with unreleased packages inside OpenShift
 cluster, you can do so by installing package from a Git repo and running the
 <code class="docutils literal notranslate"><span class="pre">oc</span> <span class="pre">build</span></code> command above:</p>
@@ -269,10 +261,10 @@ cluster, you can do so by installing package from a Git repo and running the
 <span class="gp">$</span> pipenv install <span class="s1">&#39;git+https://github.com/thoth-station/common.git@master#egg=thoth-common&#39;</span>
 </pre></div>
 </div>
-<p>After that, you can start build using <code class="docutils literal notranslate"><span class="pre">oc</span> <span class="pre">start-build</span> <span class="pre">&lt;build-name&gt;</span>
-<span class="pre">--from-dir=.</span> <span class="pre">-n</span> <span class="pre">&lt;namespace&gt;</span></code>. Note however that most of the Thoth’s
-buildconfigs use Thoth to recommend application stacks. As you are using a Git
-version, this recommendation will fail with an error similar to this one:</p>
+<p>After that, you can open a pull request with adjusted dependencies. Note the
+git dependencies <strong>must not</strong> be merged to the repository. Thoth will fail with
+recommendations if it spots a VCS dependency in the application (it’s a bad
+practice to use such deps in prod-like deployments):</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">thamos.swagger_client.rest.ApiException: (400)</span>
 <span class="go">Reason: BAD REQUEST</span>
 <span class="go">HTTP response headers: HTTPHeaderDict({&#39;Server&#39;: &#39;gunicorn/19.9.0&#39;, &#39;Date&#39;: &#39;Tue, 13 Aug 2019 06:28:21 GMT&#39;, &#39;Content-Type&#39;: &#39;application/json&#39;, &#39;Content-Length&#39;: &#39;45257&#39;, &#39;Set-Cookie&#39;: &#39;ae5b4faaab1fe6375d62dbc3b1efaf0d=3db7db180ab06210797424ca9ff3b586; path=/; HttpOnly&#39;})</span>
@@ -281,16 +273,11 @@ version, this recommendation will fail with an error similar to this one:</p>
 <span class="go">}</span>
 </pre></div>
 </div>
-<p>To bypass this error you need to temporary turn off these recommendations by
-setting <code class="docutils literal notranslate"><span class="pre">THOTH_ADVISE</span></code> to <code class="docutils literal notranslate"><span class="pre">0</span></code> in the corresponding buildconfig:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">oc edit bc &lt;build-name&gt; -n &lt;namespace&gt;</span>
-</pre></div>
-</div>
-<p>Please set the environment variable <code class="docutils literal notranslate"><span class="pre">THOTH_ADVISE</span></code> back to <code class="docutils literal notranslate"><span class="pre">1</span></code> after you
-test your changes.</p>
-<p>Also not that files <code class="docutils literal notranslate"><span class="pre">Pipfile</span></code> and <code class="docutils literal notranslate"><span class="pre">Pipfile.lock</span></code> get updated. Please, do
-NOT commit such changes into repositories (we always rely on versioned
-packages).</p>
+<p>To temporary bypass this error you need to temporary turn off these
+recommendations by setting <code class="docutils literal notranslate"><span class="pre">THOTH_ADVISE</span></code> to <code class="docutils literal notranslate"><span class="pre">0</span></code> in the corresponding
+buildconfig:</p>
+<p>__Disclaimer:__ Please, do <strong>NOT</strong> commit such changes into repositories. We
+always rely on versioned packages with proper release management.</p>
 </div>
 <div class="section" id="scheduling-workload-in-the-cluster">
 <h2>Scheduling workload in the cluster<a class="headerlink" href="#scheduling-workload-in-the-cluster" title="Permalink to this headline">¶</a></h2>
