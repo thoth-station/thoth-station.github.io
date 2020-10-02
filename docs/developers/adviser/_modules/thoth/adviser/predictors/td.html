@@ -1,0 +1,218 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.adviser.predictors.td &#8212; Thoth Adviser 0.18.0 documentation</title>
+    <link rel="stylesheet" href="..//assets/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="..//assets/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="..//assets/documentation_options.js"></script>
+    <script type="text/javascript" src="..//assets/jquery.js"></script>
+    <script type="text/javascript" src="..//assets/underscore.js"></script>
+    <script type="text/javascript" src="..//assets/doctools.js"></script>
+    <script type="text/javascript" src="..//assets/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Adviser 0.18.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.adviser.predictors.td</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-adviser</span>
+<span class="c1"># Copyright(C) 2020 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Implementation of Temporal Difference (TD) based predictor with adaptive simulated annealing schedule.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">math</span>
+<span class="kn">import</span> <span class="nn">operator</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">random</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+
+<span class="kn">from</span> <span class="nn">.annealing</span> <span class="kn">import</span> <span class="n">AdaptiveSimulatedAnnealing</span>
+<span class="kn">from</span> <span class="nn">..state</span> <span class="kn">import</span> <span class="n">State</span>
+
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="c1"># 0 means unlimited memory for policy learning.</span>
+<span class="n">_TD_POLICY_SIZE</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_TD_POLICY_SIZE&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+<span class="c1"># How often the policy should be checked for shrinking.</span>
+<span class="n">_TD_POLICY_SIZE_CHECK_ITERATION</span> <span class="o">=</span> <span class="mi">1024</span>
+
+
+<div class="viewcode-block" id="TemporalDifference"><a class="viewcode-back" href="../../../../thoth.adviser.predictors.html#thoth.adviser.predictors.td.TemporalDifference">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">TemporalDifference</span><span class="p">(</span><span class="n">AdaptiveSimulatedAnnealing</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Implementation of Temporal Difference (TD) based predictor with adaptive simulated annealing schedule.&quot;&quot;&quot;</span>
+
+    <span class="n">_policy</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TemporalDifference.pre_run"><a class="viewcode-back" href="../../../../thoth.adviser.predictors.html#thoth.adviser.predictors.td.TemporalDifference.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Initialize pre-running of this predictor.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">pre_run</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_policy</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">limit</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="TemporalDifference.set_reward_signal"><a class="viewcode-back" href="../../../../thoth.adviser.predictors.html#thoth.adviser.predictors.td.TemporalDifference.set_reward_signal">[docs]</a>    <span class="k">def</span> <span class="nf">set_reward_signal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">,</span> <span class="n">_</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">reward</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Note down reward signal of the last action performed.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">reward</span><span class="p">)</span> <span class="ow">or</span> <span class="n">math</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">reward</span><span class="p">):</span>
+            <span class="c1"># Do not take into account final states or states not leading to correct resolution.</span>
+            <span class="k">return</span>
+
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">iter_resolved_dependencies</span><span class="p">():</span>
+            <span class="n">record</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_policy</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">,</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+            <span class="n">record</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="n">reward</span>
+            <span class="n">record</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="c1"># We limit number of records stored from time to time. Using sorting in O(N*log(N)) from</span>
+        <span class="c1"># time to time appears to be much faster than keeping a min-heap queue with O(log(N)) overhead.</span>
+        <span class="k">if</span> <span class="n">_TD_POLICY_SIZE</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">%</span> <span class="n">_TD_POLICY_SIZE_CHECK_ITERATION</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Shrinking learnt policy to </span><span class="si">%d</span><span class="s2"> entries&quot;</span><span class="p">,</span> <span class="n">_TD_POLICY_SIZE</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_policy</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+                <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_policy</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)[:</span><span class="n">_TD_POLICY_SIZE</span><span class="p">]</span>
+            <span class="p">)</span></div>
+
+<div class="viewcode-block" id="TemporalDifference.run"><a class="viewcode-back" href="../../../../thoth.adviser.predictors.html#thoth.adviser.predictors.td.TemporalDifference.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">State</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Run Temporal Difference (TD) with adaptive simulated annealing schedule.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_temperature_function</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">)</span>
+
+        <span class="c1"># Expand highest promising by default.</span>
+        <span class="n">max_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+
+        <span class="c1"># Pick a random state to be expanded if accepted.</span>
+        <span class="n">probable_state_idx</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randrange</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">size</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="mi">0</span>
+        <span class="n">probable_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">probable_state_idx</span><span class="p">)</span>
+        <span class="n">acceptance_probability</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_acceptance_probability</span><span class="p">(</span>
+            <span class="n">max_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="n">probable_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">acceptance_probability</span> <span class="o">&gt;=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">():</span>
+            <span class="c1"># Perform exploration.</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">probable_state</span>
+            <span class="n">unresolved_dependency_tuple</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">get_random_unresolved_dependency</span><span class="p">(</span><span class="n">prefer_recent</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">max_state</span>
+            <span class="n">unresolved_dependency_tuple</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_exploitation</span><span class="p">(</span><span class="n">max_state</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">keep_history</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_temperature_history</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_temperature</span><span class="p">,</span>
+                    <span class="n">state</span> <span class="ow">is</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">max</span><span class="p">(),</span>
+                    <span class="n">acceptance_probability</span><span class="p">,</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">state</span><span class="p">,</span> <span class="n">unresolved_dependency_tuple</span></div>
+
+    <span class="k">def</span> <span class="nf">_do_exploitation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Perform expansion of a highest rated stack with action that should yield highest reward.&quot;&quot;&quot;</span>
+        <span class="n">to_resolve_average</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">to_resolve_package_tuple</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">package_tuple</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">iter_unresolved_dependencies</span><span class="p">():</span>
+            <span class="n">reward_records</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_policy</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">reward_records</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Compute average - we want to be skewed based on the reward signal</span>
+            <span class="c1"># we aggregate (so for example median of medians is not that suitable).</span>
+            <span class="n">average</span> <span class="o">=</span> <span class="n">reward_records</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">/</span> <span class="n">reward_records</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">to_resolve_average</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">to_resolve_average</span> <span class="o">&lt;</span> <span class="n">average</span><span class="p">:</span>
+                <span class="n">to_resolve_average</span> <span class="o">=</span> <span class="n">average</span>
+                <span class="n">to_resolve_package_tuple</span> <span class="o">=</span> <span class="n">package_tuple</span>
+
+        <span class="c1"># Make sure we found a candidate based on rewards marked. If not, pick a random one.</span>
+        <span class="k">return</span> <span class="n">to_resolve_package_tuple</span> <span class="ow">or</span> <span class="n">state</span><span class="o">.</span><span class="n">get_random_unresolved_dependency</span><span class="p">(</span><span class="n">prefer_recent</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation index</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
