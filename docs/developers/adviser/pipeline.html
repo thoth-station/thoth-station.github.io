@@ -159,27 +159,31 @@ filter out packages that should not be considered during resolver run. See
 <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieve pipeline unit documentation for more information</span></a>.</p>
 <p>Once sieves filter out packages in unwanted versions, resolver creates initial
 states that are formed out of all the combinations of packages in different
-versions that can occur in a software stack. As packages in different versions
-are sorted based on their version string semantics, the very first combination
-has always the latest versions of all the packages (this fact is used for
-example in hill climbing in the <a class="reference internal" href="predictors/annealing.html#annealing"><span class="std std-ref">adaptive simulated annealing approach</span></a>).  For each newly created initial state, there are run
-<a class="reference internal" href="steps.html#steps"><span class="std std-ref">pipeline steps</span></a> that decide whether inclusion of a package
-version is valid to a state - this is done for each and every package-version
-combination.</p>
-<p>If a state is accepted, it is added to the resolver beam as a state to be
-considered during resolver run, respecting beam width parameter.</p>
+versions that can occur in a software stack considering also pseydonyms
+computed. As packages in different versions are sorted based on their version
+string semantics, the very first combination has always the latest versions of
+all the packages (this fact is used for example in hill climbing in the
+<a class="reference internal" href="predictors/annealing.html#annealing"><span class="std std-ref">adaptive simulated annealing approach</span></a>).  For each newly
+created initial state, there are run <a class="reference internal" href="steps.html#steps"><span class="std std-ref">pipeline steps</span></a> that decide
+whether inclusion of a package version is valid to a state - this is done for
+each and every package-version combination.</p>
+<p>If all the steps on a state accept the given package, a newly created state
+(this <cite>corresponds to taking an action from a state to a new state in a Markov
+Decision Process &lt;introduction_rl&gt;</cite>) is added to the resolver beam as a state
+to be considered during resolver run, respecting <a class="reference internal" href="deployment.html#beam-width"><span class="std std-ref">beam width parameter</span></a>.</p>
 <p>The resolver than picks a state  stored in the beam based on
 <a class="reference internal" href="predictor.html#predictor"><span class="std std-ref">predictor’s decision</span></a> and resolves not yet resolved
 dependencies in the state. The resolution of a dependency makes a dependency
 resolved and all its dependencies, if any, unresolved. Resolver, again,
-runs all the sieves on newly introduced dependencies into the state and
-pipeline steps to verify and score the given resolver step.</p>
+runs all the sieves and pseudonyms on the newly introduced dependencies into
+the state and pipeline steps to verify and score the given resolver step.</p>
 <p>A state is considered as a final if there are no more unresolved dependencies.
 Such state is then passed to all <a class="reference internal" href="strides.html#strides"><span class="std std-ref">pipeline strides</span></a> that decide
 whether the final state should become a pipeline product or not. Once it is
 accepted all pipeline units of type <a class="reference internal" href="wraps.html#wraps"><span class="std std-ref">wrap</span></a> are called to wrap up
-resolution of the state. After all, state is converted into a pipeline product
-and yielded, possibly becoming part of a pipeline report, if requested so.</p>
+the resolution of the final state. After all, state is converted into a
+pipeline product and yielded, possibly becoming part of a pipeline report, if
+requested so.</p>
 </div>
 <div class="section" id="context-and-beam">
 <h2>Context and Beam<a class="headerlink" href="#context-and-beam" title="Permalink to this headline">¶</a></h2>
@@ -192,19 +196,16 @@ pipeline unit or predictor for Thoth’s adviser:</p>
 </ul>
 <p>Beam is an abstract data type maintained by resolver that keeps track of pool
 of states that are about to be (possibly) resolved. This pool can have
-restricted width which limits number of states kept in memory and limits number
-of states considered during resolution.</p>
-<p>It’s possible to request a history plot for beam size and the highest rated
+<a class="reference internal" href="deployment.html#beam-width"><span class="std std-ref">restricted width</span></a> which limits number of states kept in
+memory and limits number of states considered during resolution.</p>
+<p>It’s possible to request a history plot for the beam size and the highest rated
 stack score for introspection purposes using the <code class="docutils literal notranslate"><span class="pre">--plot</span></code> option or by
 calling <a class="reference internal" href="thoth.adviser.html#thoth.adviser.beam.Beam.plot" title="thoth.adviser.beam.Beam.plot"><code class="xref py py-func docutils literal notranslate"><span class="pre">Beam.plot</span></code></a>. The figure below
 shows beam history during resolution of 1000 TensorFlow software stacks by
 sampling the state space using <a class="reference internal" href="predictors/annealing.html#annealing"><span class="std std-ref">adaptive simulated annealing</span></a>.
 CVE penalization was the only <a class="reference internal" href="steps.html#steps"><span class="std std-ref">pipeline step</span></a> used during
-resolution, resolver did approximately 2500 resolution rounds to score 1000
-software stacks (<code class="docutils literal notranslate"><span class="pre">limit</span></code> parameter to adviser). It took approx. one and half
-minute to produce these 1000 stacks on a local machine, considering just 5 most
-recent libraries in a stack formed out of <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> and <code class="docutils literal notranslate"><span class="pre">flask</span></code>
-packages.</p>
+the resolution process, resolver did approximately 2500 resolution rounds to
+score 1000 software stacks (<code class="docutils literal notranslate"><span class="pre">limit</span></code> parameter to adviser).</p>
 <a class="reference external image-reference" href="/assets/beam_history_plot.png"><img alt="Plotted history of beam size during TensorFlow stacks resolution." src="images/beam_history_plot.png" /></a>
 <p>As can be seen, the beam limited number of states taken into consideration
 until approx. 1800th round. After this round, the temperature in the
@@ -219,29 +220,31 @@ of non-final states).</p>
 small restricts the state space too much which can cause that no software
 stack is resolved. Too big beam can lead to a very large state space to be
 explored and consumption of too much CPU time (and actual time) to produce
-software stacks.</p>
+software stacks. See <a class="reference internal" href="deployment.html#beam-width"><span class="std std-ref">the section discussion beam width</span></a>.</p>
 </div>
 </div>
 <div class="section" id="pipeline-configuration-creation">
 <h2>Pipeline configuration creation<a class="headerlink" href="#pipeline-configuration-creation" title="Permalink to this headline">¶</a></h2>
 <p>Each pipeline unit provides a class method called <cite>should_include</cite> which is
-executed on the <a class="reference internal" href="thoth.adviser.html#thoth.adviser.pipeline_config.PipelineConfig" title="thoth.adviser.pipeline_config.PipelineConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">pipeline</span> <span class="pre">configuration</span> <span class="pre">creation</span></code></a> (that states a list of boots, sieves,
-steps, strides and wraps to be included in the pipeline). The class method returns a
-dictionary stating unit configuration if the given unit should be used (an
-empty dictionary if no configuration changes to the default unit configuration are done), a
-special value of <cite>None</cite> indicates the given pipeline unit should not be added
-to the pipeline configuration.</p>
+executed on the <a class="reference internal" href="thoth.adviser.html#thoth.adviser.pipeline_config.PipelineConfig" title="thoth.adviser.pipeline_config.PipelineConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">pipeline</span> <span class="pre">configuration</span> <span class="pre">creation</span></code></a> (that states a list of boots,
+pseudonyms, sieves, steps, strides and wraps to be included in the pipeline).
+The class method returns a dictionary stating unit configuration if the given
+unit should be used (an empty dictionary if no configuration changes to the
+default unit configuration are done), a special value of <cite>None</cite> indicates the
+given pipeline unit should not be added to the pipeline configuration.</p>
+<a class="reference external image-reference" href="/assets/pipeline_builder.gif"><img alt="Pipeline builder building the pipeline configuration." src="images/pipeline_builder.gif" /></a>
 <p>The <cite>should_include</cite> unit class method is in fact called multiple times during
-pipeline configuration construction. The pipeline builder iterates over all
-pipeline units and asks if they should be included in the pipeline
-configuration until no change to the pipeline configuration is made. This way
-pipeline can be constructed autonomously where a developer of a pipeline unit
-just programatically states when the given pipeline unit should be included in
-the pipeline configuration (stating dependencies on other pipeline units or
-conditionally add pipeline unit under specific circumferences). An example can
-be a pipeline unit which includes scoring based on performance indicators done
-on <a class="reference external" href="https://www.tensorflow.org/api_docs/python/tf/nn/conv2d">conv2d</a> used in
-a TensorFlow application:</p>
+the pipeline configuration construction. The pipeline builder iterates over all
+the pipeline units available in adviser implementation and asks if they
+should be included in the pipeline configuration until no change to the
+pipeline configuration is made. This way pipeline can be constructed
+autonomously where a developer of a pipeline unit just programatically states
+when the given pipeline unit should be included in the pipeline configuration
+(stating dependencies on other pipeline units or conditionally add pipeline
+unit under specific circumferences and runtime environment configuration). An
+example can be a pipeline unit which includes scoring based on performance
+indicators done on <a class="reference external" href="https://www.tensorflow.org/api_docs/python/tf/nn/conv2d">conv2d</a> used in a
+TensorFlow application:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># snip ...</span>
 
 <span class="nd">@classmethod</span>
@@ -269,7 +272,14 @@ a TensorFlow application:</p>
 type - for example the very first sieve added is run first, then a second one
 and so on respecting the relative order of sieves in the pipeline configuration
 (the order in which they were included). This logic applies to all pipeline
-unit types - <a class="reference internal" href="boots.html#boots"><span class="std std-ref">boots</span></a>, <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieves</span></a>, <a class="reference internal" href="steps.html#steps"><span class="std std-ref">steps</span></a>, <a class="reference internal" href="strides.html#strides"><span class="std std-ref">strides</span></a> and <a class="reference internal" href="wraps.html#wraps"><span class="std std-ref">wraps</span></a>.</p>
+unit types - <a class="reference internal" href="boots.html#boots"><span class="std std-ref">boots</span></a>, <a class="reference internal" href="pseudonyms.html#pseudonyms"><span class="std std-ref">pseudonymns</span></a>,
+<a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieves</span></a>, <a class="reference internal" href="steps.html#steps"><span class="std std-ref">steps</span></a>, <a class="reference internal" href="strides.html#strides"><span class="std std-ref">strides</span></a> and
+<a class="reference internal" href="wraps.html#wraps"><span class="std std-ref">wraps</span></a>.</p>
+<p>Moreover, pipeline units of type <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieves</span></a> and <a class="reference internal" href="steps.html#steps"><span class="std std-ref">steps</span></a> can be specific to a package. This was introduced as an optimization
+to group these pipeline units based on packages they operate on not to call
+them ineffectively on packages that are not relevant in the resolution process.
+Note pipeline units can be called thousand times during the resolution process
+so this optimization matters a lot.</p>
 <p>See implementation of <a class="reference internal" href="thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext" title="thoth.adviser.pipeline_builder.PipelineBuilderContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">PipelineBuilderContext</span></code></a> for more info on
 provided methods that can be used during pipeline configuration creation.</p>
 <p>Note the resolution algorithm with pipeline units is shared for computing
@@ -282,7 +292,8 @@ pipeline configuration is used in Dependency Monkey runs.</p>
 <h2>Instrumentation of resolver’s pipeline units<a class="headerlink" href="#instrumentation-of-resolver-s-pipeline-units" title="Permalink to this headline">¶</a></h2>
 <p>Besides letting pipeline units to autonomously register into the pipeline
 configuration, the pipeline configuration can be supplied also explicitly. This
-is useful for instrumenting resolver during <a class="reference internal" href="dependency_monkey.html#dependency-monkey"><span class="std std-ref">Dependency Monkey</span></a> runs. In that case, the <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.should_include" title="thoth.adviser.unit.Unit.should_include"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.should_include</span></code></a> method is never called and the
+is useful for instrumenting resolver during <a class="reference internal" href="dependency_monkey.html#dependency-monkey"><span class="std std-ref">Dependency Monkey</span></a> runs or when experimenting/debugging the resolution
+pipeline. In that case, the <a class="reference internal" href="thoth.adviser.html#thoth.adviser.unit.Unit.should_include" title="thoth.adviser.unit.Unit.should_include"><code class="xref py py-func docutils literal notranslate"><span class="pre">Unit.should_include</span></code></a> method is never called and the
 configuration of the pipeline is explicitly encoded in a JSON format:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
   <span class="nt">&quot;pipeline&quot;</span><span class="p">:</span> <span class="p">{</span>
@@ -319,10 +330,10 @@ configuration of the pipeline is explicitly encoded in a JSON format:</p>
 </div>
 <p>Each unit is referenced by its class name and is included from the
 thoth-adviser’s implementation (modules <a class="reference internal" href="thoth.adviser.boots.html#module-thoth.adviser.boots" title="thoth.adviser.boots"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.boots</span></code></a>,
-<a class="reference internal" href="thoth.adviser.sieves.html#module-thoth.adviser.sieves" title="thoth.adviser.sieves"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.sieves</span></code></a>, <a class="reference internal" href="thoth.adviser.steps.html#module-thoth.adviser.steps" title="thoth.adviser.steps"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.steps</span></code></a>,
-<a class="reference internal" href="thoth.adviser.strides.html#module-thoth.adviser.strides" title="thoth.adviser.strides"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.strides</span></code></a> and <a class="reference internal" href="thoth.adviser.wraps.html#module-thoth.adviser.wraps" title="thoth.adviser.wraps"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.wraps</span></code></a>). The
-configuration is used to adjust unit’s configuration - see <a class="reference internal" href="unit.html#unit"><span class="std std-ref">unit
-documentation section for more info</span></a>.</p>
+<a class="reference internal" href="thoth.adviser.pseudonyms.html#module-thoth.adviser.pseudonyms" title="thoth.adviser.pseudonyms"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.pseudonyms</span></code></a>, <a class="reference internal" href="thoth.adviser.sieves.html#module-thoth.adviser.sieves" title="thoth.adviser.sieves"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.sieves</span></code></a>,
+<a class="reference internal" href="thoth.adviser.steps.html#module-thoth.adviser.steps" title="thoth.adviser.steps"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.steps</span></code></a>, <a class="reference internal" href="thoth.adviser.strides.html#module-thoth.adviser.strides" title="thoth.adviser.strides"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.strides</span></code></a> and
+<a class="reference internal" href="thoth.adviser.wraps.html#module-thoth.adviser.wraps" title="thoth.adviser.wraps"><code class="xref py py-mod docutils literal notranslate"><span class="pre">thoth.adviser.wraps</span></code></a>). The configuration is used to adjust unit’s
+configuration - see <a class="reference internal" href="unit.html#unit"><span class="std std-ref">unit documentation section for more info</span></a>.</p>
 <p>This configuration can be supplied to adviser as well as to Dependency Monkey
 via CLI or in the resolver constructor when resolver is created
 programmatically.</p>
