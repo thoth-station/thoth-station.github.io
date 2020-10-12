@@ -8,13 +8,18 @@ allocated resources were exceeded during the resolution process.
 
 ## Issue description
 
-The error can occur in two main cases:
+The error can occur in three main cases:
 
  * The software stack is too large to be resolved given the server side adviser
    configuration.
 
  * There are no valid resolutions for the given software stack and adviser
    failed to explore all the states generated to justify this fact.
+
+ * Not all the transitive dependencies were solved yet and resolver fails to
+   find a valid resolution path. This happens for large software stacks for
+   which the resolution process cannot justify this in the allocated time as
+   the state space of all the software stacks to explore is too large.
 
 ## Severity
 
@@ -23,6 +28,9 @@ The error can occur in two main cases:
 ## Issue fix
 
 Use a smaller software stack or [adjust adviser configuration in deployment][1].
+
+If not all the transitive dependencies are solved yet, the system will try to
+solve dependencies over time. Recommendations will be accessible after that.
 
 ## Recommendation types
 
