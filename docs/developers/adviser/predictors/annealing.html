@@ -58,58 +58,8 @@
             
   <div class="section" id="adaptive-simulated-annealing">
 <span id="annealing"></span><h1>Adaptive simulated annealing<a class="headerlink" href="#adaptive-simulated-annealing" title="Permalink to this headline">¶</a></h1>
-<p>A very first implementation of Adviser and Dependency Monkey was designed to
-load the whole dependency graph into memory and subsequently perform operations
-on the weighted dependency graph. This way the dependency graph was adjusted
-based on scores on edges and by traversing the dependency graph, there were
-produced software stacks. Over time we abandoned this approach as it did not
-scale with size of software stacks (e.g. a TensorFlow Python stack  required
-circa 2.5k queries to the database just for dependency graph retrieval) and
-<a class="reference external" href="https://stackoverflow.blog/2017/09/06/incredible-growth-python//">given the trend in Python ecosystem</a> this
-solution would also not be scalable.</p>
-<p>The new implementation uses a stochastic approach based on <a class="reference internal" href="../thoth.adviser.predictors.html#thoth.adviser.predictors.AdaptiveSimulatedAnnealing" title="thoth.adviser.predictors.AdaptiveSimulatedAnnealing"><code class="xref py py-class docutils literal notranslate"><span class="pre">Adaptive</span>
-<span class="pre">simulated</span> <span class="pre">annealing</span></code></a> (see
-<a class="reference external" href="https://en.wikipedia.org/wiki/Adaptive_simulated_annealing">Wikipedia for a brief info</a> and also
-<a class="reference external" href="https://en.wikipedia.org/wiki/Simulated_annealing">simulated annealing</a>).
-Software stacks are lazily expanded from initial states. The initial states are
-formed out of combinations computed on all the resolved direct dependencies. As
-an example, we can create a software stack that requests two packages to be
-installed - <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> and <code class="docutils literal notranslate"><span class="pre">flask</span></code> - with specific version ranges:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tensorflow&gt;=1.14,0</span>
-<span class="go">flask&gt;=1.0.0&lt;=1.1.0</span>
-</pre></div>
-</div>
-<p>Thoth in this case performs offline resolution (based on pre-computed data in
-the database which state how dependencies are structured) of direct
-dependencies and finds matching releases given version range specification - an
-illustrative example:</p>
-<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tensorflow==2.0.0</span>
-<span class="go">tensorflow==1.14.0</span>
-<span class="go">tensorflow==1.15.0</span>
-<span class="go">flask==1.1.0</span>
-<span class="go">flask==1.0.0</span>
-</pre></div>
-</div>
-<p>These releases are kept in buckets of a same package type (<code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> and
-<code class="docutils literal notranslate"><span class="pre">flask</span></code>) and sorted based on versions. All the possible combinations of these
-direct dependencies create initial states (as described above) - in this case
-we have 3*2=6 combinations in total:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">product</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">pprint</span> <span class="kn">import</span> <span class="n">pprint</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">pprint</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">product</span><span class="p">([</span><span class="s2">&quot;tensorflow==2.0.0&quot;</span><span class="p">,</span> <span class="s2">&quot;tensorflow==1.15.0&quot;</span><span class="p">,</span> <span class="s2">&quot;tensorflow==1.15.0&quot;</span><span class="p">],</span> <span class="p">[</span><span class="s2">&quot;flask==1.1.0&quot;</span><span class="p">,</span> <span class="s2">&quot;flask==1.0.0&quot;</span><span class="p">])))</span>
-<span class="go">[(&#39;tensorflow==2.0.0&#39;, &#39;flask==1.1.0&#39;),</span>
-<span class="go"> (&#39;tensorflow==2.0.0&#39;, &#39;flask==1.0.0&#39;),</span>
-<span class="go"> (&#39;tensorflow==1.15.0&#39;, &#39;flask==1.1.0&#39;),</span>
-<span class="go"> (&#39;tensorflow==1.15.0&#39;, &#39;flask==1.0.0&#39;),</span>
-<span class="go"> (&#39;tensorflow==1.14.0&#39;, &#39;flask==1.1.0&#39;),</span>
-<span class="go"> (&#39;tensorflow==1.14.0&#39;, &#39;flask==1.0.0&#39;)]</span>
-</pre></div>
-</div>
-<p>Each and every combination creates an initial state - see <a class="reference internal" href="../thoth.adviser.html#thoth.adviser.state.State" title="thoth.adviser.state.State"><code class="xref py py-class docutils literal notranslate"><span class="pre">State</span></code></a> abstraction in sources for representation of a
-single state which is about to be expanded resolved.</p>
-<p>States are added to a <a class="reference external" href="https://en.wikipedia.org/wiki/Beam_search">beam</a> which
-is designed to limit search space given the memory resources available (keep
-only <code class="docutils literal notranslate"><span class="pre">beam.width</span></code> most promising states to be expanded/resolved).</p>
+<p>See <a class="reference external" href="https://en.wikipedia.org/wiki/Adaptive_simulated_annealing">Wikipedia</a> and also
+<a class="reference external" href="https://en.wikipedia.org/wiki/Simulated_annealing">simulated annealing</a> for basics.</p>
 <p>The adaptive simulated annealing part of adviser’s resolution algorithm takes
 either a top rated state for expansion or, based on probability, picks some
 another state from the beam. This state is expanded by picking one dependency
@@ -124,25 +74,48 @@ neighbour state (and not the highest rated stack) from beam is computed based
 on, besides other parameters, the temperature function which respects number of
 iterations and number of final states produced so far (thus “adaptive”
 simulated annealing).</p>
-<p>The section described above is a brief summary of <a class="reference internal" href="../resolver.html#resolver"><span class="std std-ref">resolver implementation</span></a>. The annealing implementation can also perform hill-climbing. As
-the order in which states are added to the beam is preserved, the first state
-added is also first pop-ed. This simulates <a class="reference internal" href="../thoth.adviser.html#thoth.adviser.enums.RecommendationType" title="thoth.adviser.enums.RecommendationType"><code class="xref py py-attr docutils literal notranslate"><span class="pre">LATEST</span></code></a> resolution - expanding always the
-first state added to the beam.</p>
 <p>An example of an adaptive simulated annealing run that produced 1000 Python
 stacks (final states) with no observations on scored packages and states can be
 seen on the following figure. As the database for scoring states is empty
 (Python stacks were just resolved without any guidance), the probability of
-picking a random state from the beam is very high (the algorithm is looking for
-a state which would be better than a score of 0.0). This acceptance probability
-is kept even the temperature dropped.</p>
-<a class="reference external image-reference" href="/assets/history_no_data.png"><img alt="Resolving software stacks with simulated annealing with no data available." src="..//assets/history_no_data.png" /></a>
-<p>On the figure below, there was randomized scoring of top rated states for
-demonstration purposes. As can be seen, the acceptance probability for picking
-a neighbour state for expansion is decreasing with number of final states
-produced and with decreasing temperature during iterations. This caused picking
-the highest rated states for expansion and producing final states out of them
-(fully resolved Python software stacks).</p>
-<a class="reference external image-reference" href="/assets/history_random_data.png"><img alt="Resolving software stacks with simulated annealing with random data." src="..//assets/history_random_data.png" /></a>
+picking a random state from the beam is high (the algorithm is looking for
+a state which would be better than a score of 0.0 in comparision to a neighbour
+candidate with a score of 0.0). This acceptance probability is kept even as the
+temperature dropps.</p>
+<a class="reference external image-reference" href="/assets/asa_no_data.png"><img alt="Resolving software stacks with simulated annealing with no data available." src="..//assets/asa_no_data.png" /></a>
+<p>On the figure below, there was created a random dataset for scoring packages in
+the resolution process for demonstration purposes. As can be seen, the
+acceptance probability for picking a neighbour state for expansion is
+decreasing with number of final states produced and with decreasing temperature
+during iterations. This caused picking the highest rated states for expansion
+and producing final states out of them (fully resolved Python software stacks).
+Once temperature drops to 0.0, only highest rated software stack is picked for
+resolution as acceptance probability for the neighbour state dropped to 0.0 as
+well.</p>
+<a class="reference external image-reference" href="/assets/asa_data.png"><img alt="Resolving software stacks with simulated annealing with randomized data." src="..//assets/asa_data.png" /></a>
+<div class="section" id="temperature-coefficient">
+<h2>Temperature coefficient<a class="headerlink" href="#temperature-coefficient" title="Permalink to this headline">¶</a></h2>
+<p>Predictor based on adaptive simulated annealing (and all the derived ones),
+accepts a parameter called <code class="docutils literal notranslate"><span class="pre">temperature_coefficient</span></code>. This parameter is used
+to specify how steep the temperature decrease should be. For reinforcement
+learning based predictors (see <a class="reference internal" href="mcts.html#mcts"><span class="std std-ref">Monte Carlo Tree Search (MCTS)</span></a> and
+<a class="reference internal" href="temporal_difference_learning.html#temporal-difference-learning"><span class="std std-ref">Temporal Difference learning</span></a>) this parameter balances exploration and
+exploitation phases. A usual values for this parameter are
+<code class="docutils literal notranslate"><span class="pre">0.9&lt;=temperature_coefficient&lt;1.0</span></code>.</p>
+<p>The figure below shows a simulated annealing run when
+<code class="docutils literal notranslate"><span class="pre">temperature_coefficient</span></code> is set to <code class="docutils literal notranslate"><span class="pre">0.9</span></code>.</p>
+<a class="reference external image-reference" href="/assets/asa_tc_09.png"><img alt="Resolving software stacks with simulated annealing with randomized data and temperature coefficient set to 0.9." src="..//assets/asa_tc_09.png" /></a>
+<p>In comparision to figure above, the figure below shows another simulated
+annealing run when <code class="docutils literal notranslate"><span class="pre">temperature_coefficient</span></code> is set to <code class="docutils literal notranslate"><span class="pre">0.98</span></code>.</p>
+<a class="reference external image-reference" href="/assets/asa_tc_098.png"><img alt="Resolving software stacks with simulated annealing with randomized data and temperature coefficient set to 0.98." src="..//assets/asa_tc_098.png" /></a>
+<p>Even thught in both cases there were used same input data and same seed for
+random generator, results differ as steps taken by resolver differ across
+iterations.</p>
+<p>It’s worth to adjust this parameter in deployment based on time allocated for
+adviser runs. The right value should make sure adviser is able to sample the
+state space and perform exploitation of highest states found. See
+<a class="reference internal" href="../deployment.html#deployment"><span class="std std-ref">Configuring and setting up adviser in a cluster</span></a> section for more info.</p>
+</div>
 </div>
 
 
@@ -150,7 +123,15 @@ the highest rated states for expansion and producing final states out of them
         </div>
       </div>
       <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Adaptive simulated annealing</a><ul>
+<li><a class="reference internal" href="#temperature-coefficient">Temperature coefficient</a></li>
+</ul>
+</li>
+</ul>
+<h3>Related Topics</h3>
 <ul>
   <li><a href="../index.html">Documentation index</a><ul>
       <li>Previous: <a href="hill_climbing.html" title="previous chapter">Hill climbing</a></li>
