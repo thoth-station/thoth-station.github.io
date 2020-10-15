@@ -15,14 +15,14 @@ successful if at least one software stack is produced (otherwise [no stack
 produced][no_stack] error is printed).
 
 This warning might also indicate that there is no valid resolution for the
-requirements supplied. In such cases, "[no was stack produced][no_stack]" error
+requirements supplied. In such cases, "[no stack was produced][no_stack]" error
 message should be printed. See the [linked justification for a
 resolution][no_stack].
 
 As number of states kept during the resolution process is configurable,
 consider adjusting [beam and it's width][beam] if the resolution process should
 take into account more states. This configuration option is not available to
-users but is conifgured by the service operator.
+users but is configured by the service operator.
 
 ## Affected packages:
 
