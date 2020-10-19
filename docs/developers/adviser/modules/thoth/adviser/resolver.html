@@ -308,7 +308,11 @@
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">boot</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
             <span class="k">except</span> <span class="n">NotAcceptable</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Boot pipeline unit </span><span class="si">{</span><span class="n">boot</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Boot pipeline unit </span><span class="si">{</span><span class="n">boot</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">msg</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,}</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">stack_info</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="n">BootError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to run pipeline boot </span><span class="si">{</span><span class="n">boot</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
 
@@ -715,7 +719,11 @@
         <span class="n">direct_dependencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_direct_dependencies</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">direct_dependencies</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span><span class="s2">&quot;No direct dependencies found&quot;</span><span class="p">)</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;No direct dependencies found&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">msg</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span> <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;no_direct&quot;</span><span class="p">),}</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">stack_info</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="p">)</span>
 
         <span class="n">skipped_packages</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">direct_dependency_name</span><span class="p">,</span> <span class="n">package_versions</span> <span class="ow">in</span> <span class="n">direct_dependencies</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -732,10 +740,14 @@
                 <span class="k">continue</span>
 
             <span class="k">if</span> <span class="ow">not</span> <span class="n">package_versions</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Cannot satisfy direct dependencies - direct dependencies &quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;of type </span><span class="si">{</span><span class="n">direct_dependency_name</span><span class="si">!r}</span><span class="s2"> were removed by pipeline sieves&quot;</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Cannot satisfy direct dependencies - direct dependencies of type </span><span class="si">{</span><span class="n">direct_dependency_name</span><span class="si">!r}</span><span class="s2"> &quot;</span>
+                    <span class="s2">&quot;were removed by pipeline sieves&quot;</span>
                 <span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span> <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">msg</span><span class="p">,}</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">stack_info</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span><span class="p">:</span>
                 <span class="n">direct_dependencies</span><span class="p">[</span><span class="n">direct_dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_versions</span><span class="p">[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit_latest_versions</span><span class="p">]</span>
@@ -1273,10 +1285,15 @@
                 <span class="n">report</span><span class="o">.</span><span class="n">add_product</span><span class="p">(</span><span class="n">product</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">product_count</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Resolver did not find any stack that would satisfy &quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;requirements and stack characteristics given the time allocated - see </span><span class="si">{</span><span class="n">jl</span><span class="p">(</span><span class="s1">&#39;no_stack&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Resolver did not find any stack that would satisfy requirements and stack &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;characteristics given the time allocated&quot;</span>
                 <span class="p">)</span>
+                <span class="n">link</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;no_stack&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">msg</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span> <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="n">link</span><span class="p">,}</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span><span class="n">msg</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;- see </span><span class="si">{</span><span class="n">link</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">stack_info</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="p">:</span>
                 <span class="n">report</span><span class="o">.</span><span class="n">set_stack_info</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="p">)</span>
