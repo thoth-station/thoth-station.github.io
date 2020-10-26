@@ -1,0 +1,534 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.python.pipfile &#8212; Thoth&#39;s Python library 0.10.2 documentation</title>
+    <link rel="stylesheet" href="../../../_static/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../../../_static/jquery.js"></script>
+    <script type="text/javascript" src="../../../_static/underscore.js"></script>
+    <script type="text/javascript" src="../../../_static/doctools.js"></script>
+    <script type="text/javascript" src="../../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth&#39;s Python library 0.10.2 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.python.pipfile</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-python</span>
+<span class="c1"># Copyright(C) 2018, 2019, 2020 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Parse string representation of a Pipfile or Pipfile.lock and represent it in an object.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">hashlib</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Iterable</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
+
+<span class="kn">import</span> <span class="nn">toml</span>
+<span class="kn">import</span> <span class="nn">attr</span>
+
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">PipfileParseError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">InternalError</span>
+<span class="kn">from</span> <span class="nn">.packages</span> <span class="kn">import</span> <span class="n">Packages</span>
+<span class="kn">from</span> <span class="nn">.source</span> <span class="kn">import</span> <span class="n">Source</span>
+<span class="kn">from</span> <span class="nn">.package_version</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
+
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># The default Pipfile spec number (version) stated in the Pipfile.lock.</span>
+<span class="n">_DEFAULT_PIPFILE_SPEC</span> <span class="o">=</span> <span class="mi">6</span>
+
+
+<div class="viewcode-block" id="PipfileMeta"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileMeta">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">PipfileMeta</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Parse meta information stored in Pipfile or Pipfile.lock.&quot;&quot;&quot;</span>
+
+    <span class="n">sources</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Source</span><span class="p">])</span>
+    <span class="n">requires</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>
+    <span class="n">pipenv</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="nb">hash</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">pipfile_spec</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">_DEFAULT_PIPFILE_SPEC</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PipfileMeta.from_dict"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileMeta.from_dict">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">dict_</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Parse sources from dict as stated in Pipfile/Pipfile.lock.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Parsing Pipfile/Pipfile.lock metadata section&quot;</span><span class="p">)</span>
+        <span class="n">dict_</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">dict_</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;sources&quot;</span> <span class="ow">in</span> <span class="n">dict_</span><span class="p">:</span>
+            <span class="c1"># Naming is confusing here - Pipfile uses source, Pipfile.lock sources.</span>
+            <span class="n">dict_</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;sources&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;source&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dict_</span><span class="p">:</span>
+            <span class="n">dict_</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="n">sources</span> <span class="o">=</span> <span class="p">{</span><span class="n">d</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]:</span> <span class="n">Source</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;source&quot;</span><span class="p">)}</span>
+        <span class="n">requires</span> <span class="o">=</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;requires&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">pipenv</span> <span class="o">=</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;pipenv&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">pipfile_spec</span> <span class="o">=</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;pipfile-spec&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">hash_</span> <span class="o">=</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;hash&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">dict_</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Metadata ignored in Pipfile or Pipfile.lock: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dict_</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">sources</span><span class="o">=</span><span class="n">sources</span><span class="p">,</span> <span class="n">requires</span><span class="o">=</span><span class="n">requires</span><span class="p">,</span> <span class="n">pipenv</span><span class="o">=</span><span class="n">pipenv</span><span class="p">,</span> <span class="nb">hash</span><span class="o">=</span><span class="n">hash_</span><span class="p">,</span> <span class="n">pipfile_spec</span><span class="o">=</span><span class="n">pipfile_spec</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="PipfileMeta.to_dict"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileMeta.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">is_lock</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Produce sources as a dict representation as stated in Pipfile/Pipfile.lock.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Generating Pipfile</span><span class="si">%s</span><span class="s2"> metadata section&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">is_lock</span> <span class="k">else</span> <span class="s2">&quot;.lock&quot;</span><span class="p">)</span>
+        <span class="n">sources_dict</span> <span class="o">=</span> <span class="p">[</span><span class="n">source</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span> <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">values</span><span class="p">()]</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">is_lock</span><span class="p">:</span>
+            <span class="c1"># Pipenv is omitted.</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">&quot;sources&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sources_dict</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">&quot;requires&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">requires</span> <span class="ow">or</span> <span class="p">{}</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">&quot;hash&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hash</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">&quot;pipfile-spec&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_spec</span> <span class="ow">or</span> <span class="n">_DEFAULT_PIPFILE_SPEC</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">&quot;source&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sources_dict</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipenv</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">&quot;pipenv&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipenv</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">requires</span><span class="p">:</span>
+                <span class="n">result</span><span class="p">[</span><span class="s2">&quot;requires&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">requires</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="PipfileMeta.set_hash"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileMeta.set_hash">[docs]</a>    <span class="k">def</span> <span class="nf">set_hash</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hash_</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Set hash of Pipfile to make sure pipenv uses correct parts..&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">hash</span> <span class="o">=</span> <span class="n">hash_</span></div>
+
+<div class="viewcode-block" id="PipfileMeta.to_requirements_index_conf"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileMeta.to_requirements_index_conf">[docs]</a>    <span class="k">def</span> <span class="nf">to_requirements_index_conf</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add index configuration as would be stated in the requirements.txt file.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="n">primary_index_added</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">primary_index_added</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;-i </span><span class="si">{</span><span class="n">source</span><span class="o">.</span><span class="n">url</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="n">primary_index_added</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;--extra-index-url </span><span class="si">{</span><span class="n">source</span><span class="o">.</span><span class="n">url</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="PipfileMeta.get_sources_providing_package"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileMeta.get_sources_providing_package">[docs]</a>    <span class="k">def</span> <span class="nf">get_sources_providing_package</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get all source indexes providing the given package.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">package_name</span> <span class="ow">in</span> <span class="n">source</span><span class="o">.</span><span class="n">get_packages</span><span class="p">():</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="PipfileMeta.get_sources_providing_package_version"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileMeta.get_sources_providing_package_version">[docs]</a>    <span class="k">def</span> <span class="nf">get_sources_providing_package_version</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get all source indexes providing the given package in the specified value.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">source</span><span class="o">.</span><span class="n">provides_package_version</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span><span class="p">):</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="PipfileMeta.add_source"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileMeta.add_source">[docs]</a>    <span class="k">def</span> <span class="nf">add_source</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="n">Source</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Add the given package source.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sources</span><span class="p">[</span><span class="n">source</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">source</span></div></div>
+
+
+<span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">_PipfileBase</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;A base class encapsulating logic of Pipfile and Pipfile.lock.&quot;&quot;&quot;</span>
+
+    <span class="n">packages</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">dev_packages</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+    <span class="n">meta</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">PipfileMeta</span><span class="p">)</span>
+
+    <span class="c1"># I wanted to reuse pipenv implementation, but the implementation is not that reusable. Also, we would like</span>
+    <span class="c1"># to have support of different pipenv files so we will need to distinguish implementation details on our own.</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_requirements</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">requirements_content</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_string</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Try to parse provided Pipfile{,.lock} content.</span>
+
+<span class="sd">        Try to determine whether Pipfile{,.lock} or raw requirements were used.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">PipfileParseError</span><span class="p">:</span>
+            <span class="c1"># Fallback to raw requirements parsing.</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_requirements</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">to_requirements_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">develop</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Convert the current requirement specification to a string that is in compliance with requirements.txt.&quot;&quot;&quot;</span>
+        <span class="c1"># First add index configuration.</span>
+        <span class="n">requirements_file</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">to_requirements_index_conf</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">develop</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">requirements_file</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="si">}{</span><span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="k">return</span> <span class="n">requirements_file</span>
+
+    <span class="k">def</span> <span class="nf">add_package_version</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Add the given package.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">develop</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">add_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">add_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">sanitize_source_indexes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Make sure all indexes used by packages are registerd in meta.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Checking source indexes used&quot;</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">_index_check</span><span class="p">(</span><span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="n">Source</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">source</span> <span class="ow">is</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+                <span class="k">return</span>
+
+            <span class="k">if</span> <span class="n">source</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="ow">and</span> <span class="n">source</span><span class="o">.</span><span class="n">url</span> <span class="o">!=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">InternalError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Found package source index </span><span class="si">{</span><span class="n">source</span><span class="si">}</span><span class="s2"> with different name but same URL &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;as for package </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> in &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;version </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">source</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="ow">and</span> <span class="n">source</span><span class="o">.</span><span class="n">verify_ssl</span> <span class="o">!=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">verify_ssl</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">InternalError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Found package source index </span><span class="si">{</span><span class="n">source</span><span class="si">}</span><span class="s2"> with different SSL verification settings &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;but same URL as for package </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> in &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;version </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                    <span class="n">_index_check</span><span class="p">(</span><span class="n">package_version</span><span class="p">,</span> <span class="n">source</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">_index_check</span><span class="p">(</span><span class="n">package_version</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span><span class="p">])</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_construct_requirements_packages</span><span class="p">(</span>
+        <span class="n">packages</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Construct a requirements.txt/in string entry for each package.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">packages</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">+=</span> <span class="n">package</span><span class="o">.</span><span class="n">name</span>
+            <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">extras</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">e</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">extras</span><span class="p">))</span><span class="si">}</span><span class="s2">]&quot;</span>
+            <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">version</span> <span class="ow">and</span> <span class="n">package</span><span class="o">.</span><span class="n">version</span> <span class="o">!=</span> <span class="s2">&quot;*&quot;</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">+=</span> <span class="n">package</span><span class="o">.</span><span class="n">version</span>
+
+            <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">markers</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot;; &quot;</span> <span class="o">+</span> <span class="n">package</span><span class="o">.</span><span class="n">markers</span>
+
+            <span class="k">if</span> <span class="n">package</span><span class="o">.</span><span class="n">hashes</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot; </span><span class="se">\\\n</span><span class="s2">&quot;</span>
+                <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">digest</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">hashes</span><span class="p">):</span>
+                    <span class="n">result</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;    --hash=</span><span class="si">{</span><span class="n">digest</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="k">if</span> <span class="n">idx</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">package</span><span class="o">.</span><span class="n">hashes</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+                        <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot; </span><span class="se">\\\n</span><span class="s2">&quot;</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_construct_requirements</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">packages</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">],</span>
+        <span class="n">dev_packages</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Iterable</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]],</span>
+        <span class="n">meta</span><span class="p">:</span> <span class="n">PipfileMeta</span><span class="p">,</span>
+        <span class="n">with_header</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">with_header</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;#</span>
+<span class="s2"># This file is autogenerated by Thoth and is meant to be used with pip-compile</span>
+<span class="s2"># as provided by pip-tools.</span>
+<span class="s2">#</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
+        <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">index</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+            <span class="k">if</span> <span class="n">idx</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;--index-url </span><span class="si">{</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;--extra-index-url </span><span class="si">{</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+        <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">result</span> <span class="o">+=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_construct_requirements_packages</span><span class="p">(</span><span class="n">packages</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">dev_packages</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">#</span><span class="se">\n</span><span class="s2"># dev packages</span><span class="se">\n</span><span class="s2">#</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">result</span> <span class="o">+=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_construct_requirements_packages</span><span class="p">(</span><span class="n">dev_packages</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">construct_requirements_txt</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Construct requirements.txt file.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_requirements</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">,</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="Pipfile"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.Pipfile">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">Pipfile</span><span class="p">(</span><span class="n">_PipfileBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A Pipfile representation - representation of direct dependencies of an application.&quot;&quot;&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">data</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return data used to compute hash based on Pipfile stored in Pipfile.lock.&quot;&quot;&quot;</span>
+        <span class="n">meta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">is_lock</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="c1"># Only these values are used to compute digest.</span>
+        <span class="n">meta</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;requires&quot;</span><span class="p">:</span> <span class="n">meta</span><span class="p">[</span><span class="s2">&quot;requires&quot;</span><span class="p">],</span> <span class="s2">&quot;sources&quot;</span><span class="p">:</span> <span class="n">meta</span><span class="p">[</span><span class="s2">&quot;sources&quot;</span><span class="p">]}</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;default&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">to_pipfile</span><span class="p">(),</span> <span class="s2">&quot;develop&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">to_pipfile</span><span class="p">(),</span> <span class="s2">&quot;_meta&quot;</span><span class="p">:</span> <span class="n">meta</span><span class="p">}</span>
+
+<div class="viewcode-block" id="Pipfile.from_package_versions"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.Pipfile.from_package_versions">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_package_versions</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">packages</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">],</span> <span class="n">meta</span><span class="p">:</span> <span class="n">PipfileMeta</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Construct Pipfile from provided PackageVersion instances.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">packages</span><span class="o">=</span><span class="n">Packages</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">([</span><span class="n">pv</span> <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="n">packages</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">pv</span><span class="o">.</span><span class="n">develop</span><span class="p">],</span> <span class="n">develop</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+            <span class="n">dev_packages</span><span class="o">=</span><span class="n">Packages</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">([</span><span class="n">pv</span> <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="n">packages</span> <span class="k">if</span> <span class="n">pv</span><span class="o">.</span><span class="n">develop</span><span class="p">],</span> <span class="n">develop</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="n">meta</span><span class="o">=</span><span class="n">meta</span> <span class="ow">or</span> <span class="n">PipfileMeta</span><span class="o">.</span><span class="n">from_dict</span><span class="p">({}),</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="Pipfile.from_file"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.Pipfile.from_file">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Parse Pipfile file and return its Pipfile representation.&quot;&quot;&quot;</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="n">file_path</span> <span class="ow">or</span> <span class="s2">&quot;Pipfile&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading Pipfile from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pipfile_file</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">pipfile_file</span><span class="o">.</span><span class="n">read</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="Pipfile.from_string"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.Pipfile.from_string">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_string</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pipfile_content</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Parse Pipfile from its string representation.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Parsing Pipfile toml representation from string&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parsed</span> <span class="o">=</span> <span class="n">toml</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pipfile_content</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="c1"># We are transparent - Pipfile can be eigher TOML or JSON - try to parse any of these.</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">parsed</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pipfile_content</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">PipfileParseError</span><span class="p">(</span><span class="s2">&quot;Failed to parse provided Pipfile&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">parsed</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Pipfile.from_dict"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.Pipfile.from_dict">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">dict_</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve instance of Pipfile from its dictionary representation.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Parsing Pipfile&quot;</span><span class="p">)</span>
+        <span class="n">packages</span> <span class="o">=</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;packages&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="n">dev_packages</span> <span class="o">=</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;dev-packages&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="c1"># Use remaining parts - such as requires, pipenv configuration and other flags.</span>
+        <span class="n">meta</span> <span class="o">=</span> <span class="n">PipfileMeta</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">dict_</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">packages</span><span class="o">=</span><span class="n">Packages</span><span class="o">.</span><span class="n">from_pipfile</span><span class="p">(</span><span class="n">packages</span><span class="p">,</span> <span class="n">develop</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="n">meta</span><span class="p">),</span>
+            <span class="n">dev_packages</span><span class="o">=</span><span class="n">Packages</span><span class="o">.</span><span class="n">from_pipfile</span><span class="p">(</span><span class="n">dev_packages</span><span class="p">,</span> <span class="n">develop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="n">meta</span><span class="p">),</span>
+            <span class="n">meta</span><span class="o">=</span><span class="n">meta</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="Pipfile.to_dict"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.Pipfile.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Return Pipfile representation as dict.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Generating Pipfile&quot;</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;packages&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">to_pipfile</span><span class="p">(),</span> <span class="s2">&quot;dev-packages&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">to_pipfile</span><span class="p">()}</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="Pipfile.to_string"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.Pipfile.to_string">[docs]</a>    <span class="k">def</span> <span class="nf">to_string</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Convert representation of Pipfile to actual Pipfile file content.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Converting Pipfile to toml&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">toml</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="Pipfile.construct_requirements_in"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.Pipfile.construct_requirements_in">[docs]</a>    <span class="k">def</span> <span class="nf">construct_requirements_in</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Construct requirements.in file for the current project.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_requirements</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="Pipfile.to_file"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.Pipfile.to_file">[docs]</a>    <span class="k">def</span> <span class="nf">to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Convert the current state of Pipfile to actual Pipfile file stored in CWD.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;Pipfile&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pipfile</span><span class="p">:</span>
+            <span class="n">pipfile</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="Pipfile.hash"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.Pipfile.hash">[docs]</a>    <span class="k">def</span> <span class="nf">hash</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Compute hash of Pipifile.&quot;&quot;&quot;</span>
+        <span class="c1"># TODO: this can be implementation dependent on Pipfile version - we are simply reusing the current version.</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">separators</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">,</span> <span class="s2">&quot;:&quot;</span><span class="p">))</span>
+        <span class="n">hexdigest</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">content</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf8&quot;</span><span class="p">))</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Computed hash for </span><span class="si">%r</span><span class="s2">: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">content</span><span class="p">,</span> <span class="n">hexdigest</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;sha256&quot;</span><span class="p">:</span> <span class="n">hexdigest</span><span class="p">}</span></div></div>
+
+
+<div class="viewcode-block" id="PipfileLock"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileLock">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">PipfileLock</span><span class="p">(</span><span class="n">_PipfileBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A Pipfile.lock representation - representation of fully pinned down stack with info such as hashes.&quot;&quot;&quot;</span>
+
+    <span class="n">pipfile</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Pipfile</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PipfileLock.from_package_versions"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileLock.from_package_versions">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_package_versions</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pipfile</span><span class="p">:</span> <span class="n">Pipfile</span><span class="p">,</span> <span class="n">packages</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">],</span> <span class="n">meta</span><span class="p">:</span> <span class="n">PipfileMeta</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Construct Pipfile from provided PackageVersion instances.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span>
+            <span class="n">packages</span><span class="o">=</span><span class="n">Packages</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">([</span><span class="n">pv</span> <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="n">packages</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">pv</span><span class="o">.</span><span class="n">develop</span><span class="p">],</span> <span class="n">develop</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+            <span class="n">dev_packages</span><span class="o">=</span><span class="n">Packages</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">([</span><span class="n">pv</span> <span class="k">for</span> <span class="n">pv</span> <span class="ow">in</span> <span class="n">packages</span> <span class="k">if</span> <span class="n">pv</span><span class="o">.</span><span class="n">develop</span><span class="p">],</span> <span class="n">develop</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="n">meta</span><span class="o">=</span><span class="n">meta</span> <span class="ow">or</span> <span class="n">PipfileMeta</span><span class="o">.</span><span class="n">from_dict</span><span class="p">({}),</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="PipfileLock.from_file"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileLock.from_file">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_file</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pipfile</span><span class="p">:</span> <span class="n">Pipfile</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Parse Pipfile.lock file and return its PipfileLock representation.&quot;&quot;&quot;</span>
+        <span class="n">file_path</span> <span class="o">=</span> <span class="n">file_path</span> <span class="ow">or</span> <span class="s2">&quot;Pipfile.lock&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading Pipfile.lock from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">file_path</span><span class="p">)</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pipfile_file</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">pipfile_file</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span> <span class="n">pipfile</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="PipfileLock.from_string"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileLock.from_string">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_string</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">pipfile_content</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">pipfile</span><span class="p">:</span> <span class="n">Pipfile</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Parse Pipfile.lock from its string content.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Parsing Pipfile.lock JSON representation from string&quot;</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">parsed</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">pipfile_content</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">PipfileParseError</span><span class="p">(</span><span class="s2">&quot;Failed to parse provided Pipfile.lock&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">parsed</span><span class="p">,</span> <span class="n">pipfile</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="PipfileLock.from_dict"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileLock.from_dict">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">dict_</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">pipfile</span><span class="p">:</span> <span class="n">Pipfile</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Construct PipfileLock class from a parsed JSON representation as stated in actual Pipfile.lock.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Parsing Pipfile.lock&quot;</span><span class="p">)</span>
+        <span class="n">meta</span> <span class="o">=</span> <span class="n">PipfileMeta</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">dict_</span><span class="p">[</span><span class="s2">&quot;_meta&quot;</span><span class="p">])</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">meta</span><span class="o">=</span><span class="n">meta</span><span class="p">,</span>
+            <span class="n">packages</span><span class="o">=</span><span class="n">Packages</span><span class="o">.</span><span class="n">from_pipfile_lock</span><span class="p">(</span><span class="n">dict_</span><span class="p">[</span><span class="s2">&quot;default&quot;</span><span class="p">],</span> <span class="n">develop</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="n">meta</span><span class="p">),</span>
+            <span class="n">dev_packages</span><span class="o">=</span><span class="n">Packages</span><span class="o">.</span><span class="n">from_pipfile_lock</span><span class="p">(</span><span class="n">dict_</span><span class="p">[</span><span class="s2">&quot;develop&quot;</span><span class="p">],</span> <span class="n">develop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="n">meta</span><span class="p">),</span>
+            <span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="PipfileLock.to_string"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileLock.to_string">[docs]</a>    <span class="k">def</span> <span class="nf">to_string</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pipfile</span><span class="p">:</span> <span class="n">Pipfile</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Convert the current state of PipfileLock to its Pipfile.lock file representation.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Converting Pipfile.lock to JSON&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">pipfile</span><span class="p">),</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span></div>
+
+<div class="viewcode-block" id="PipfileLock.to_file"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileLock.to_file">[docs]</a>    <span class="k">def</span> <span class="nf">to_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pipfile</span><span class="p">:</span> <span class="n">Pipfile</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Convert the current state of PipfileLock to actual Pipfile.lock file stored in CWD.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pipfile_lock</span><span class="p">:</span>
+            <span class="n">pipfile_lock</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">pipfile</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="PipfileLock.to_dict"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.pipfile.PipfileLock.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pipfile</span><span class="p">:</span> <span class="n">Pipfile</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create a dict representation of Pipfile.lock content.&quot;&quot;&quot;</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Generating Pipfile.lock&quot;</span><span class="p">)</span>
+        <span class="n">pipfile</span> <span class="o">=</span> <span class="n">pipfile</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pipfile</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">InternalError</span><span class="p">(</span><span class="s2">&quot;Pipfile has to be provided when generating Pipfile.lock to compute SHA hashes&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">set_hash</span><span class="p">(</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">sanitize_source_indexes</span><span class="p">()</span>
+
+        <span class="n">content</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;_meta&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">is_lock</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="s2">&quot;default&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">to_pipfile_lock</span><span class="p">(),</span>
+            <span class="s2">&quot;develop&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">to_pipfile_lock</span><span class="p">(),</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">content</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation index</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+  
+  </body>
+</html>
