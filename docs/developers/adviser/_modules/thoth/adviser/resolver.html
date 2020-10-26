@@ -384,10 +384,10 @@
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running step </span><span class="si">%r</span><span class="s2"> for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span> <span class="n">package_version_tuple</span><span class="p">)</span>
             <span class="n">step</span><span class="o">.</span><span class="n">unit_run</span> <span class="o">=</span> <span class="kc">True</span>
 
-            <span class="k">if</span> <span class="n">multi_package_resolution</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">step</span><span class="o">.</span><span class="n">MULTI_PACKAGE_RESOLUTIONS</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">multi_package_resolution</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">step</span><span class="o">.</span><span class="n">configuration</span><span class="p">[</span><span class="s2">&quot;multi_package_resolution&quot;</span><span class="p">]:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                     <span class="s2">&quot;Skipping running step </span><span class="si">%r</span><span class="s2"> - this step was already run for package </span><span class="si">%r</span><span class="s2"> &quot;</span>
-                    <span class="s2">&quot;and the given step has no MULTI_PACKAGE_RESOLUTIONS flag set&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;and the given step has no multi_package_resolution flag set&quot;</span><span class="p">,</span>
                     <span class="n">step</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
                     <span class="n">package_version_tuple</span><span class="p">,</span>
                 <span class="p">)</span>
@@ -1106,7 +1106,7 @@
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_steps</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">package_version</span><span class="p">,</span> <span class="n">all_dependencies</span><span class="p">,</span> <span class="n">newly_added</span><span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_do_resolve_states</span><span class="p">(</span>
+    <span class="k">def</span> <span class="nf">_do_resolve_states_raw</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">user_stack_scoring</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">State</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Actually perform states resolution.&quot;&quot;&quot;</span>
@@ -1172,7 +1172,6 @@
                 <span class="k">if</span> <span class="n">state_returned</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">state_returned</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">:</span>
                     <span class="c1"># A final state produced by the pipeline.</span>
                     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_strides</span><span class="p">(</span><span class="n">state_returned</span><span class="p">):</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">_run_wraps</span><span class="p">(</span><span class="n">state_returned</span><span class="p">)</span>
                         <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span> <span class="o">+=</span> <span class="mi">1</span>
                         <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">register_accepted_final_state</span><span class="p">(</span><span class="n">state_returned</span><span class="p">)</span>
                         <span class="k">yield</span> <span class="n">state_returned</span>
@@ -1200,10 +1199,10 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">beam</span><span class="o">.</span><span class="n">size</span><span class="p">,</span>
             <span class="p">)</span>
 
-    <span class="k">def</span> <span class="nf">_do_resolve_products</span><span class="p">(</span>
+    <span class="k">def</span> <span class="nf">_do_resolve_states</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">user_stack_scoring</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Product</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Resolve raw products as produced by this resolver pipeline.&quot;&quot;&quot;</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">State</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Resolve states as produced by this resolver pipeline, ready to be used to build a product.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">count</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                 <span class="s2">&quot;Count (</span><span class="si">%d</span><span class="s2">) is higher than limit (</span><span class="si">%d</span><span class="s2">), setting count to </span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">limit</span><span class="p">,</span>
@@ -1219,7 +1218,9 @@
         <span class="n">max_score</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">last_iteration_logged</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">final_state</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_resolve_states</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">,</span> <span class="n">user_stack_scoring</span><span class="o">=</span><span class="n">user_stack_scoring</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">final_state</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_resolve_states_raw</span><span class="p">(</span>
+                <span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">,</span> <span class="n">user_stack_scoring</span><span class="o">=</span><span class="n">user_stack_scoring</span>
+            <span class="p">):</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                     <span class="s2">&quot;Pipeline reached a new final state, yielding pipeline product with a score of </span><span class="si">%g</span><span class="s2"> - </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2">&quot;</span><span class="p">,</span>
                     <span class="n">final_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
@@ -1246,8 +1247,7 @@
                     <span class="p">)</span>
                     <span class="n">last_iteration_logged</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span>
 
-                <span class="n">product</span> <span class="o">=</span> <span class="n">Product</span><span class="o">.</span><span class="n">from_final_state</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">final_state</span><span class="p">)</span>
-                <span class="k">yield</span> <span class="n">product</span>
+                <span class="k">yield</span> <span class="n">final_state</span>
                 <span class="k">del</span> <span class="n">final_state</span>
         <span class="k">except</span> <span class="n">EagerStopPipeline</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Stopping pipeline eagerly as per request: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
@@ -1277,7 +1277,10 @@
         <span class="sd">&quot;&quot;&quot;Resolve raw products as produced by this resolver pipeline.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_init_context</span><span class="p">()</span>
         <span class="k">with</span> <span class="n">Unit</span><span class="o">.</span><span class="n">assigned_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">assigned_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">):</span>
-            <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_resolve_products</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">,</span> <span class="n">user_stack_scoring</span><span class="o">=</span><span class="n">user_stack_scoring</span><span class="p">)</span></div>
+            <span class="k">for</span> <span class="n">state</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_resolve_states</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">,</span> <span class="n">user_stack_scoring</span><span class="o">=</span><span class="n">user_stack_scoring</span><span class="p">):</span>
+                <span class="c1"># Always run wraps as raw products are computed.</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_run_wraps</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
+                <span class="k">yield</span> <span class="n">Product</span><span class="o">.</span><span class="n">from_final_state</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">state</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="Resolver.resolve"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.resolver.Resolver.resolve">[docs]</a>    <span class="k">def</span> <span class="nf">resolve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">user_stack_scoring</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Report</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Resolve software stacks and return resolver report.&quot;&quot;&quot;</span>
@@ -1285,8 +1288,11 @@
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_init_context</span><span class="p">()</span>
         <span class="k">with</span> <span class="n">Unit</span><span class="o">.</span><span class="n">assigned_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">predictor</span><span class="o">.</span><span class="n">assigned_context</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">):</span>
-            <span class="k">for</span> <span class="n">product</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_resolve_products</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">,</span> <span class="n">user_stack_scoring</span><span class="o">=</span><span class="n">user_stack_scoring</span><span class="p">):</span>
-                <span class="n">report</span><span class="o">.</span><span class="n">add_product</span><span class="p">(</span><span class="n">product</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">state</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_do_resolve_states</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">with_devel</span><span class="p">,</span> <span class="n">user_stack_scoring</span><span class="o">=</span><span class="n">user_stack_scoring</span><span class="p">):</span>
+                <span class="n">product</span> <span class="o">=</span> <span class="n">Product</span><span class="o">.</span><span class="n">from_final_state</span><span class="p">(</span><span class="n">context</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">state</span><span class="o">=</span><span class="n">state</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">add_product</span><span class="p">(</span><span class="n">product</span><span class="p">):</span>
+                    <span class="c1"># An optimization - we do not need to run wraps if the product is not part of the final result.</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_run_wraps</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">report</span><span class="o">.</span><span class="n">product_count</span><span class="p">()</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
                 <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
