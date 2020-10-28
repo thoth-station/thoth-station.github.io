@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.state &#8212; Thoth Adviser 0.16.0 documentation</title>
+    <title>thoth.adviser.state &#8212; Thoth Adviser 0.19.0 documentation</title>
     <link rel="stylesheet" href="/assets/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Adviser 0.16.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Adviser 0.19.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -69,7 +69,6 @@
 
 <span class="sd">&quot;&quot;&quot;A state of not fully resolved software stack in adviser&#39;s recommendations implementation.&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">math</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
@@ -82,6 +81,7 @@
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">RuntimeEnvironment</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
+<span class="kn">import</span> <span class="nn">termial_random</span>
 
 
 <div class="viewcode-block" id="State"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -96,6 +96,28 @@
     <span class="n">resolved_dependencies</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>  <span class="c1"># type: Dict[str, Tuple[str, str, str]]</span>
     <span class="n">_parent</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># type: weakref.ReferenceType[&#39;State&#39;]</span>
     <span class="n">advised_runtime_environment</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">RuntimeEnvironment</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="c1"># See RFC-6902:</span>
+    <span class="c1">#   https://tools.ietf.org/html/rfc6902</span>
+    <span class="c1"># An example entry for a manifest change:</span>
+    <span class="c1">#   [</span>
+    <span class="c1">#     {</span>
+    <span class="c1">#       &quot;apiVersion:&quot;: &quot;apps.openshift.io/v1&quot;,</span>
+    <span class="c1">#       &quot;kind&quot;: &quot;DeploymentConfig&quot;,</span>
+    <span class="c1">#       &quot;patch&quot;: {</span>
+    <span class="c1">#         &quot;op&quot;: &quot;add&quot;,</span>
+    <span class="c1">#         &quot;path&quot;: &quot;spec.template.spec.containers[0].env&quot;,</span>
+    <span class="c1">#         &quot;value&quot;: {&quot;name&quot;: &quot;OMP_NUM_THREADS&quot;, &quot;value&quot;: &quot;1&quot;},</span>
+    <span class="c1">#       }</span>
+    <span class="c1">#     }</span>
+    <span class="c1">#   ]</span>
+    <span class="c1"># See available yaml-patch operations at https://python-json-patch.readthedocs.io/en/latest/tutorial.html</span>
+    <span class="c1">#</span>
+    <span class="c1"># Each entry is a list of JSON patches to be applied. If any entry fails to</span>
+    <span class="c1"># patch, the patching can continue with the subsequent JSON patch as each</span>
+    <span class="c1"># entry corresponds to a list of atomic changes to be applied:</span>
+    <span class="c1">#</span>
+    <span class="c1">#  https://tools.ietf.org/html/rfc6902#section-5</span>
+    <span class="n">advised_manifest_changes</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
     <span class="n">justification</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">),</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="n">_EPSILON</span> <span class="o">=</span> <span class="mf">0.1</span>
@@ -138,6 +160,7 @@
 
         <span class="c1"># Parent is removed intentionally.</span>
         <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;advised_manifest_changes&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">advised_manifest_changes</span><span class="p">,</span>
             <span class="s2">&quot;advised_runtime_environment&quot;</span><span class="p">:</span> <span class="n">advised_runtime_environment</span><span class="p">,</span>
             <span class="s2">&quot;iteration&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span>
             <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">justification</span><span class="p">,</span>
@@ -241,68 +264,6 @@
 
         <span class="k">return</span> <span class="nb">int</span><span class="p">((</span><span class="mi">1</span> <span class="o">+</span> <span class="n">n</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">n</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span>
 
-    <span class="nd">@staticmethod</span>
-    <span class="k">def</span> <span class="nf">_termial_function_solution</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Compute solution to termial function.</span>
-
-<span class="sd">        Let termial function be:</span>
-
-<span class="sd">           (n**2 + n) / 2 = x</span>
-
-<span class="sd">        This function computes non-negative ceil(n) so that it satisfies x.</span>
-
-<span class="sd">        The solution is optimized to compute a generic parabolic intersection for termial function:</span>
-
-<span class="sd">           x1 = (-b + sqrt(b**2 - 4*a*c)) / 2*a</span>
-<span class="sd">           x2 = (-b - sqrt(b**2 - 4*a*c)) / 2*a</span>
-
-<span class="sd">        Note solution x2 can be discarded based on termial function usage in the sources.</span>
-
-<span class="sd">        The original formula:</span>
-
-<span class="sd">           a*x**2 + b*x + c = 0</span>
-
-<span class="sd">        for solution:</span>
-
-<span class="sd">           (n**2)/2 + n/2 = x</span>
-
-<span class="sd">        where:</span>
-
-<span class="sd">          a = 1/2</span>
-<span class="sd">          b = 1/2</span>
-<span class="sd">          c = -x</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">+</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">0.25</span> <span class="o">+</span> <span class="p">(</span><span class="n">x</span> <span class="o">&lt;&lt;</span> <span class="mi">1</span><span class="p">)))</span>
-
-    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">_random_termial</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Compute a random number x such as 0 &lt;= x &lt; n, use termial function not to spread numbers uniformly.</span>
-
-<span class="sd">        To prefer lower numbers more often, termial function is used to assign &quot;weights&quot; for</span>
-<span class="sd">        numbers - then random uniform is used in conjunction with weights.</span>
-
-<span class="sd">        An illustrative example can be cls._random_termial(4) which calls:</span>
-
-<span class="sd">          cls._termial_function(4) == 10</span>
-
-<span class="sd">        This way, we create 10 &quot;cells&quot; where (assignment range is inclusive):</span>
-
-<span class="sd">           * 0 - 3 are assigned to number 3</span>
-<span class="sd">           * 4 - 6 are assigned to number 2</span>
-<span class="sd">           * 7 - 8 are assigned to number 1</span>
-<span class="sd">           * 9 is assigned to number 0</span>
-
-<span class="sd">        Now a random uniform call picks from 0 - 9 (inclusively), then we check what interval we have hit.</span>
-<span class="sd">        The value returned inverts priority, so for cls._termial_function(4) probabilities are:</span>
-
-<span class="sd">          * 0 - 4/10 = 0.4</span>
-<span class="sd">          * 1 - 3/10 = 0.3</span>
-<span class="sd">          * 2 - 2/10 = 0.2</span>
-<span class="sd">          * 3 - 1/10 = 0.1</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_termial_function</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">n</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_termial_function_solution</span><span class="p">(</span><span class="n">random</span><span class="o">.</span><span class="n">randrange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span>
-
 <div class="viewcode-block" id="State.get_random_unresolved_dependency"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.get_random_unresolved_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">get_random_unresolved_dependency</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">dependency_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">prefer_recent</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
@@ -314,7 +275,7 @@
             <span class="c1"># perform multi-armed bandit - epsilon-greedy strategy</span>
             <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">choices</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_EPSILON</span> <span class="o">&gt;=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">():</span>
-                <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="n">choices</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_random_termial</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">choices</span><span class="p">))]</span>
+                <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="n">choices</span><span class="p">[</span><span class="n">termial_random</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">choices</span><span class="p">))]</span>
 
             <span class="k">if</span> <span class="n">unresolved_dependency_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="n">choices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -348,6 +309,7 @@
             <span class="n">unresolved_dependencies</span><span class="o">=</span><span class="n">unresolved_dependencies</span><span class="p">,</span>
             <span class="n">resolved_dependencies</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span>
             <span class="n">advised_runtime_environment</span><span class="o">=</span><span class="n">cloned_advised_environment</span><span class="p">,</span>
+            <span class="n">advised_manifest_changes</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">advised_manifest_changes</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span>
             <span class="n">justification</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">justification</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span>
             <span class="n">parent</span><span class="o">=</span><span class="n">weakref</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span>
         <span class="p">)</span></div>
