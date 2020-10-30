@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.run &#8212; Thoth Adviser 0.19.0 documentation</title>
+    <title>thoth.adviser.run &#8212; Thoth Adviser 0.19.1 documentation</title>
     <link rel="stylesheet" href="/assets/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Adviser 0.19.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Adviser 0.19.1 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -87,7 +87,7 @@
 
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
 
-<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">AdviserRunException</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">CannotProduceStack</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">UnresolvedDependencies</span>
 <span class="kn">from</span> <span class="nn">.dependency_monkey</span> <span class="kn">import</span> <span class="n">DependencyMonkey</span>
 <span class="kn">from</span> <span class="nn">.dm_report</span> <span class="kn">import</span> <span class="n">DependencyMonkeyReport</span>
@@ -160,20 +160,18 @@
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Resolver history saved to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">resolver_history_file</span><span class="p">)</span>
 
             <span class="n">result_dict</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">error_msg</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">report</span><span class="o">=</span><span class="n">report</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()))</span>
-        <span class="k">except</span> <span class="n">AdviserRunException</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">exc</span><span class="p">,</span> <span class="n">UnresolvedDependencies</span><span class="p">):</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                    <span class="s2">&quot;Resolver failed due to unsolved dependencies for packages </span><span class="si">%s</span><span class="s2">; these dependencies will be &quot;</span>
-                    <span class="s2">&quot;automatically marked for solving by the system for future resolutions&quot;</span><span class="p">,</span>
-                    <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">exc</span><span class="o">.</span><span class="n">unresolved</span><span class="p">),</span>
-                <span class="p">)</span>
-                <span class="n">return_code</span> <span class="o">=</span> <span class="mi">2</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Resolver run failed: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
-                <span class="n">return_code</span> <span class="o">=</span> <span class="mi">1</span>
-
+        <span class="k">except</span> <span class="n">UnresolvedDependencies</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Resolver failed due to unsolved dependencies for packages </span><span class="si">%s</span><span class="s2">; these dependencies will be &quot;</span>
+                <span class="s2">&quot;automatically marked for solving by the system for future resolutions&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">exc</span><span class="o">.</span><span class="n">unresolved</span><span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">return_code</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># If forked, do not overwrite results by parent process.</span>
             <span class="n">result_dict</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">error_msg</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">),</span> <span class="n">report</span><span class="o">=</span><span class="n">exc</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()))</span>
-
+        <span class="k">except</span> <span class="n">CannotProduceStack</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Resolver did not produce any software stack: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+            <span class="n">return_code</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># If forked, do not overwrite results by parent process.</span>
+            <span class="n">result_dict</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="n">error</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">error_msg</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">),</span> <span class="n">report</span><span class="o">=</span><span class="n">exc</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()))</span>
         <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Adviser raised exception: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
             <span class="n">result_dict</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
