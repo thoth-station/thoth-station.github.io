@@ -6,7 +6,7 @@
   <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     
-    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.25.15 documentation</title>
+    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.25.16 documentation</title>
     
     <link rel="stylesheet" href="/assets/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/pygments.css" type="text/css" />
@@ -14,7 +14,7 @@
     <script type="text/javascript">
       var DOCUMENTATION_OPTIONS = {
         URL_ROOT:    '../../../../',
-        VERSION:     '0.25.15',
+        VERSION:     '0.25.16',
         COLLAPSE_INDEX: false,
         FILE_SUFFIX: '.html',
         HAS_SOURCE:  true
@@ -25,7 +25,7 @@
     <script type="text/javascript" src="/assets/doctools.js"></script>
     <link rel="index" title="Index" href="../../../../genindex.html" />
     <link rel="search" title="Search" href="../../../../search.html" />
-    <link rel="top" title="Thoth Storages 0.25.15 documentation" href="../../../../index.html" />
+    <link rel="top" title="Thoth Storages 0.25.16 documentation" href="../../../../index.html" />
     <link rel="up" title="Module code" href="../../../index.html" />
 
    
@@ -53,7 +53,7 @@
         <li class="right" >
           <a href="../../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Storages 0.25.15 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Storages 0.25.16 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -1727,7 +1727,11 @@
             <span class="k">return</span> <span class="n">query</span><span class="o">.</span><span class="n">count</span><span class="p">()</span></div>
 
     <span class="k">def</span> <span class="nf">_construct_si_unanalyzed_python_package_versions_query</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">,</span> <span class="n">index_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">provides_source_distro</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">,</span>
+        <span class="n">index_url</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">provides_source_distro</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">si_error</span> <span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Query</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Construct query for packages analyzed by solver, but unanalyzed by SI.&quot;&quot;&quot;</span>
         <span class="n">index_url</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="o">.</span><span class="n">normalize_python_index_url</span><span class="p">(</span><span class="n">index_url</span><span class="p">)</span>
@@ -1742,10 +1746,14 @@
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">)</span>
 
         <span class="c1"># We find all rows that are same in PythonPackageVersion and SIAggregated table.</span>
-        <span class="n">conditions</span> <span class="o">=</span> <span class="p">[</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">entity_id</span> <span class="o">==</span> <span class="n">SIAggregated</span><span class="o">.</span><span class="n">python_package_version_entity_id</span><span class="p">]</span>
+        <span class="n">conditions</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">entity_id</span> <span class="o">==</span> <span class="n">SIAggregated</span><span class="o">.</span><span class="n">python_package_version_entity_id</span><span class="p">,</span>
+            <span class="n">SIAggregated</span><span class="o">.</span><span class="n">si_aggregated_run_id</span> <span class="o">==</span> <span class="n">SecurityIndicatorAggregatedRun</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+        <span class="p">]</span>
 
         <span class="c1"># Finally filter these out.</span>
         <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="o">~</span><span class="n">exists</span><span class="p">()</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">and_</span><span class="p">(</span><span class="o">*</span><span class="n">conditions</span><span class="p">)))</span>
+        <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">exists</span><span class="p">()</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">SecurityIndicatorAggregatedRun</span><span class="o">.</span><span class="n">error</span><span class="o">.</span><span class="n">is_</span><span class="p">(</span><span class="n">si_error</span><span class="p">)))</span>
 
         <span class="k">return</span> <span class="n">query</span>
 
@@ -1756,6 +1764,7 @@
         <span class="n">distinct</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">randomize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">provides_source_distro</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">si_error</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve solved Python package versions in Thoth Database, that are not anaylyzed by SI. </span>
 <span class="sd">        Examples:</span>
@@ -1767,7 +1776,8 @@
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
             <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_si_unanalyzed_python_package_versions_query</span><span class="p">(</span>
                 <span class="n">session</span><span class="p">,</span>
-                <span class="n">provides_source_distro</span><span class="o">=</span><span class="n">provides_source_distro</span>
+                <span class="n">provides_source_distro</span><span class="o">=</span><span class="n">provides_source_distro</span><span class="p">,</span>
+                <span class="n">si_error</span><span class="o">=</span><span class="n">si_error</span><span class="p">,</span>
             <span class="p">)</span>
 
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
@@ -1792,12 +1802,14 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">distinct</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">provides_source_distro</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">si_error</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get SI unanalyzed Python package versions number in Thoth Database.&quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
             <span class="n">query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_construct_si_unanalyzed_python_package_versions_query</span><span class="p">(</span>
                 <span class="n">session</span><span class="p">,</span>
-                <span class="n">provides_source_distro</span><span class="o">=</span><span class="n">provides_source_distro</span>
+                <span class="n">provides_source_distro</span><span class="o">=</span><span class="n">provides_source_distro</span><span class="p">,</span>
+                <span class="n">si_error</span><span class="o">=</span><span class="n">si_error</span><span class="p">,</span>
             <span class="p">)</span>
 
             <span class="n">query</span> <span class="o">=</span> <span class="n">query</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span><span class="o">.</span><span class="n">with_entities</span><span class="p">(</span>
@@ -4479,8 +4491,8 @@
 <div class="viewcode-block" id="GraphDatabase.sync_security_indicator_aggregated_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.sync_security_indicator_aggregated_result">[docs]</a>    <span class="k">def</span> <span class="nf">sync_security_indicator_aggregated_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Sync the given security-indicator aggregated result to the graph database.&quot;&quot;&quot;</span>
         <span class="n">metadata</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">]</span>
         <span class="n">document_id</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;document_id&quot;</span><span class="p">]</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">document</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;result&quot;</span><span class="p">,</span> <span class="nb">dict</span><span class="p">())</span>
 
         <span class="n">package_name</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;app.py&quot;</span><span class="p">][</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span>
         <span class="n">package_version</span> <span class="o">=</span> <span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;arguments&quot;</span><span class="p">][</span><span class="s2">&quot;app.py&quot;</span><span class="p">][</span><span class="s2">&quot;package_version&quot;</span><span class="p">]</span>
@@ -4495,6 +4507,7 @@
                 <span class="n">session</span><span class="p">,</span>
                 <span class="n">si_aggregated_run_document_id</span><span class="o">=</span><span class="n">document_id</span><span class="p">,</span>
                 <span class="n">datetime</span><span class="o">=</span><span class="n">metadata</span><span class="p">[</span><span class="s2">&quot;datetime&quot;</span><span class="p">],</span>
+                <span class="n">error</span><span class="o">=</span><span class="n">document</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
                 <span class="n">severity_high_confidence_high</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SEVERITY.HIGH__CONFIDENCE.HIGH&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
                 <span class="n">severity_high_confidence_low</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SEVERITY.HIGH__CONFIDENCE.LOW&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
                 <span class="n">severity_high_confidence_medium</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;SEVERITY.HIGH__CONFIDENCE.MEDIUM&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span>
