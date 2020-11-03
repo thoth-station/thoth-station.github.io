@@ -12,9 +12,9 @@ remove these based on the runtime configuration provided.
 
 ## Affected packages:
 
- * ``tensorflow<=2.3``
- * ``intel-tensorflow<=2.3``
- * ``tensorflow-gpu<=2.3``
+ * ``tensorflow<=2.4``
+ * ``intel-tensorflow<=2.4``
+ * ``tensorflow-gpu<=2.4``
 
 ## Severity
 
