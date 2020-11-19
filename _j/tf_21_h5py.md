@@ -1,8 +1,8 @@
 ---
-title: TensorFlow in version 2.1 can cause runtime errors when running with h5py>=3 caused by library overpinning
+title: TensorFlow in versions 2.1 and 2.3 can cause runtime errors when running with h5py>=3 caused by library overpinning
 ---
 
-TensorFlow in version 2.1 overpins [h5py][2] library.
+TensorFlow in versions 2.1 and 2.3 overpins [h5py][2] library.
 
 ## Issue description
 
@@ -14,6 +14,9 @@ TensorFlow 2.1 stack. See the [reported upstream issue for more info][1].
  * ``intel-tensorflow==2.1``
  * ``tensorflow==2.1``
  * ``tensorflow-gpu==2.1``
+ * ``intel-tensorflow==2.3``
+ * ``tensorflow==2.3``
+ * ``tensorflow-gpu==2.3``
 
 ## Severity
 
@@ -48,9 +51,15 @@ listed](http://thoth-station.ninja/recommendation-types).
  * [tensorflow==2.1][4]
  * [tensorflow-gpu==2.1][5]
  * [tensorflow/tensorflow#44467][1]
+ * [intel-tensorflow==2.3.1][6]
+ * [tensorflow==2.3.1][7]
+ * [tensorflow-gpu==2.3.1][8]
 
 [1]: https://github.com/tensorflow/tensorflow/issues/44467
 [2]: http://pypi.org/project/h5py
 [3]: http://pypi.org/project/intel-tensorflow/2.1.1/
 [4]: http://pypi.org/project/tensorflow/2.1.2/
 [5]: http://pypi.org/project/tensorflow-gpu/2.1.2/
+[6]: http://pypi.org/project/intel-tensorflow/2.3.1/
+[7]: http://pypi.org/project/tensorflow/2.3.1/
+[8]: http://pypi.org/project/tensorflow-gpu/2.3.1/
