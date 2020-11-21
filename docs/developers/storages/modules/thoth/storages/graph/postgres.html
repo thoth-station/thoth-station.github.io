@@ -5429,6 +5429,44 @@
         <span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_CACHED_METHODS</span><span class="p">:</span>
             <span class="n">method</span><span class="o">.</span><span class="n">cache_clear</span><span class="p">()</span></div>
 
+<div class="viewcode-block" id="GraphDatabase.is_database_corrupted"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.is_database_corrupted">[docs]</a>    <span class="k">def</span> <span class="nf">is_database_corrupted</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run the amcheck extension to check for DB corruption, false negatives are possible but false positives are not.</span>
+
+<span class="sd">        amcheck documenation: https://www.postgresql.org/docs/10/amcheck.html</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        bool</span>
+<span class="sd">            False: No DB corruption detected by amcheck (not definitive)</span>
+<span class="sd">            True: Database is corrupted</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">check_for_ext_query</span> <span class="o">=</span> <span class="s2">&quot;SELECT * FROM pg_extension WHERE extname=&#39;amcheck&#39;&quot;</span>
+        <span class="n">install_ext_query</span> <span class="o">=</span> <span class="s2">&quot;CREATE EXTENSION amcheck&quot;</span>
+        <span class="n">run_amcheck_query</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT bt_index_check(index =&gt; c.oid),</span>
+<span class="s2">                    c.relname,</span>
+<span class="s2">                    c.relpages</span>
+<span class="s2">            FROM pg_index i</span>
+<span class="s2">            JOIN pg_opclass op ON i.indclass[0] = op.oid</span>
+<span class="s2">            JOIN pg_am am ON op.opcmethod = am.oid</span>
+<span class="s2">            JOIN pg_class c ON i.indexrelid = c.oid</span>
+<span class="s2">            WHERE am.amname = &#39;btree&#39;</span>
+<span class="s2">            -- Don&#39;t check temp tables, which may be from another session:</span>
+<span class="s2">            AND c.relpersistence != &#39;t&#39;</span>
+<span class="s2">            -- Function may throw an error when this is omitted:</span>
+<span class="s2">            AND c.relkind = &#39;i&#39; AND i.indisready AND i.indisvalid&quot;&quot;&quot;</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">session</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">check_for_ext_query</span><span class="p">)</span> <span class="o">==</span> <span class="p">[]:</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">install_ext_query</span><span class="p">)</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">run_amcheck_query</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span></div>
+
 <div class="viewcode-block" id="GraphDatabase.get_bloat_data"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_bloat_data">[docs]</a>    <span class="k">def</span> <span class="nf">get_bloat_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get bloat data.&quot;&quot;&quot;</span>
         <span class="c1"># Reference: https://raw.githubusercontent.com/pgexperts/pgx_scripts/master/bloat/table_bloat_check.sql</span>
