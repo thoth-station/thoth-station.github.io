@@ -3,7 +3,7 @@ title: Upstream TensorFlow=2.4.0 build filtered out as it requires AVX2 instruct
 ---
 
 The upstream TensorFlow release available on PyPI in version 2.4.0 causes core
-dump on ``tensorflow`` import when run on non-AVX2 enabled CPU.
+dump on ``tensorflow`` import when run on a non-AVX2 enabled CPU.
 
 ## Issue description
 
@@ -23,6 +23,11 @@ Illegal instruction (core dumped)
 ## Severity
 
  * WARNING
+ 
+ ## Issue fix
+
+Resolver will try to come up with a different resolution path so that
+TensorFlow==2.4.0 will not be part of the resolved software stack.
 
 ## Pipeline units
 
