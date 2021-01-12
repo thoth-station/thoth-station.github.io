@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.cli &#8212; Thamos 1.4.0 documentation</title>
+    <title>thamos.cli &#8212; Thamos 1.6.0 documentation</title>
     <link rel="stylesheet" href="/assets/thamos/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/thamos/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="/assets/thamos/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.4.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.6.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -90,15 +90,17 @@
 <span class="kn">from</span> <span class="nn">rich.table</span> <span class="kn">import</span> <span class="n">Table</span>
 <span class="kn">from</span> <span class="nn">rich</span> <span class="kn">import</span> <span class="n">box</span>
 <span class="kn">import</span> <span class="nn">daiquiri</span>
-<span class="kn">import</span> <span class="nn">micropipenv</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Project</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">cwd</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">ThothAdviserIntegrationEnum</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
 <span class="kn">from</span> <span class="nn">thamos.exceptions</span> <span class="kn">import</span> <span class="n">NoProjectDirError</span>
+<span class="kn">from</span> <span class="nn">thamos.exceptions</span> <span class="kn">import</span> <span class="n">NoRuntimeEnvironmentError</span>
 <span class="kn">from</span> <span class="nn">thamos.config</span> <span class="kn">import</span> <span class="n">config</span> <span class="k">as</span> <span class="n">configuration</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">advise_here</span> <span class="k">as</span> <span class="n">thoth_advise_here</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">provenance_check</span> <span class="k">as</span> <span class="n">thoth_provenance_check</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_log</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">install</span> <span class="k">as</span> <span class="n">thamos_install</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_status</span>
 <span class="kn">from</span> <span class="nn">thamos.utils</span> <span class="kn">import</span> <span class="n">workdir</span>
 <span class="kn">from</span> <span class="nn">thamos</span> <span class="kn">import</span> <span class="n">__version__</span> <span class="k">as</span> <span class="n">thamos_version</span>
@@ -145,7 +147,7 @@
 <span class="k">def</span> <span class="nf">_load_files</span><span class="p">(</span><span class="n">requirements_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
     <span class="sd">&quot;&quot;&quot;Load Pipfile/Pipfile.lock or requirements.in/txt from the current directory.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using Pipenv files located in the project root directory&quot;</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using Pipenv files located in </span><span class="si">%r</span><span class="s2"> directory&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
         <span class="n">pipfile_lock_exists</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">pipfile_lock_exists</span><span class="p">:</span>
@@ -170,9 +172,7 @@
                 <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
             <span class="p">)</span>
     <span class="k">elif</span> <span class="n">requirements_format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;pip&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-tools&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-compile&quot;</span><span class="p">):</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="s2">&quot;Using requirements.txt file located in the project root directory&quot;</span>
-        <span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using requirements.txt file located in </span><span class="si">%r</span><span class="s2"> directory&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
         <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_pip_compile_files</span><span class="p">(</span><span class="n">allow_without_lock</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -185,7 +185,9 @@
 
 
 <span class="k">def</span> <span class="nf">_write_files</span><span class="p">(</span>
-    <span class="n">requirements</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">requirements_lock</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">requirements_format</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">requirements</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">requirements_lock</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">requirements_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Write content of Pipfile/Pipfile.lock or requirements.in/txt to the current directory.&quot;&quot;&quot;</span>
     <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">requirements</span><span class="p">,</span> <span class="n">requirements_lock</span><span class="p">)</span>
@@ -273,7 +275,7 @@
     <span class="c1"># Remove fields that can be an array - these are addition details that are supressed from the table output.</span>
     <span class="n">header</span> <span class="o">=</span> <span class="n">header</span> <span class="o">-</span> <span class="n">to_remove</span>
 
-    <span class="n">header_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">header</span><span class="p">))</span>
+    <span class="n">header_list</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">header_list</span><span class="p">:</span>
         <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span>
             <span class="n">item</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">capitalize</span><span class="p">(),</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;cyan&quot;</span><span class="p">,</span> <span class="n">overflow</span><span class="o">=</span><span class="s2">&quot;fold&quot;</span>
@@ -384,6 +386,13 @@
         <span class="n">api_url</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">api_url</span>
     <span class="k">except</span> <span class="n">NoProjectDirError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Cannot obtain Thoth backend information: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+            <span class="n">_log</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_log</span> <span class="o">=</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span>
+
+        <span class="n">_log</span><span class="p">(</span><span class="s2">&quot;Failed to obtain Thoth backend version: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
 
     <span class="k">if</span> <span class="n">json_output</span><span class="p">:</span>
         <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span>
@@ -414,25 +423,22 @@
     <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Consider or do not consider development dependencies during the installation process.&quot;</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify explicitly runtime environment for which the installation process should be done.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Install dependencies as stated in Pipfile.lock or requirements.txt.</span>
 
 <span class="sd">    This command assumes requirements files are present and dependencies are already resolved.</span>
 <span class="sd">    If that&#39;s not the case, issue `thamos advise` before calling this.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">with</span> <span class="n">workdir</span><span class="p">():</span>
-        <span class="n">method</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="s2">&quot;pipenv&quot;</span>
-            <span class="k">if</span> <span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span>
-            <span class="k">else</span> <span class="s2">&quot;requirements&quot;</span>
-        <span class="p">)</span>
-
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">dev</span> <span class="ow">and</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                <span class="s2">&quot;Development dependencies will not be installed - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;no_dev&quot;</span><span class="p">)</span>
-            <span class="p">)</span>
-
-        <span class="n">micropipenv</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span> <span class="n">deploy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">)</span>
+    <span class="n">thamos_install</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span> <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">)</span>
 
 
 <span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;advise&quot;</span><span class="p">)</span>
@@ -540,7 +546,7 @@
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Cannot install dependencies if lock files are not written&quot;</span><span class="p">)</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
 
-    <span class="k">with</span> <span class="n">workdir</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">get_overlays_directory</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">)):</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">dev</span> <span class="ow">and</span> <span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
                 <span class="s2">&quot;Development dependencies will not be considered during the resolution process - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
@@ -630,12 +636,7 @@
                     <span class="n">advised_manifest_changes_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">install</span><span class="p">:</span>
-                <span class="n">method</span> <span class="o">=</span> <span class="p">(</span>
-                    <span class="s2">&quot;pipenv&quot;</span>
-                    <span class="k">if</span> <span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span>
-                    <span class="k">else</span> <span class="s2">&quot;requirements&quot;</span>
-                <span class="p">)</span>
-                <span class="n">micropipenv</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span> <span class="n">deploy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">)</span>
+                <span class="n">thamos_install</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span> <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
 
@@ -658,6 +659,16 @@
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Do not wait for analysis to finish, just submit it.&quot;</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify explicitly runtime environment to get recommendations for; &quot;</span>
+    <span class="s2">&quot;defaults to the first entry in the configuration file.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
     <span class="s2">&quot;--force&quot;</span><span class="p">,</span>
     <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_FORCE&quot;</span><span class="p">,</span>
@@ -670,9 +681,10 @@
     <span class="n">no_wait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">json_output</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Check provenance of installed packages.&quot;&quot;&quot;</span>
-    <span class="k">with</span> <span class="n">workdir</span><span class="p">():</span>
+    <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">get_overlays_directory</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">)):</span>
         <span class="k">if</span> <span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span> <span class="o">!=</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
                 <span class="s2">&quot;Provenance checks are available only for requirements managed by Pipenv&quot;</span>
@@ -772,6 +784,69 @@
     <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
 
 
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;list&quot;</span><span class="p">)</span>
+<span class="k">def</span> <span class="nf">list_</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;List available runtime environments.&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">workdir</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">CONFIG_NAME</span><span class="p">):</span>
+        <span class="n">environments</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">list_runtime_environments</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">environments</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;No runtime environments found&quot;</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">env</span> <span class="ow">in</span> <span class="n">environments</span><span class="p">:</span>
+        <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">))</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;show&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--output-format&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-o&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Choice</span><span class="p">([</span><span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;yaml&quot;</span><span class="p">]),</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;yaml&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify output format for the status report.&quot;</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify explicitly runtime environment to be shown.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span> <span class="nf">show</span><span class="p">(</span><span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Show configuration of available runtime environments.&quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">workdir</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">CONFIG_NAME</span><span class="p">):</span>
+        <span class="n">environments</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">list_runtime_environments</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">runtime_environment</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">environments</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;No runtime environments found&quot;</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">to_show</span> <span class="o">=</span> <span class="n">environments</span>
+    <span class="k">if</span> <span class="n">runtime_environment</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">env</span> <span class="ow">in</span> <span class="n">environments</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">env</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">runtime_environment</span><span class="p">:</span>
+                <span class="n">to_show</span> <span class="o">=</span> <span class="n">env</span>
+                <span class="k">break</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NoRuntimeEnvironmentError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Runtime environment </span><span class="si">{</span><span class="n">runtime_environment</span><span class="si">!r}</span><span class="s2"> not found&quot;</span>
+            <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;json&quot;</span><span class="p">:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">to_show</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;yaml&quot;</span><span class="p">:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_dump</span><span class="p">(</span><span class="n">to_show</span><span class="p">,</span> <span class="n">default_flow_style</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown output format </span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+
+
 <span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;config&quot;</span><span class="p">)</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
     <span class="s2">&quot;--no-interactive&quot;</span><span class="p">,</span>
@@ -820,8 +895,68 @@
         <span class="p">)</span>
 
 
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-    <span class="n">cli</span><span class="p">()</span>
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;check&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify explicitly runtime environment to check configuration file against.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--output-format&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-o&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Choice</span><span class="p">([</span><span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;table&quot;</span><span class="p">]),</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;table&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify output format for the status report.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span> <span class="nf">check</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Check configuration file and runtime environment.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;yaml&quot;</span><span class="p">:</span>
+        <span class="n">yaml</span><span class="o">.</span><span class="n">safe_dump</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;json&quot;</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;table&quot;</span><span class="p">:</span>
+        <span class="n">table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">()</span>
+
+        <span class="n">header</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="n">header</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+        <span class="n">header_sorted</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">header_sorted</span><span class="p">:</span>
+            <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span>
+                <span class="n">item</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">capitalize</span><span class="p">(),</span>
+                <span class="n">style</span><span class="o">=</span><span class="s2">&quot;cyan&quot;</span><span class="p">,</span>
+                <span class="n">overflow</span><span class="o">=</span><span class="s2">&quot;fold&quot;</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
+            <span class="n">row</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">header_sorted</span><span class="p">:</span>
+                <span class="n">entry</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_NO_EMOJI&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
+                    <span class="n">entry</span><span class="p">,</span> <span class="nb">str</span>
+                <span class="p">):</span>
+                    <span class="n">entry</span> <span class="o">=</span> <span class="n">_EMOJI</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">entry</span><span class="p">)</span>
+
+                <span class="n">row</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span> <span class="k">if</span> <span class="n">entry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
+
+            <span class="n">table</span><span class="o">.</span><span class="n">add_row</span><span class="p">(</span><span class="o">*</span><span class="n">row</span><span class="p">)</span>
+
+        <span class="n">console</span> <span class="o">=</span> <span class="n">Console</span><span class="p">()</span>
+        <span class="n">console</span><span class="o">.</span><span class="n">print</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">justify</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">)</span>
+
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span> <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;ERROR&quot;</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
+
+
+<span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span> <span class="ow">and</span> <span class="n">cli</span><span class="p">()</span>
 </pre></div>
 
           </div>
