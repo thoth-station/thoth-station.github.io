@@ -814,6 +814,43 @@
         <span class="n">job_spec</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;generateName&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span>
         <span class="k">return</span> <span class="n">job_spec</span>
 
+<div class="viewcode-block" id="OpenShift.schedule_graph_schema_update"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_graph_schema_update">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_graph_schema_update</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Schedule graph schema update job in infra namespace by default.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">namespace</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
+                    <span class="s2">&quot;No infra namespace configured to run graph-schema-update job&quot;</span>
+                <span class="p">)</span>
+
+            <span class="n">namespace</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">infra_namespace</span>
+
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_template</span><span class="p">(</span>
+            <span class="s2">&quot;template=graph-schema-update-job&quot;</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span>
+        <span class="p">)</span>
+
+        <span class="n">job_id</span> <span class="o">=</span> <span class="n">job_id</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_id</span><span class="p">(</span><span class="s2">&quot;graph-update-schema&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_template_parameters</span><span class="p">(</span>
+            <span class="n">template</span><span class="p">,</span>
+            <span class="n">THOTH_SCHEMA_UPDATE_JOB_ID</span><span class="o">=</span><span class="n">job_id</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">template</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">oc_process</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="n">template</span><span class="p">)</span>
+
+        <span class="n">graph_update_schema_template</span> <span class="o">=</span> <span class="n">template</span><span class="p">[</span><span class="s2">&quot;objects&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ocp_client</span><span class="o">.</span><span class="n">resources</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="n">api_version</span><span class="o">=</span><span class="n">graph_update_schema_template</span><span class="p">[</span><span class="s2">&quot;apiVersion&quot;</span><span class="p">],</span>
+            <span class="n">kind</span><span class="o">=</span><span class="n">graph_update_schema_template</span><span class="p">[</span><span class="s2">&quot;kind&quot;</span><span class="p">],</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">body</span><span class="o">=</span><span class="n">graph_update_schema_template</span><span class="p">,</span> <span class="n">namespace</span><span class="o">=</span><span class="n">namespace</span><span class="p">)</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;OpenShift response for creating a pod: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">][</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="n">name</span></div>
+
 <div class="viewcode-block" id="OpenShift.schedule_graph_refresh"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_graph_refresh">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_graph_refresh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">namespace</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Schedule graph refresh job in frontend namespace by default.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">namespace</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -1254,6 +1291,12 @@
             <span class="s2">&quot;THOTH_BUILD_ANALYSIS_ORIGIN&quot;</span><span class="p">:</span> <span class="n">origin</span><span class="p">,</span>
             <span class="s2">&quot;THOTH_BUILD_ANALYSIS_LOG&quot;</span><span class="p">:</span> <span class="s2">&quot;DEBUG&quot;</span> <span class="k">if</span> <span class="n">debug</span> <span class="k">else</span> <span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
             <span class="s2">&quot;THOTH_BUILD_ANALYSIS_JOB_ID&quot;</span><span class="p">:</span> <span class="n">job_id</span><span class="p">,</span>
+            <span class="s2">&quot;THOTH_BUILD_ANALYSIS_METADATA&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;origin&quot;</span><span class="p">:</span> <span class="n">origin</span><span class="p">,</span>
+                    <span class="s2">&quot;environment_type&quot;</span><span class="p">:</span> <span class="n">environment_type</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">),</span>
         <span class="p">}</span>
 
         <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_assign_workflow_parameters_for_ceph</span><span class="p">()</span>
