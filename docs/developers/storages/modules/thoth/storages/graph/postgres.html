@@ -4594,6 +4594,17 @@
                 <span class="n">session</span><span class="p">,</span> <span class="n">python_interpreter</span><span class="o">=</span><span class="n">python_interpreter</span><span class="p">,</span> <span class="n">package_extract_run</span><span class="o">=</span><span class="n">package_extract_run</span>
             <span class="p">)</span>
 
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_package_extract_get_env_vars</span><span class="p">(</span><span class="n">document</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Obtain Thoth specific environment variables present in the container image.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="p">(</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;skopeo-inspect&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;Env&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="k">if</span> <span class="n">entry</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;THAMOS_&quot;</span><span class="p">,</span> <span class="s2">&quot;THOTH_&quot;</span><span class="p">)):</span>
+                <span class="n">env_name</span><span class="p">,</span> <span class="n">env_val</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">result</span><span class="p">[</span><span class="n">env_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">env_val</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
 <div class="viewcode-block" id="GraphDatabase.sync_analysis_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.sync_analysis_result">[docs]</a>    <span class="k">def</span> <span class="nf">sync_analysis_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Sync the given analysis result to the graph database.&quot;&quot;&quot;</span>
         <span class="n">analysis_document_id</span> <span class="o">=</span> <span class="n">AnalysisResultsStore</span><span class="o">.</span><span class="n">get_document_id</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
@@ -4634,6 +4645,8 @@
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">re</span><span class="o">.</span><span class="n">match</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;^\d\.\d+$&quot;</span><span class="p">,</span> <span class="n">python_version</span><span class="p">):</span>
                     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Python Version does not match pattern&quot;</span><span class="p">)</span>
 
+            <span class="n">env_vars</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_package_extract_get_env_vars</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+
             <span class="n">software_environment</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">sw_class</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
                 <span class="n">session</span><span class="p">,</span>
                 <span class="n">environment_name</span><span class="o">=</span><span class="n">environment_name</span><span class="p">,</span>
@@ -4642,6 +4655,8 @@
                 <span class="n">image_sha</span><span class="o">=</span><span class="n">document</span><span class="p">[</span><span class="s2">&quot;result&quot;</span><span class="p">][</span><span class="s2">&quot;layers&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
                 <span class="n">os_name</span><span class="o">=</span><span class="n">os_name</span><span class="p">,</span>
                 <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
+                <span class="n">thoth_s2i_image_name</span><span class="o">=</span><span class="n">env_vars</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;THOTH_S2I_NAME&quot;</span><span class="p">),</span>
+                <span class="n">thoth_s2i_image_version</span><span class="o">=</span><span class="n">env_vars</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;THOTH_S2I_VERSION&quot;</span><span class="p">),</span>
                 <span class="n">cuda_version</span><span class="o">=</span><span class="n">cuda_nvcc_version</span> <span class="ow">or</span> <span class="n">cuda_found_in_file_version</span><span class="p">,</span>
                 <span class="n">environment_type</span><span class="o">=</span><span class="n">environment_type</span><span class="p">,</span>
             <span class="p">)</span>
@@ -5505,6 +5520,25 @@
                 <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">SoftwareEnvironment</span><span class="o">.</span><span class="n">os_version</span> <span class="o">==</span> <span class="n">normalize_os_version</span><span class="p">(</span><span class="n">os_name</span><span class="p">,</span> <span class="n">os_version</span><span class="p">))</span>
                 <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">SoftwareEnvironment</span><span class="o">.</span><span class="n">cuda_version</span> <span class="o">==</span> <span class="n">cuda_version</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">SoftwareEnvironment</span><span class="o">.</span><span class="n">python_version</span> <span class="o">==</span> <span class="n">python_version</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">HasSymbol</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">VersionedSymbol</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">VersionedSymbol</span><span class="o">.</span><span class="n">symbol</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">distinct</span><span class="p">(</span><span class="n">VersionedSymbol</span><span class="o">.</span><span class="n">symbol</span><span class="p">)</span>
+            <span class="p">)</span>
+
+            <span class="c1"># Query returns list of single tuples (empty if bad request)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()]</span></div>
+
+<div class="viewcode-block" id="GraphDatabase.get_thoth_s2i_analyzed_image_symbols_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_thoth_s2i_analyzed_image_symbols_all">[docs]</a>    <span class="k">def</span> <span class="nf">get_thoth_s2i_analyzed_image_symbols_all</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">thoth_s2i_image_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">thoth_s2i_image_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">is_external</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get symbols associated with a given Thoth s2i container image.&quot;&quot;&quot;</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">ExternalSoftwareEnvironment</span> <span class="k">if</span> <span class="n">is_external</span> <span class="k">else</span> <span class="n">SoftwareEnvironment</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">thoth_s2i_image_name</span> <span class="o">==</span> <span class="n">thoth_s2i_image_name</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">thoth_s2i_image_version</span> <span class="o">==</span> <span class="n">thoth_s2i_image_version</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">HasSymbol</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">VersionedSymbol</span><span class="p">)</span>
                 <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">VersionedSymbol</span><span class="o">.</span><span class="n">symbol</span><span class="p">)</span>
