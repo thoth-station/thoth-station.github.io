@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.sieves.abi_compat &#8212; Thoth Adviser 0.22.0 documentation</title>
+    <title>thoth.adviser.sieves.thoth_s2i_abi_compat &#8212; Thoth Adviser 0.23.0 documentation</title>
     <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="/assets/adviser/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Adviser 0.22.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Adviser 0.23.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -49,10 +49,10 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <h1>Source code for thoth.adviser.sieves.abi_compat</h1><div class="highlight"><pre>
+  <h1>Source code for thoth.adviser.sieves.thoth_s2i_abi_compat</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
 <span class="c1"># thoth-adviser</span>
-<span class="c1"># Copyright(C) 2019, 2020 Kevin Postlehtwait</span>
+<span class="c1"># Copyright(C) 2019-2021 Kevin Postlehtwait</span>
 <span class="c1">#</span>
 <span class="c1"># This program is free software: you can redistribute it and / or modify</span>
 <span class="c1"># it under the terms of the GNU General Public License as published by</span>
@@ -67,7 +67,7 @@
 <span class="c1"># You should have received a copy of the GNU General Public License</span>
 <span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
 
-<span class="sd">&quot;&quot;&quot;Filter out stacks which have require non-existent ABI symbols.&quot;&quot;&quot;</span>
+<span class="sd">&quot;&quot;&quot;Filter out stacks which have require non-existent ABI symbols in Thoth&#39;s s2i base image.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Generator</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Tuple</span>
@@ -84,41 +84,74 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="AbiCompatibilitySieve"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.abi_compat.AbiCompatibilitySieve">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">AbiCompatibilitySieve</span><span class="p">(</span><span class="n">Sieve</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Remove packages if the image being used doesn&#39;t have necessary ABI.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="ThothS2IAbiCompatibilitySieve"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.thoth_s2i_abi_compat.ThothS2IAbiCompatibilitySieve">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">ThothS2IAbiCompatibilitySieve</span><span class="p">(</span><span class="n">Sieve</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Remove packages if the Thoth&#39;s s2i image being used doesn&#39;t have necessary ABI.&quot;&quot;&quot;</span>
 
+    <span class="n">_THOTH_S2I_PREFIX</span> <span class="o">=</span> <span class="s2">&quot;quay.io/thoth-station/&quot;</span>
     <span class="n">CONFIGURATION_DEFAULT</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
     <span class="n">image_symbols</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Set</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">set</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="n">_messages_logged</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">set</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
     <span class="n">_LINK</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;abi_missing&quot;</span><span class="p">)</span>
+    <span class="n">_LINK_BAD_IMAGE</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;bad_base_image&quot;</span><span class="p">)</span>
 
-<div class="viewcode-block" id="AbiCompatibilitySieve.should_include"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.abi_compat.AbiCompatibilitySieve.should_include">[docs]</a>    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="ThothS2IAbiCompatibilitySieve.should_include"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.thoth_s2i_abi_compat.ThothS2IAbiCompatibilitySieve.should_include">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">should_include</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
-        <span class="sd">&quot;&quot;&quot;Include sieve which checks for abi compatability.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_included</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="ow">and</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">is_fully_specified</span><span class="p">():</span>
+        <span class="sd">&quot;&quot;&quot;Register if the base image provided is Thoth&#39;s s2i.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_included</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">base_image</span> <span class="o">=</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">base_image</span>
+        <span class="k">if</span> <span class="n">base_image</span> <span class="ow">and</span> <span class="n">base_image</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_THOTH_S2I_PREFIX</span><span class="p">):</span>
             <span class="k">return</span> <span class="p">{}</span>
 
         <span class="k">return</span> <span class="kc">None</span></div>
 
-<div class="viewcode-block" id="AbiCompatibilitySieve.pre_run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.abi_compat.AbiCompatibilitySieve.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="ThothS2IAbiCompatibilitySieve.pre_run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.thoth_s2i_abi_compat.ThothS2IAbiCompatibilitySieve.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Initialize image_symbols.&quot;&quot;&quot;</span>
-        <span class="n">runtime_environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span>
+        <span class="n">base_image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">base_image</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="n">base_image</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="n">error_msg</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Cannot determine Thoth s2i version information from </span><span class="si">{</span><span class="n">base_image</span><span class="si">}</span><span class="s2">, &quot;</span>
+                <span class="s2">&quot;recommendations specific for ABI used will not be taken into account&quot;</span>
+            <span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">error_msg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_LINK_BAD_IMAGE</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">error_msg</span><span class="p">,</span>
+                    <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_LINK_BAD_IMAGE</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">image_symbols</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">return</span>
+
+        <span class="n">thoth_s2i_image_name</span><span class="p">,</span> <span class="n">thoth_s2i_image_version</span> <span class="o">=</span> <span class="n">parts</span>
+        <span class="k">if</span> <span class="n">thoth_s2i_image_version</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;v&quot;</span><span class="p">):</span>
+            <span class="c1"># Not nice as we always prefix with &quot;v&quot; but do not store it with &quot;v&quot; in the database</span>
+            <span class="c1"># (based on env var exported and detected in Thoth&#39;s s2i).</span>
+            <span class="n">thoth_s2i_image_version</span> <span class="o">=</span> <span class="n">thoth_s2i_image_version</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">image_symbols</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_analyzed_image_symbols_all</span><span class="p">(</span>
-                <span class="n">os_name</span><span class="o">=</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                <span class="n">os_version</span><span class="o">=</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
-                <span class="n">cuda_version</span><span class="o">=</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">cuda_version</span><span class="p">,</span>
-                <span class="n">python_version</span><span class="o">=</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_thoth_s2i_analyzed_image_symbols_all</span><span class="p">(</span>
+                <span class="n">thoth_s2i_image_name</span><span class="o">=</span><span class="n">thoth_s2i_image_name</span><span class="p">,</span>
+                <span class="n">thoth_s2i_image_version</span><span class="o">=</span><span class="n">thoth_s2i_image_version</span><span class="p">,</span>
+                <span class="n">is_external</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="p">)</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_messages_logged</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Analyzed image has the following symbols: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_symbols</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">pre_run</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="AbiCompatibilitySieve.run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.abi_compat.AbiCompatibilitySieve.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_versions</span><span class="p">:</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+<div class="viewcode-block" id="ThothS2IAbiCompatibilitySieve.run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.thoth_s2i_abi_compat.ThothS2IAbiCompatibilitySieve.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_versions</span><span class="p">:</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;If package requires non-present symbols remove it.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">image_symbols</span><span class="p">:</span>
+            <span class="c1"># No image symbols or the version was not provided.</span>
+            <span class="k">return</span>
+
         <span class="k">for</span> <span class="n">pkg_vers</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
             <span class="n">package_symbols</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_python_package_required_symbols</span><span class="p">(</span>
