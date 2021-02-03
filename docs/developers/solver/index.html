@@ -54,6 +54,14 @@
   <div class="section" id="thoth-solver">
 <h1>Thoth Solver<a class="headerlink" href="#thoth-solver" title="Permalink to this headline">¶</a></h1>
 <p>Dependency solver used in <a class="reference external" href="https://thoth-station.ninja">Thoth project</a>.</p>
+<p>As Python is a dynamic programming language, Thoth runs several types of
+solvers that differ in software environment (operating system, native packages
+present, system symbols and their versions and Python interpreter version). An
+example can be a solver which is running raw RHEL 8.0 with Python 3.6, another
+example can be a solver with Fedora 33 with Python 3.9 installed with different
+version of glibc and some of the ABI symbols of native libraries provided by
+operating system (see also Python manylinux standards and devtools for more
+info).</p>
 <p>See the listing built solvers used in Thoth:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://quay.io/repository/thoth-station/solver-rhel-8-py38">quay.io/thoth-station/solver-rhel-8-py38</a></p></li>
@@ -367,41 +375,9 @@ installed via pip or <a class="reference external" href="https://pipenv.readthed
 </div>
 <p>Solver is run in <a class="reference external" href="https://thoth-station.ninja">project Thoth</a> to gather
 information about package dependencies. You can find deployment templates in
-the <code class="docutils literal notranslate"><span class="pre">openshift/</span></code> directory present in the root of <a class="reference external" href="https://github.com/thoth-station/solver">solver’s Git repository</a>. The actual deployment is done
-using Ansible playbooks available in the <a class="reference external" href="https://github.com/thoth-station/core">Thoth’s core repository</a>.</p>
-</div>
-<div class="section" id="installation-for-thoth-deployment-and-adding-new-solvers">
-<h2>Installation for Thoth deployment and adding new solvers<a class="headerlink" href="#installation-for-thoth-deployment-and-adding-new-solvers" title="Permalink to this headline">¶</a></h2>
-<p>As Python is a dynamic programming language, Thoth runs several types of solvers that differ in software environment (operating system, native packages present, system symbols and their versions and Python interpreter version). An example can be a solver which is running raw RHEL 8.0 with Python 3.6, another example can be a solver with Fedora 31 with Python 3.6 installed with different version of glibc and some of the ABI symbols of native libraries provided by operating system (see also Python manylinux standards and devtools for more info). Thoth is an OpenShift native application so it utilizes OpenShift objects to keep track of solvers - see solver specific BuildConfig, ImageStream and Job templates (all are available in this repo in <code class="docutils literal notranslate"><span class="pre">openshift/</span></code> directory).</p>
-<p>To create your own solver, take a look at existing templates and extend them/modify them accordingly. Follow the rules mentioned bellow to make sure your solver is fully compliant and issue free:</p>
-<ol class="arabic simple">
-<li><p>Each solver is named <code class="docutils literal notranslate"><span class="pre">solver-&lt;operating-system-name&gt;-&lt;operating-system-version&gt;-&lt;python-version&gt;</span></code>. An example can be <code class="docutils literal notranslate"><span class="pre">solver-rhel-8.0-py36</span></code> (no dots in Python version). If you extend operating system with additional libraries, you can encode this fact in operating system name and operating system version (e.g. <code class="docutils literal notranslate"><span class="pre">rhel+gcc92</span></code> or create appropriate aliases). It’s important to keep delimiters - dash signs - which are used to parse solver information (<code class="docutils literal notranslate"><span class="pre">os_name</span></code>, <code class="docutils literal notranslate"><span class="pre">os_version</span></code>, <code class="docutils literal notranslate"><span class="pre">python_version</span></code>).</p></li>
-<li><p>Create ImageStream and BuildConfig for each newly introduced solver - both should re-use solver name.</p></li>
-<li><p>Adjust BuildConfig which uses a <a class="reference external" href="https://docs.openshift.com/container-platform/3.4/dev_guide/builds/build_strategies.html#docker-strategy-options">Docker build strategy</a>) to produce container image.</p></li>
-</ol>
-<blockquote>
-<div><ol class="arabic simple">
-<li><p>Use a base container image based on your needs.</p></li>
-<li><p>Install needed packages and Python interpreter of your choice.</p></li>
-<li><p>Always use <a class="reference external" href="https://snarky.ca/why-you-should-use-python-m-pip/">a fully qualified path to a Python binary</a> to make sure you invoke correct Python interpreter and Python environment.</p></li>
-<li><p>Make sure you create a virtual environment for solver used to analyze Python packages in advance during the build - this helps to reduce time needed to analyze a Python package (see already existing BuildConfigs).</p></li>
-</ol>
-</div></blockquote>
-<ol class="arabic simple" start="4">
-<li><p>Open a pull-request to thoth-station/solver repo to register your solver.</p></li>
-<li><p>Install templates into Thoth application (to OpenShift cluster):</p></li>
-</ol>
-<blockquote>
-<div><ol class="arabic simple">
-<li><p>Add created BuildConfig template.</p></li>
-<li><p>Add created ImageStream template.</p></li>
-<li><p>All solver jobs are registered in a template called <code class="docutils literal notranslate"><span class="pre">solver</span></code> in infra namespace - make sure you add labels <code class="docutils literal notranslate"><span class="pre">component=solver</span></code> and label <code class="docutils literal notranslate"><span class="pre">solver-type</span></code> which matches name of the solver so that the solver is correctly registered and visible in a Thoth deployment.</p></li>
-</ol>
-</div></blockquote>
-<ol class="arabic simple" start="6">
-<li><p>Once all templates are installed, you can check <code class="docutils literal notranslate"><span class="pre">/solvers</span></code> endpoint on Management API which exposes information about installed solvers.</p></li>
-<li><p>System will automatically schedule new solver jobs of packages known to Thoth to gather observations - you can check exposed metrics to verify it.</p></li>
-</ol>
+the <code class="docutils literal notranslate"><span class="pre">openshift/</span></code> directory present in the root of <a class="reference external" href="https://github.com/thoth-station/solver">solver’s Git repository</a>. Check
+<a class="reference external" href="https://github.com/thoth-station/thoth-application">thoth-station/thoth-application</a> repository for
+deployment and installation instructions.</p>
 </div>
 <div class="section" id="running-solver-locally">
 <h2>Running solver locally<a class="headerlink" href="#running-solver-locally" title="Permalink to this headline">¶</a></h2>
@@ -452,7 +428,7 @@ if you plan to develop this utility.</p>
 </ul>
 </div>
 <p>This documentation corresponds to implementation in version 1.6.3,
-documentation was generated on Feb 02, 2021.</p>
+documentation was generated on Feb 03, 2021.</p>
 </div>
 </div>
 
@@ -468,7 +444,6 @@ documentation was generated on Feb 02, 2021.</p>
 <li><a class="reference internal" href="#project-scope">Project Scope</a></li>
 <li><a class="reference internal" href="#produced-output">Produced output</a></li>
 <li><a class="reference internal" href="#installation-and-deployment">Installation and Deployment</a></li>
-<li><a class="reference internal" href="#installation-for-thoth-deployment-and-adding-new-solvers">Installation for Thoth deployment and adding new solvers</a></li>
 <li><a class="reference internal" href="#running-solver-locally">Running solver locally</a></li>
 <li><a class="reference internal" href="#crossroad">Crossroad</a></li>
 </ul>
