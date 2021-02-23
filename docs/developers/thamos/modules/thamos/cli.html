@@ -90,6 +90,7 @@
 <span class="kn">from</span> <span class="nn">rich.table</span> <span class="kn">import</span> <span class="n">Table</span>
 <span class="kn">from</span> <span class="nn">rich</span> <span class="kn">import</span> <span class="n">box</span>
 <span class="kn">import</span> <span class="nn">daiquiri</span>
+<span class="kn">from</span> <span class="nn">micropipenv</span> <span class="kn">import</span> <span class="n">HashMismatch</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Project</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">cwd</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">ThothAdviserIntegrationEnum</span>
@@ -353,7 +354,12 @@
     <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Use selected host instead of the one stated in the configuration file.&quot;</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="k">def</span> <span class="nf">cli</span><span class="p">(</span><span class="n">ctx</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">workdir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">thoth_host</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">cli</span><span class="p">(</span>
+    <span class="n">ctx</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">workdir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="kc">None</span><span class="p">],</span>
+    <span class="n">thoth_host</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;CLI tool for interacting with Thoth.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">ctx</span><span class="p">:</span>
         <span class="n">ctx</span><span class="o">.</span><span class="n">auto_envvar_prefix</span> <span class="o">=</span> <span class="s2">&quot;THAMOS&quot;</span>
@@ -442,9 +448,16 @@
 <span class="sd">    This command assumes requirements files are present and dependencies are already resolved.</span>
 <span class="sd">    If that&#39;s not the case, issue `thamos advise` before calling this.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">thamos_install</span><span class="p">(</span>
-        <span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span> <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span> <span class="n">pip_args</span><span class="o">=</span><span class="n">pip_args</span>
-    <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">thamos_install</span><span class="p">(</span>
+            <span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span> <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span> <span class="n">pip_args</span><span class="o">=</span><span class="n">pip_args</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="n">HashMismatch</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="s2">&quot;Changes made to packages are not reflected in the lock file, please install &quot;</span>
+            <span class="s2">&quot;using `thamos advise --install` to apply changes made: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">),</span>
+        <span class="p">)</span>
 
 
 <span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;advise&quot;</span><span class="p">)</span>
@@ -533,8 +546,8 @@
 <span class="k">def</span> <span class="nf">advise</span><span class="p">(</span>
     <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">no_write</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
-    <span class="n">recommendation_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">runtime_environment</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">recommendation_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">no_wait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">no_static_analysis</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">json_output</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -731,7 +744,7 @@
 
 <span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-<span class="k">def</span> <span class="nf">log</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">log</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Get log of running or finished analysis.</span>
 
 <span class="sd">    If ANALYSIS_ID is not provided, there will be used last analysis id, if noted by Thamos.</span>
@@ -754,7 +767,9 @@
     <span class="n">default</span><span class="o">=</span><span class="s2">&quot;table&quot;</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify output format for the status report.&quot;</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="k">def</span> <span class="nf">status</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">status</span><span class="p">(</span>
+    <span class="n">analysis_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">output_format</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Get status of an analysis.</span>
 
 <span class="sd">    If ANALYSIS_ID is not provided, there will be used last analysis id, if noted by Thamos.</span>
@@ -1112,6 +1127,112 @@
         <span class="n">console</span><span class="o">.</span><span class="n">print</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">justify</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">)</span>
 
     <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;add&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;requirement&quot;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;PKG&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify runtime environment to which the given package should be added.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--index-url&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-i&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;https://pypi.org/simple&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;INDEX_URL&quot;</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify Python package index to be used as a source for the given requirement.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--dev&quot;</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Add the given package to the development packages.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span> <span class="nf">add</span><span class="p">(</span>
+    <span class="n">requirement</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">index_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Add one or multiple requirements.</span>
+
+<span class="sd">    Add one or multiple requirement to the direct dependency listing without actually installing them.</span>
+<span class="sd">    The supplied requirement is specified using PEP-508 standard.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">project</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get_project</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">req</span> <span class="ow">in</span> <span class="n">requirement</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Adding </span><span class="si">%r</span><span class="s2"> to </span><span class="si">%s</span><span class="s2"> requirements of runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">req</span><span class="p">,</span>
+            <span class="s2">&quot;development&quot;</span> <span class="k">if</span> <span class="n">dev</span> <span class="k">else</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
+            <span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">add_requirement</span><span class="p">(</span>
+            <span class="n">req</span><span class="p">,</span> <span class="n">is_dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span> <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+        <span class="s2">&quot;Changes done might require triggering new advise to resolve dependencies&quot;</span>
+    <span class="p">)</span>
+    <span class="n">configuration</span><span class="o">.</span><span class="n">save_project</span><span class="p">(</span><span class="n">project</span><span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;remove&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;requirement&quot;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;PKG&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify runtime environment from which the given package should be removed.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span> <span class="nf">remove</span><span class="p">(</span>
+    <span class="n">requirement</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Remove the given requirement.&quot;&quot;&quot;</span>
+    <span class="n">project</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get_project</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">req</span> <span class="ow">in</span> <span class="n">requirement</span><span class="p">:</span>
+        <span class="n">any_change</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">req</span> <span class="ow">in</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">packages</span><span class="p">:</span>
+            <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">req</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Removed </span><span class="si">%r</span><span class="s2"> from default requirements for runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">req</span><span class="p">,</span>
+                <span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">any_change</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="n">req</span> <span class="ow">in</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">packages</span><span class="p">:</span>
+            <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">req</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Removed </span><span class="si">%r</span><span class="s2"> from development requirements for runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">req</span><span class="p">,</span>
+                <span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">any_change</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">any_change</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Requirement </span><span class="si">%r</span><span class="s2"> not found in project requirements for runtime environment </span><span class="si">%r</span><span class="s2">, &quot;</span>
+                <span class="s2">&quot;aborting making any changes&quot;</span><span class="p">,</span>
+                <span class="n">req</span><span class="p">,</span>
+                <span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+        <span class="s2">&quot;Changes done might require triggering new advise to resolve dependencies&quot;</span>
+    <span class="p">)</span>
+    <span class="n">configuration</span><span class="o">.</span><span class="n">save_project</span><span class="p">(</span><span class="n">project</span><span class="p">)</span>
 
 
 <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span> <span class="ow">and</span> <span class="n">cli</span><span class="p">()</span>
