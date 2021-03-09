@@ -445,10 +445,15 @@
 <span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;pip_args&quot;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
 <span class="k">def</span> <span class="nf">install</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span> <span class="n">pip_args</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Install dependencies as stated in Pipfile.lock or requirements.txt.</span>
+    <span class="sd">&quot;&quot;&quot;Install dependencies as stated in the lock file.</span>
 
 <span class="sd">    This command assumes requirements files are present and dependencies are already resolved.</span>
-<span class="sd">    If that&#39;s not the case, issue `thamos advise` before calling this.</span>
+<span class="sd">    If that&#39;s not the case, issue `thamos advise` before running this command.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos install --runtime-environment &quot;testing&quot;</span>
+
+<span class="sd">      thamos install --dev</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">thamos_install</span><span class="p">(</span>
@@ -561,7 +566,22 @@
     <span class="n">install</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">write_advised_manifest_changes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Ask Thoth for recommendations on application stack.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;Ask Thoth for recommendations on the application stack.</span>
+
+<span class="sd">    Ask the remote Thoth service for advise on the application stack used. The command</span>
+<span class="sd">    collects information stated in the .thoth.yaml file for the given runtime environment,</span>
+<span class="sd">    static source code analysis and requirements for the application and sends them to the</span>
+<span class="sd">    remote service. Optionally, install packages resolved by Thoth.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos advise --runtime-environment &quot;testing&quot;</span>
+
+<span class="sd">      thamos advise --dev</span>
+
+<span class="sd">      thamos advise --install</span>
+
+<span class="sd">      thamos advise --no-static-analysis --no-user-stack</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">install</span> <span class="ow">and</span> <span class="n">no_wait</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Cannot install dependencies as --no-wait was provided&quot;</span><span class="p">)</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
@@ -707,7 +727,14 @@
     <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Check provenance of installed packages.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;Check provenance of installed packages.</span>
+
+<span class="sd">    Collect information about direct dependencies and dependencies stated in the lock file</span>
+<span class="sd">    and send them to the remote service to verify their provenance.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos provenance-check --runtime-environment &quot;production&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">get_overlays_directory</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">)):</span>
         <span class="k">if</span> <span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span> <span class="o">!=</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -749,12 +776,12 @@
 
 <span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
-<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;ANALYSIS_ID&quot;</span><span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
 <span class="k">def</span> <span class="nf">log</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Get log of running or finished analysis.</span>
 
-<span class="sd">    If ANALYSIS_ID is not provided, there will be used last analysis id, if noted by Thamos.</span>
+<span class="sd">    If ANALYSIS_ID is not provided, the last request is used by default.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_id</span><span class="p">:</span>
         <span class="k">with</span> <span class="n">workdir</span><span class="p">():</span>
@@ -767,7 +794,7 @@
 
 <span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;status&quot;</span><span class="p">)</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
-<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;ANALYSIS_ID&quot;</span><span class="p">)</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
     <span class="s2">&quot;--output-format&quot;</span><span class="p">,</span>
     <span class="s2">&quot;-o&quot;</span><span class="p">,</span>
@@ -781,7 +808,12 @@
 <span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Get status of an analysis.</span>
 
-<span class="sd">    If ANALYSIS_ID is not provided, there will be used last analysis id, if noted by Thamos.</span>
+<span class="sd">    If ANALYSIS_ID is not provided, the last request is used by default.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos status</span>
+
+<span class="sd">      thamos status &quot;adviser-940101080006-110c392feb7cf6da&quot;</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_id</span><span class="p">:</span>
         <span class="k">with</span> <span class="n">workdir</span><span class="p">():</span>
@@ -818,7 +850,11 @@
 <span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
 <span class="nd">@handle_cli_exception</span>
 <span class="k">def</span> <span class="nf">list_</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;List available runtime environments configured.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;List available runtime environments configured.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos list</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">with</span> <span class="n">workdir</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">CONFIG_NAME</span><span class="p">):</span>
         <span class="n">environments</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">list_runtime_environments</span><span class="p">()</span>
 
@@ -851,7 +887,11 @@
 <span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
 <span class="k">def</span> <span class="nf">show</span><span class="p">(</span><span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Show configuration of available runtime environments configured.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;Show details for configured runtime environments.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos show --runtime-environment &quot;development&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">with</span> <span class="n">workdir</span><span class="p">(</span><span class="n">configuration</span><span class="o">.</span><span class="n">CONFIG_NAME</span><span class="p">):</span>
         <span class="n">environments</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">list_runtime_environments</span><span class="p">()</span>
 
@@ -900,10 +940,11 @@
 <span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
 <span class="k">def</span> <span class="nf">config</span><span class="p">(</span><span class="n">no_interactive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">template</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Adjust Thamos and Thoth remote configuration.</span>
+    <span class="sd">&quot;&quot;&quot;Adjust Thamos and Thoth configuration.</span>
 
-<span class="sd">    Perform autodiscovery of available hardware and software on the host and</span>
-<span class="sd">    create a default configuration for Thoth (placed into .thoth.yaml).</span>
+<span class="sd">    Open the .thoth.yaml configuration file. If does not exist yet, perform</span>
+<span class="sd">    auto-discovery of available hardware and software on the host and</span>
+<span class="sd">    create a default configuration for Thoth.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">template</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
@@ -951,7 +992,16 @@
 <span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
 <span class="k">def</span> <span class="nf">check</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Check configuration file and runtime environment.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;Check the configuration file and runtime environment.</span>
+
+<span class="sd">    Check the correctness of the configuration file and runtime environment configuration</span>
+<span class="sd">    for the current host.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        thamos check --runtime-environment &quot;production&quot;</span>
+
+<span class="sd">        thamos check --output-format yaml</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">check</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;yaml&quot;</span><span class="p">:</span>
@@ -1005,7 +1055,11 @@
 <span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
 <span class="k">def</span> <span class="nf">s2i</span><span class="p">(</span><span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Check available Thoth Source-To-Images offered.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;Check available Thoth Source-To-Image containers.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos s2i --output-format json</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">list_thoth_s2i</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;yaml&quot;</span><span class="p">:</span>
@@ -1060,7 +1114,12 @@
 <span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
 <span class="k">def</span> <span class="nf">hw</span><span class="p">(</span><span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;List available hardware information for which Thoth can assist with recommendations.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;List available hardware information on backend.</span>
+
+<span class="sd">    List available hardware information on the backend for which resolver can give more detailed information.</span>
+<span class="sd">    This hardware configuration is not enforced and is find if it does not match the one available on the</span>
+<span class="sd">    client side.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">list_hardware_environments</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;yaml&quot;</span><span class="p">:</span>
@@ -1112,7 +1171,7 @@
 <span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
 <span class="k">def</span> <span class="nf">indexes</span><span class="p">(</span><span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;List available hardware information for which Thoth can assist with recommendations.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;List available Python package indexes.&quot;&quot;&quot;</span>
     <span class="n">result</span> <span class="o">=</span> <span class="n">list_python_package_indexes</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;yaml&quot;</span><span class="p">:</span>
@@ -1187,10 +1246,19 @@
     <span class="n">index_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Add one or multiple requirements.</span>
+    <span class="sd">&quot;&quot;&quot;Add one or multiple requirements to the project.</span>
 
-<span class="sd">    Add one or multiple requirement to the direct dependency listing without actually installing them.</span>
+<span class="sd">    Add one or multiple requirements to the direct dependency listing without actually installing them.</span>
 <span class="sd">    The supplied requirement is specified using PEP-508 standard.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos add flask</span>
+
+<span class="sd">      thamos add tensorflow --runtime-environment &quot;training&quot;</span>
+
+<span class="sd">      thamos add --dev &#39;pytest~=6.2.0&#39;</span>
+
+<span class="sd">      thamos add &#39;importlib-metadata; python_version &lt; &quot;3.8&quot;&#39;</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">project</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get_project</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">,</span> <span class="n">missing_dir_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">req</span> <span class="ow">in</span> <span class="n">requirement</span><span class="p">:</span>
@@ -1226,7 +1294,13 @@
     <span class="n">requirement</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Remove the given requirement.&quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;Remove the given requirement.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos remove flask</span>
+
+<span class="sd">      thamos remove pytest --runtime-environment &quot;training&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">project</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get_project</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">)</span>
 
     <span class="k">for</span> <span class="n">req</span> <span class="ow">in</span> <span class="n">requirement</span><span class="p">:</span>

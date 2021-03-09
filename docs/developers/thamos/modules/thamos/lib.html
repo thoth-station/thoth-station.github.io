@@ -115,6 +115,7 @@
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">UnknownAnalysisType</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="ne">TimeoutError</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">ApiError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NoDevRequirements</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NoRequirementsFile</span>
 
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Dict</span>
@@ -990,11 +991,29 @@
                 <span class="k">raise</span> <span class="n">NoRequirementsFile</span><span class="p">(</span>
                     <span class="sa">f</span><span class="s2">&quot;No Pipfile found in </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span><span class="si">!r}</span><span class="s2"> needed for the installation process&quot;</span>
                 <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">dev</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pipfile_lock_file</span><span class="p">:</span>
+                    <span class="n">content</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">pipfile_lock_file</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;develop&quot;</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="n">NoDevRequirements</span><span class="p">(</span>
+                        <span class="s2">&quot;No development requirements found in the lock file, make sure development &quot;</span>
+                        <span class="s2">&quot;requirements are stated and the resolved stack preserves them by &quot;</span>
+                        <span class="s2">&quot;using `thamos advise --dev`&quot;</span>
+                    <span class="p">)</span>
+
+                <span class="k">del</span> <span class="n">content</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s2">&quot;requirements.txt&quot;</span><span class="p">):</span>
                 <span class="k">raise</span> <span class="n">NoRequirementsFile</span><span class="p">(</span>
                     <span class="sa">f</span><span class="s2">&quot;No requirements.txt file found in </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span><span class="si">!r}</span><span class="s2"> needed to install dependencies&quot;</span>
                 <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">runtime_environment_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">config_entry</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="p">)</span>
+            <span class="n">runtime_environment_name</span> <span class="o">=</span> <span class="n">config_entry</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Installing requirements for runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">runtime_environment_name</span><span class="p">)</span>
 
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">&quot;Using </span><span class="si">%r</span><span class="s2"> installation method to install dependencies stated in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
