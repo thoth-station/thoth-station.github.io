@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.lib &#8212; Thamos 1.14.0 documentation</title>
+    <title>thamos.lib &#8212; Thamos 1.15.0 documentation</title>
     <link rel="stylesheet" href="/assets/thamos/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/thamos/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="/assets/thamos/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.14.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.15.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -1020,7 +1020,39 @@
             <span class="n">method</span><span class="p">,</span>
             <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span>
         <span class="p">)</span>
-        <span class="n">micropipenv</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">,</span> <span class="n">deploy</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span> <span class="n">pip_args</span><span class="o">=</span><span class="n">pip_args</span><span class="p">)</span></div>
+
+        <span class="n">micropipenv_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">method</span><span class="p">,</span>
+            <span class="s2">&quot;deploy&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">&quot;dev&quot;</span><span class="p">:</span> <span class="n">dev</span><span class="p">,</span>
+            <span class="s2">&quot;pip_args&quot;</span><span class="p">:</span> <span class="n">pip_args</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="n">virtualenv_path</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">get_virtualenv_path</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">virtualenv_path</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">):</span>
+                <span class="n">thoth_config</span><span class="o">.</span><span class="n">create_virtualenv</span><span class="p">()</span>
+
+            <span class="n">micropipenv_kwargs</span><span class="p">[</span><span class="s2">&quot;pip_bin&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">,</span> <span class="s2">&quot;bin&quot;</span><span class="p">,</span> <span class="s2">&quot;pip3&quot;</span><span class="p">)</span>
+
+        <span class="c1"># micropipenv writes and prints the lockfile which is not very user friendly when thamos is used by a user.</span>
+        <span class="c1"># Suppress this behavior unless these environment variables options are supplied explicitly.</span>
+        <span class="n">old_write</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_WRITE&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">old_write</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_WRITE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+
+        <span class="n">old_print</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_PRINT&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">old_print</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_PRINT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">micropipenv</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="o">**</span><span class="n">micropipenv_kwargs</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">old_write</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_WRITE&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">old_print</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_PRINT&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="list_hardware_environments"><a class="viewcode-back" href="../../thamos.html#thamos.lib.list_hardware_environments">[docs]</a><span class="nd">@with_api_client</span>

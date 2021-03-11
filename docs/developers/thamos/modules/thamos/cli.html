@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.cli &#8212; Thamos 1.14.0 documentation</title>
+    <title>thamos.cli &#8212; Thamos 1.15.0 documentation</title>
     <link rel="stylesheet" href="/assets/thamos/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/thamos/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="/assets/thamos/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.14.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.15.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -72,11 +72,13 @@
 
 <span class="sd">&quot;&quot;&quot;Command line interface Thamos for interaction with Thoth.&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">typing</span>
-<span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">import</span> <span class="nn">sys</span>
 <span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">typing</span>
 <span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
@@ -454,6 +456,8 @@
 <span class="sd">      thamos install --runtime-environment &quot;testing&quot;</span>
 
 <span class="sd">      thamos install --dev</span>
+
+<span class="sd">      thamos install --no-dev -- --force-reinstall</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">thamos_install</span><span class="p">(</span>
@@ -464,6 +468,116 @@
             <span class="s2">&quot;Changes made to packages are not reflected in the lock file, please install &quot;</span>
             <span class="s2">&quot;using `thamos advise --install` to apply changes made: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
             <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">),</span>
+        <span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_error_virtual_environment</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Print error and exit if virtual environment was not setup.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">configuration</span><span class="o">.</span><span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;virtualenv&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;No virtual environment created yet, create it using `thamos install`&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;No virtual environment management configured, use `thamos config` to adjust configuration&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;run&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;command&quot;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;CMD&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify explicitly runtime environment to get recommendations for; &quot;</span>
+    <span class="s2">&quot;defaults to the first entry in the configuration file.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">command</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Run the command in virtual environment.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos run ./app.py</span>
+
+<span class="sd">      thamos run --runtime-environment &quot;testing&quot; -- flask --help</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">virtualenv_path</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get_virtualenv_path</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">)</span>
+    <span class="n">python_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">,</span> <span class="s2">&quot;bin&quot;</span><span class="p">,</span> <span class="s2">&quot;python&quot;</span><span class="p">)</span>
+    <span class="n">_error_virtual_environment</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">)</span>
+    <span class="c1"># No magic here.</span>
+    <span class="n">cmd</span> <span class="o">=</span> <span class="p">[</span><span class="n">python_path</span><span class="p">,</span> <span class="o">*</span><span class="n">command</span><span class="p">]</span>
+    <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">universal_newlines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;venv&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify explicitly runtime environment to get recommendations for; &quot;</span>
+    <span class="s2">&quot;defaults to the first entry in the configuration file.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span> <span class="nf">venv</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Get path of the virtual environment.&quot;&quot;&quot;</span>
+    <span class="n">virtualenv_path</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get_virtualenv_path</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">)</span>
+    <span class="n">_error_virtual_environment</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;purge&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify explicitly runtime environment to get recommendations for; &quot;</span>
+    <span class="s2">&quot;defaults to the first entry in the configuration file.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--all&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-A&quot;</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Purge virtual environments for all the runtime environments configured.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span> <span class="nf">purge</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">all</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Remove virtual environment created.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">      thamos purge</span>
+
+<span class="sd">      thamos purge --runtime-environment &quot;testing&quot;</span>
+
+<span class="sd">      thamos purge --all</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">all</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">runtime_environment_config</span> <span class="ow">in</span> <span class="n">configuration</span><span class="o">.</span><span class="n">list_runtime_environments</span><span class="p">():</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Removing virtual environment for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">runtime_environment_config</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span>
+                <span class="n">configuration</span><span class="o">.</span><span class="n">get_virtualenv_path</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">),</span>
+                <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">runtime_environment_config</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">(</span>
+            <span class="n">runtime_environment</span>
+        <span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;Removing virtual environment for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">runtime_environment_config</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span>
+            <span class="n">configuration</span><span class="o">.</span><span class="n">get_virtualenv_path</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">),</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span>
         <span class="p">)</span>
 
 
