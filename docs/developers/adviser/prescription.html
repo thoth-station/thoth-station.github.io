@@ -1,0 +1,491 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Declarative prescription for resolver &#8212; Thoth Adviser 0.26.0 documentation</title>
+    <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="/assets/adviser/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/adviser/jquery.js"></script>
+    <script type="text/javascript" src="/assets/adviser/underscore.js"></script>
+    <script type="text/javascript" src="/assets/adviser/doctools.js"></script>
+    <script type="text/javascript" src="/assets/adviser/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Random state space sampling" href="predictors/sampling.html" />
+    <link rel="prev" title="Wrap pipeline unit type" href="wraps.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="predictors/sampling.html" title="Random state space sampling"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="wraps.html" title="Wrap pipeline unit type"
+             accesskey="P">previous</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.26.0 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="declarative-prescription-for-resolver">
+<span id="prescription"></span><h1>Declarative prescription for resolver<a class="headerlink" href="#declarative-prescription-for-resolver" title="Permalink to this headline">¶</a></h1>
+<p>The implementation allows to declaratively specify pipeline units that should
+be included in the resolver pipeline without actually implementing any Python
+classes. The document below describes core mechanics behind creating such
+prescription for the resolver. Note the declarative prescription allows to
+quickly provide pipeline units that assist the resolution process but have
+limited expressive capabilities. For more sophisticated pipeline units one can
+still use the programmable interface.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>All the units created based on prescription live in their own namespace. Names
+cannot clash when different units of <strong>different</strong> type share the name. Also,
+they cannot clash with pipeline unit names provided by the Python
+implementation.</p>
+<p>However, it’s recommended not to use same unit names for different units.</p>
+</div>
+<div class="section" id="prescription-yaml-v1">
+<h2>Prescription YAML v1<a class="headerlink" href="#prescription-yaml-v1" title="Permalink to this headline">¶</a></h2>
+<p>Here is a core part of the prescription YAML document:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">apiVersion</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">thoth-station.ninja/v1</span>
+<span class="nt">kind</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">prescription</span>
+<span class="nt">spec</span><span class="p">:</span>
+  <span class="nt">units</span><span class="p">:</span>
+    <span class="nt">boots</span><span class="p">:</span> <span class="p p-Indicator">[]</span>
+    <span class="nt">pseudonyms</span><span class="p">:</span> <span class="p p-Indicator">[]</span>
+    <span class="nt">sieves</span><span class="p">:</span> <span class="p p-Indicator">[]</span>
+    <span class="nt">steps</span><span class="p">:</span> <span class="p p-Indicator">[]</span>
+    <span class="nt">strides</span><span class="p">:</span> <span class="p p-Indicator">[]</span>
+    <span class="nt">wraps</span><span class="p">:</span> <span class="p p-Indicator">[]</span>
+</pre></div>
+</div>
+<p>Each unit entry in the respective <code class="docutils literal notranslate"><span class="pre">units</span></code> section corresponding to a pipeline
+unit type declaratively describes a unit and its action that should be done
+when conditions are met.</p>
+<p>The core scheme for a unit declaration is:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">UnitName</span>       <span class="c1"># A unique unit name.</span>
+  <span class="nt">type</span><span class="p">:</span> <span class="s">&#39;&lt;unit_type&gt;&#39;</span>  <span class="c1"># One of boot, sieve, step, stride, wrap, pseudonym.</span>
+  <span class="nt">should_include</span><span class="p">:</span>      <span class="c1"># Section describing when the unit should be included.</span>
+    <span class="l l-Scalar l-Scalar-Plain">&lt;should_include_section&gt;</span>
+  <span class="nt">run</span><span class="p">:</span>
+    <span class="l l-Scalar l-Scalar-Plain">&lt;run_section&gt;</span>      <span class="c1"># Section describing the actual unit logic when it is run.</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="registering-pipeline-units-should-include">
+<h2>Registering pipeline units - <code class="docutils literal notranslate"><span class="pre">should_include</span></code><a class="headerlink" href="#registering-pipeline-units-should-include" title="Permalink to this headline">¶</a></h2>
+<p>The document below describes how pipeline units can be configured for inclusion
+in the resolution process. This section is shared for pipeline units of any type.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">times</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>                           <span class="c1"># How many times should be the pipeline unit included (accepts 0 or 1).</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>             <span class="c1"># Register in the adviser resolution, defaults to false if not provided.</span>
+  <span class="nt">dependency_monkey_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>   <span class="c1"># Register for Dependency Monkey resolution, defaults to false if not provided.</span>
+  <span class="nt">dependencies</span><span class="p">:</span>                      <span class="c1"># Pipeline units that should be included in the configuration prior to including this unit. Defaults to no dependency restrictions if not provided.</span>
+    <span class="nt">boots</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">SomeBoot1</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">SomeBoot2</span>
+    <span class="nt">pseudonyms</span><span class="p">:</span>
+    <span class="nt">sieves</span><span class="p">:</span>
+    <span class="nt">steps</span><span class="p">:</span>
+    <span class="nt">strides</span><span class="p">:</span>
+    <span class="nt">wraps</span><span class="p">:</span>
+  <span class="nt">recommendation_types</span><span class="p">:</span>              <span class="c1"># Recommendation types for which the pipeline unit should be included if adviser_pipeline=true. Defaults to all available if not provided.</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">latest</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">performance</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">security</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">stable</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">testing</span>
+  <span class="nt">decision_types</span><span class="p">:</span>                    <span class="c1"># Decision types for which the pipeline unit should be included if dependency_monkey_pipeline=true. Defaults to all available if not provided.</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">random</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">all</span>
+  <span class="nt">runtime_environment</span><span class="p">:</span>               <span class="c1"># User&#39;s runtime environment used for which the resolution is triggered.</span>
+    <span class="nt">operating_system</span><span class="p">:</span>                <span class="c1"># Name and version of the user&#39;s operating system.</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="s">&#39;rhel&#39;</span>
+      <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;8&#39;</span>
+    <span class="nt">hardware</span><span class="p">:</span>                        <span class="c1"># Hardware information present on the user&#39;s machine.</span>
+      <span class="nt">cpu_family</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>
+      <span class="nt">cpu_model</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">2</span>
+      <span class="nt">gpu_model</span><span class="p">:</span> <span class="s">&#39;Nvidia</span><span class="nv"> </span><span class="s">GeForce</span><span class="nv"> </span><span class="s">GTX</span><span class="nv"> </span><span class="s">1060&#39;</span>
+    <span class="nt">python_version</span><span class="p">:</span> <span class="s">&#39;3.6&#39;</span>            <span class="c1"># Python interpreter version used to run the application.</span>
+    <span class="nt">cuda_version</span><span class="p">:</span> <span class="s">&#39;9.0&#39;</span>
+    <span class="nt">platform</span><span class="p">:</span> <span class="s">&#39;linux-x86_64&#39;</span>
+    <span class="nt">openblas_version</span><span class="p">:</span> <span class="s">&#39;0.3.13&#39;</span>
+    <span class="nt">openmpi_version</span><span class="p">:</span> <span class="s">&#39;4.1&#39;</span>
+    <span class="nt">cudnn_version</span><span class="p">:</span> <span class="s">&#39;8.1.0&#39;</span>
+    <span class="nt">mkl_version</span><span class="p">:</span> <span class="s">&#39;2021.1.1&#39;</span>
+    <span class="nt">base_image</span><span class="p">:</span> <span class="s">&#39;quay.io/thoth-station/s2i-thoth-ubi8-py36:v1.0.0&#39;</span>  <span class="c1"># Base image used for running the application.</span>
+</pre></div>
+</div>
+<p>The configuration options not stated do not enforce the given configuration.
+For example, not stating <code class="docutils literal notranslate"><span class="pre">python_version</span></code> means that the pipeline unit will
+not consider Python interpreter version running as a restriction to be
+registered.</p>
+</div>
+<div class="section" id="boots">
+<h2>Boots<a class="headerlink" href="#boots" title="Permalink to this headline">¶</a></h2>
+<p>See <a class="reference internal" href="boots.html#boots"><span class="std std-ref">boot pipeline unit</span></a> for more information on semantics.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">BootUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">boot</span>
+<span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>                                          <span class="c1"># Criteria to trigger run of this pipeline unit. Defaults to always running the boot pipeline unit if no package_name is provided.</span>
+    <span class="nt">package_name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">flask</span>                           <span class="c1"># Name of the package that needs to be present in the direct dependency listing to run this unit.</span>
+
+  <span class="c1"># Configuration of prematurely terminating the resolution process - the</span>
+  <span class="c1"># message will be reported to the user. If this configuration option is not</span>
+  <span class="c1"># set, the resolver will not terminate when running this unit.</span>
+  <span class="nt">eager_stop_pipeline</span><span class="p">:</span> <span class="s">&quot;Terminating</span><span class="nv"> </span><span class="s">resolution</span><span class="nv"> </span><span class="s">as</span><span class="nv"> </span><span class="s">&#39;flask&#39;</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">direct</span><span class="nv"> </span><span class="s">dependencies.&quot;</span>
+
+   <span class="c1"># Configuration of prematurely terminating the resolution process.</span>
+  <span class="nt">not_acceptable</span><span class="p">:</span> <span class="s">&quot;Cannot</span><span class="nv"> </span><span class="s">include</span><span class="nv"> </span><span class="s">this</span><span class="nv"> </span><span class="s">package&quot;</span>
+
+  <span class="nt">log</span><span class="p">:</span>
+    <span class="nt">text</span><span class="p">:</span> <span class="s">&quot;Some</span><span class="nv"> </span><span class="s">text</span><span class="nv"> </span><span class="s">printed</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">log</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">pipeline</span><span class="nv"> </span><span class="s">unit</span><span class="nv"> </span><span class="s">run.&quot;</span>
+    <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;WARNING&quot;</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="pseudonyms">
+<h2>Pseudonyms<a class="headerlink" href="#pseudonyms" title="Permalink to this headline">¶</a></h2>
+<p>See <a class="reference internal" href="pseudonyms.html#pseudonyms"><span class="std std-ref">pseudonym pipeline unit</span></a> for more information on
+semantics.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">PseudonymUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">pseudonym</span>
+<span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">log</span><span class="p">:</span>                                            <span class="c1"># Optional text printed to logs when the unit gets called.</span>
+    <span class="nt">text</span><span class="p">:</span> <span class="s">&quot;Some</span><span class="nv"> </span><span class="s">text</span><span class="nv"> </span><span class="s">printed</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">log</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">pipeline</span><span class="nv"> </span><span class="s">unit</span><span class="nv"> </span><span class="s">run.&quot;</span>
+    <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;WARNING&quot;</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>                                     <span class="c1"># Information printed to the recommended stack report.</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">world&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>           <span class="c1"># A link to justifications or a link to a web page.</span>
+
+  <span class="nt">match</span><span class="p">:</span>                                          <span class="c1"># Criteria to trigger run of this pipeline unit. Defaults to always running the pseudonym pipeline unit if no package_version is provided.</span>
+    <span class="nt">package_version</span><span class="p">:</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">flask</span>                                 <span class="c1"># Mandatory, name of the package for which pseudonym should be registered.</span>
+      <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;&gt;1.0&lt;=1.1.0&#39;</span>                      <span class="c1"># Version specifier for which the pseudonym should be run. If not provided, defauts to any version.</span>
+      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>        <span class="c1"># Package source index for which the pseudonym should be run. If not provided, defaults to any index.</span>
+
+  <span class="nt">yield</span><span class="p">:</span>
+    <span class="c1"># Pseudonym that should be registered.</span>
+    <span class="nt">package_version</span><span class="p">:</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">flask</span>                                 <span class="c1"># Mandatory, name of the pseudonym package.</span>
+      <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;==1.2.0&#39;</span>                          <span class="c1"># Version of the pseudonym in a locked form.</span>
+      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>        <span class="c1"># Package source index where the pseudonym is hosted.</span>
+</pre></div>
+</div>
+<p>The pseudonym is registered for the specified criteria. The unit derived out of
+this declarative prescription will make sure the package yielded is known to
+the resolver.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>An example pipeline unit that suggests <code class="docutils literal notranslate"><span class="pre">intel-tensorflow</span></code> coming from PyPI as an alternative to <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">PseudonymUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">pseudonym</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">times</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>
+    <span class="nt">package_name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">tensorflow</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Considering</span><span class="nv"> </span><span class="s">also</span><span class="nv"> </span><span class="s">intel-tensorflow</span><span class="nv"> </span><span class="s">as</span><span class="nv"> </span><span class="s">an</span><span class="nv"> </span><span class="s">alternative</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">tensorflow&quot;</span>
+      <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;INFO&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="s">&quot;https://pypi.org/project/intel-tensorflow&quot;</span>
+
+  <span class="nt">yield</span><span class="p">:</span>
+    <span class="nt">package_version</span><span class="p">:</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">intel-tensorflow</span>
+      <span class="nt">index-url</span><span class="p">:</span> <span class="s">&quot;https://pypi.org/simple&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="sieves">
+<h2>Sieves<a class="headerlink" href="#sieves" title="Permalink to this headline">¶</a></h2>
+<p>See <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieve pipeline unit</span></a> for more information on
+semantics.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">SieveUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">sieve</span>
+<span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>                                          <span class="c1"># Criteria to trigger run of this pipeline unit. Defaults to always running the sieve pipeline unit if no package_version is provided.</span>
+    <span class="nt">package_version</span><span class="p">:</span>                              <span class="c1"># Any package matching this criteria will be filtered out from the resolution.</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">flask</span>                                 <span class="c1"># Name of the package for which the unit should be registered.</span>
+      <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;&gt;1.0&lt;=1.1.0&#39;</span>                      <span class="c1"># Version specifier for which the sieve should be run. If not provided, defauts to any version.</span>
+      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>        <span class="c1"># Package source index for which the sieve should be run. If not provided, defaults to any index.</span>
+
+  <span class="nt">log</span><span class="p">:</span>                                            <span class="c1"># Optional text printed to logs when the unit gets called.</span>
+    <span class="nt">text</span><span class="p">:</span> <span class="s">&quot;Some</span><span class="nv"> </span><span class="s">text</span><span class="nv"> </span><span class="s">printed</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">log</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">pipeline</span><span class="nv"> </span><span class="s">unit</span><span class="nv"> </span><span class="s">run.&quot;</span>
+    <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;WARNING&quot;</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>                                     <span class="c1"># Information printed to the recommended stack report.</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">world&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>           <span class="c1"># A link to justifications or a link to a web page.</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>An example pipeline unit that filters out <code class="docutils literal notranslate"><span class="pre">pysaml2</span></code> with the reported CVE.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">SieveUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">sieve</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">times</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+  <span class="nt">recommendation_types</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">security</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">stable</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>
+    <span class="nt">package_version</span><span class="p">:</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">pysaml2</span>
+      <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;&lt;6.5.0&#39;</span>
+      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Not</span><span class="nv"> </span><span class="s">considering</span><span class="nv"> </span><span class="s">package</span><span class="nv"> </span><span class="s">pysaml2</span><span class="nv"> </span><span class="s">based</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">vulnerability</span><span class="nv"> </span><span class="s">present&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="s">&quot;https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-21238&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="steps">
+<h2>Steps<a class="headerlink" href="#steps" title="Permalink to this headline">¶</a></h2>
+<p>See <span class="xref std std-ref">step pipeline unit</span> for more information on
+semantics.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">StepUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">step</span>
+<span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>                                          <span class="c1"># Criteria to trigger run of this pipeline unit. Defaults to always running the boot pipeline unit if no package_version is provided.</span>
+    <span class="nt">package_version</span><span class="p">:</span>                              <span class="c1"># Any package matching this criteria will be filtered out from the resolution.</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">flask</span>                                 <span class="c1"># Name of the package for which the unit should be registered.</span>
+      <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;&gt;1.0&lt;=1.1.0&#39;</span>                      <span class="c1"># Version specifier for which the sieve should be run. If not provided, defauts to any version.</span>
+      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>        <span class="c1"># Package source index for which the sieve should be run. If not provided, defaults to any index.</span>
+
+    <span class="nt">state</span><span class="p">:</span>                                        <span class="c1"># Optional, resolver internal state to match for the given resolution step.</span>
+      <span class="nt">resolved_dependencies</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">werkzeug</span>                          <span class="c1"># Dependencies that have to be present in the resolved state.</span>
+          <span class="nt">locked_version</span><span class="p">:</span> <span class="s">&quot;1.0.0&quot;</span>
+          <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>
+
+  <span class="nt">score</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">0.42</span>                                     <span class="c1"># Score assigned to the step performed in the resolution.</span>
+  <span class="nt">justification</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">INFO</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">Thoth!&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>
+
+  <span class="nt">not_acceptable</span><span class="p">:</span> <span class="s">&quot;Bad</span><span class="nv"> </span><span class="s">package</span><span class="nv"> </span><span class="s">inclusion&quot;</span>         <span class="c1"># Block including certain package during the resolution.</span>
+
+  <span class="c1"># Configuration of prematurely terminating the resolution process.</span>
+  <span class="nt">eager_stop_pipeline</span><span class="p">:</span> <span class="s">&quot;Stop</span><span class="nv"> </span><span class="s">pipeline&quot;</span>
+
+  <span class="nt">multi_package_resolution</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">false</span>                 <span class="c1"># Run this pipeline multiple times when matched mutliple times. Defaults to false if not provided.</span>
+
+  <span class="nt">log</span><span class="p">:</span>                                            <span class="c1"># Optional text printed to logs when the unit gets called.</span>
+    <span class="nt">text</span><span class="p">:</span> <span class="s">&quot;Some</span><span class="nv"> </span><span class="s">text</span><span class="nv"> </span><span class="s">printed</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">log</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">pipeline</span><span class="nv"> </span><span class="s">unit</span><span class="nv"> </span><span class="s">run.&quot;</span>
+    <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;WARNING&quot;</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>                                     <span class="c1"># Information printed to the recommended stack report.</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">world&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>           <span class="c1"># A link to justifications or a link to a web page.</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>An example pipeline unit that filters out <code class="docutils literal notranslate"><span class="pre">pysaml2</span></code> with the reported CVE.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">StepUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">step</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">times</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>
+    <span class="nt">package_version</span><span class="p">:</span>
+      <span class="c1"># Considering builds available also on other indexes than PyPI.</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">tensorflow</span>
+      <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;~=2.4.0&#39;</span>
+
+    <span class="nt">state</span><span class="p">:</span>
+      <span class="nt">resolved_dependencies</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">numpy</span>
+          <span class="nt">locked_version</span><span class="p">:</span> <span class="s">&quot;==1.19.1&quot;</span>
+          <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>
+
+  <span class="nt">not_acceptable</span><span class="p">:</span> <span class="s">&quot;NumPy==1.19.5</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">causing</span><span class="nv"> </span><span class="s">issues</span><span class="nv"> </span><span class="s">when</span><span class="nv"> </span><span class="s">used</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">TensorFlow</span><span class="nv"> </span><span class="s">2.4&quot;</span>
+  <span class="nt">multi_package_resolution</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;NumPy==1.19.5</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">causing</span><span class="nv"> </span><span class="s">issues</span><span class="nv"> </span><span class="s">when</span><span class="nv"> </span><span class="s">used</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">TensorFlow</span><span class="nv"> </span><span class="s">2.4&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="s">&quot;https://thoth-station.ninja/j/tf_24_np.html&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="strides">
+<h2>Strides<a class="headerlink" href="#strides" title="Permalink to this headline">¶</a></h2>
+<p>See <span class="xref std std-ref">step pipeline unit</span> for more information on
+semantics.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">StrideUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">stride</span>
+<span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>                                          <span class="c1"># Criteria to trigger run of this pipeline unit. Defaults to always running the boot pipeline unit if no package_version is provided.</span>
+    <span class="nt">state</span><span class="p">:</span>                                        <span class="c1"># Optional, resolver internal state to match for the given stride.</span>
+      <span class="nt">resolved_dependencies</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">werkzeug</span>                          <span class="c1"># Dependencies that have to be present in the resolved state.</span>
+          <span class="nt">locked_version</span><span class="p">:</span> <span class="s">&quot;1.0.0&quot;</span>
+          <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>
+
+  <span class="nt">not_acceptable</span><span class="p">:</span> <span class="s">&quot;Bad</span><span class="nv"> </span><span class="s">package</span><span class="nv"> </span><span class="s">inclusion&quot;</span>         <span class="c1"># Block resolving the given stack.</span>
+
+  <span class="c1"># Configuration of prematurely terminating the resolution process.</span>
+  <span class="nt">eager_stop_pipeline</span><span class="p">:</span> <span class="s">&quot;Stop</span><span class="nv"> </span><span class="s">pipeline&quot;</span>
+
+  <span class="nt">log</span><span class="p">:</span>                                            <span class="c1"># Optional text printed to logs when the unit gets called.</span>
+    <span class="nt">text</span><span class="p">:</span> <span class="s">&quot;Some</span><span class="nv"> </span><span class="s">text</span><span class="nv"> </span><span class="s">printed</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">log</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">pipeline</span><span class="nv"> </span><span class="s">unit</span><span class="nv"> </span><span class="s">run.&quot;</span>
+    <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;WARNING&quot;</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>                                     <span class="c1"># Information printed to the recommended stack report.</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">world&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>           <span class="c1"># A link to justifications or a link to a web page.</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="wraps">
+<h2>Wraps<a class="headerlink" href="#wraps" title="Permalink to this headline">¶</a></h2>
+<p>See <span class="xref std std-ref">wrap pipeline unit</span> for more information on
+semantics.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WrapUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">wrap</span>
+<span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>                                          <span class="c1"># Criteria to trigger run of this pipeline unit. Defaults to always running the boot pipeline unit if no package_version is provided.</span>
+    <span class="nt">state</span><span class="p">:</span>                                        <span class="c1"># Optional, resolver internal state to match for the given stride.</span>
+      <span class="nt">resolved_dependencies</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">werkzeug</span>                          <span class="c1"># Dependencies that have to be present in the resolved state.</span>
+          <span class="nt">locked_version</span><span class="p">:</span> <span class="s">&quot;1.0.0&quot;</span>
+          <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>
+
+  <span class="nt">not_acceptable</span><span class="p">:</span> <span class="s">&quot;Bad</span><span class="nv"> </span><span class="s">package</span><span class="nv"> </span><span class="s">inclusion&quot;</span>         <span class="c1"># Block resolving the given stack.</span>
+
+  <span class="c1"># Configuration of prematurely terminating the resolution process.</span>
+  <span class="nt">eager_stop_pipeline</span><span class="p">:</span> <span class="s">&quot;Stop</span><span class="nv"> </span><span class="s">pipeline&quot;</span>
+
+  <span class="nt">log</span><span class="p">:</span>                                            <span class="c1"># Optional text printed to logs when the unit gets called.</span>
+    <span class="nt">text</span><span class="p">:</span> <span class="s">&quot;Some</span><span class="nv"> </span><span class="s">text</span><span class="nv"> </span><span class="s">printed</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">log</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">pipeline</span><span class="nv"> </span><span class="s">unit</span><span class="nv"> </span><span class="s">run.&quot;</span>
+    <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;WARNING&quot;</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>                                     <span class="c1"># Information printed to the recommended stack report.</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">world&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>           <span class="c1"># A link to justifications or a link to a web page.</span>
+
+  <span class="nt">justification</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">INFO</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">Thoth!&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Declarative prescription for resolver</a><ul>
+<li><a class="reference internal" href="#prescription-yaml-v1">Prescription YAML v1</a></li>
+<li><a class="reference internal" href="#registering-pipeline-units-should-include">Registering pipeline units - <code class="docutils literal notranslate"><span class="pre">should_include</span></code></a></li>
+<li><a class="reference internal" href="#boots">Boots</a></li>
+<li><a class="reference internal" href="#pseudonyms">Pseudonyms</a></li>
+<li><a class="reference internal" href="#sieves">Sieves</a></li>
+<li><a class="reference internal" href="#steps">Steps</a></li>
+<li><a class="reference internal" href="#strides">Strides</a></li>
+<li><a class="reference internal" href="#wraps">Wraps</a></li>
+</ul>
+</li>
+</ul>
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation index</a><ul>
+      <li>Previous: <a href="wraps.html" title="previous chapter">Wrap pipeline unit type</a></li>
+      <li>Next: <a href="predictors/sampling.html" title="next chapter">Random state space sampling</a></li>
+  </ul></li>
+</ul>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="sources/prescription.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
