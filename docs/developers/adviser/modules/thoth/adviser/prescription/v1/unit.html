@@ -73,6 +73,8 @@
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 <span class="kn">from</span> <span class="nn">packaging.specifiers</span> <span class="kn">import</span> <span class="n">SpecifierSet</span>
 
@@ -81,6 +83,7 @@
 <span class="kn">from</span> <span class="nn">thoth.adviser.exceptions</span> <span class="kn">import</span> <span class="n">NotAcceptable</span>
 <span class="kn">from</span> <span class="nn">thoth.adviser.exceptions</span> <span class="kn">import</span> <span class="n">EagerStopPipeline</span>
 <span class="kn">from</span> <span class="nn">thoth.adviser.state</span> <span class="kn">import</span> <span class="n">State</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
 
 <span class="kn">from</span> <span class="nn">...unit</span> <span class="kn">import</span> <span class="n">Unit</span>
 
@@ -95,7 +98,7 @@
 <span class="k">class</span> <span class="nc">UnitPrescription</span><span class="p">(</span><span class="n">Unit</span><span class="p">,</span> <span class="n">metaclass</span><span class="o">=</span><span class="n">abc</span><span class="o">.</span><span class="n">ABCMeta</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;A base class for implementing pipeline units based on prescription supplied.&quot;&quot;&quot;</span>
 
-    <span class="n">_PRESCRIPTION</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">_PRESCRIPTION</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
 
     <span class="n">prescription</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">run_prescription</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -103,14 +106,19 @@
     <span class="nd">@prescription</span><span class="o">.</span><span class="n">default</span>
     <span class="k">def</span> <span class="nf">_prescription_default</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Initialize prescription property.&quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_PRESCRIPTION</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;No assigned prescription on the class level to be set&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">_PRESCRIPTION</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_PRESCRIPTION</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No assigned prescription on the class level to be set&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_PRESCRIPTION</span>
 
     <span class="nd">@run_prescription</span><span class="o">.</span><span class="n">default</span>
     <span class="k">def</span> <span class="nf">_run_prescription_default</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Initialize the run prescription property.&quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">_PRESCRIPTION</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;No assigned prescription on the class level to be set&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="n">_PRESCRIPTION</span><span class="p">[</span><span class="s2">&quot;run&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_PRESCRIPTION</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No assigned prescription on the class level to be set&quot;</span><span class="p">)</span>
+
+        <span class="n">result</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_PRESCRIPTION</span><span class="p">[</span><span class="s2">&quot;run&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">result</span>
 
 <div class="viewcode-block" id="UnitPrescription.get_unit_name"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.unit.UnitPrescription.get_unit_name">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">get_unit_name</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -248,6 +256,19 @@
 
         <span class="k">return</span> <span class="kc">True</span>
 
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_prepare_justification_link</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">entries</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Prepare justification links before using them.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">:</span>
+            <span class="n">link</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;link&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">link</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">link</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;https://&quot;</span><span class="p">,</span> <span class="s2">&quot;http://&quot;</span><span class="p">)):</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;link&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="n">link</span><span class="p">)</span>
+
+<div class="viewcode-block" id="UnitPrescription.pre_run"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.unit.UnitPrescription.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Prepare this pipeline unit before running it.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_justification_link</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stack_info&quot;</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">pre_run</span><span class="p">()</span></div>
+
     <span class="k">def</span> <span class="nf">_run_log</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Log message specified in the run prescription.&quot;&quot;&quot;</span>
         <span class="n">log</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;log&quot;</span><span class="p">)</span>
@@ -256,8 +277,9 @@
 
     <span class="k">def</span> <span class="nf">_run_stack_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Add stack info if any prescribed.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stack_info&quot;</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="p">[</span><span class="s2">&quot;stack_info&quot;</span><span class="p">])</span>
+        <span class="n">stack_info</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stack_info&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">stack_info</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">stack_info</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_run_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Check state match.&quot;&quot;&quot;</span>
@@ -279,11 +301,13 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_run_log</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_run_stack_info</span><span class="p">()</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;not_acceptable&quot;</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="n">NotAcceptable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="p">[</span><span class="s2">&quot;not_acceptable&quot;</span><span class="p">])</span>
+        <span class="n">not_acceptable</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;not_acceptable&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">not_acceptable</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NotAcceptable</span><span class="p">(</span><span class="n">not_acceptable</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;eager_stop_pipeline&quot;</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="n">EagerStopPipeline</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="p">[</span><span class="s2">&quot;eager_stop_pipeline&quot;</span><span class="p">])</span></div>
+        <span class="n">eager_stop_pipeline</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;eager_stop_pipeline&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">eager_stop_pipeline</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">EagerStopPipeline</span><span class="p">(</span><span class="n">eager_stop_pipeline</span><span class="p">)</span></div>
 </pre></div>
 
           </div>
