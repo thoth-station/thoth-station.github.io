@@ -65,33 +65,31 @@ prescription for the resolver. Note the declarative prescription allows to
 quickly provide pipeline units that assist the resolution process but have
 limited expressive capabilities. For more sophisticated pipeline units one can
 still use the programmable interface.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>All the units created based on prescription live in their own namespace. Names
-cannot clash when different units of <em>different</em> type share the name. Also,
-they cannot clash with pipeline unit names provided by the Python
-implementation.</p>
-<p>However, it’s recommended not to use same unit names for different units.</p>
-</div>
-<p>One can see prescriptions as <a class="reference external" href="https://pip.pypa.io/en/stable/user_guide/#constraints-files">enhanced constraints</a> but on the server
-side. This way constraints can be generalized and applied also for multiple projects
-for which server-side resolution can provide guidance.</p>
+<p>One can see prescriptions as <a class="reference external" href="https://pip.pypa.io/en/stable/user_guide/#constraints-files">enhanced constraints</a> but on the
+server side. This way constraints can be generalized and applied also for
+multiple projects for which server-side resolution can provide guidance.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Prescription YAML specification provides unit abstractions that map to their
-Python code implementation. If you wish to create your own unit declaration in
-the YAML configuration suitable for your needs, just declare your YAML unit
-and provide its Python implementation. Core pipeline units can serve as
+Python code implementation. If you wish to create your own unit declaration
+in the YAML configuration suitable for your needs, just declare your YAML
+unit and provide its Python implementation. Core pipeline units can serve as
 a base for the implementation.</p>
 </div>
 <div class="section" id="prescription-yaml-v1">
 <h2>Prescription YAML v1<a class="headerlink" href="#prescription-yaml-v1" title="Permalink to this headline">¶</a></h2>
-<p>Here is a core part of the prescription YAML document:</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Check <a class="reference external" href="https://github.com/thoth-station/adviser/blob/master/thoth/adviser/prescription/v1/schema.py">thoth-station/adviser repository</a>
+to see the precise definition of the schema.</p>
+</div>
+<p>Each prescription YAML v1 document states the following core parts that will be
+discussed in detail in the upcoming sections.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">apiVersion</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">thoth-station.ninja/v1</span>
 <span class="nt">kind</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">prescription</span>
 <span class="nt">spec</span><span class="p">:</span>
-  <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">thoth</span>          <span class="c1"># Name of the prescription to create namespace for unit names.</span>
-  <span class="nt">release</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">2021.03.30</span>  <span class="c1"># A calendar release of the prescription.</span>
+  <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">thoth</span>
+  <span class="nt">release</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">2021.03.30</span>
   <span class="nt">units</span><span class="p">:</span>
     <span class="nt">boots</span><span class="p">:</span> <span class="p p-Indicator">[]</span>
     <span class="nt">pseudonyms</span><span class="p">:</span> <span class="p p-Indicator">[]</span>
@@ -101,79 +99,514 @@ a base for the implementation.</p>
     <span class="nt">wraps</span><span class="p">:</span> <span class="p p-Indicator">[]</span>
 </pre></div>
 </div>
-<p>Each unit entry in the respective <code class="docutils literal notranslate"><span class="pre">units</span></code> section corresponding to a pipeline
-unit type declaratively describes a unit and its action that should be done
-when conditions are met.</p>
-<p>The core scheme for a unit declaration is:</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">UnitName</span>       <span class="c1"># A unique unit name.</span>
-  <span class="nt">type</span><span class="p">:</span> <span class="s">&#39;&lt;unit_type&gt;&#39;</span>  <span class="c1"># One of boot, sieve, step, stride, wrap, pseudonym.</span>
-  <span class="nt">should_include</span><span class="p">:</span>      <span class="c1"># Section describing when the unit should be included.</span>
-    <span class="l l-Scalar l-Scalar-Plain">&lt;should_include_section&gt;</span>
-  <span class="nt">run</span><span class="p">:</span>
-    <span class="l l-Scalar l-Scalar-Plain">&lt;run_section&gt;</span>      <span class="c1"># Section describing the actual unit logic when it is run.</span>
+<p>The semantics behind entries stated:</p>
+<div class="section" id="apiversion">
+<h3><code class="docutils literal notranslate"><span class="pre">apiVersion</span></code><a class="headerlink" href="#apiversion" title="Permalink to this headline">¶</a></h3>
+<p>API version of the prescription.</p>
+<p>Prescription units are versioned and provide certain capabilities to describe
+the resolution process. Prescriptions implementing different API version can
+provide different semantics or different feature set. Make sure you refer to
+the right API version when using prescriptions.</p>
+</div>
+<div class="section" id="kind">
+<h3><code class="docutils literal notranslate"><span class="pre">kind</span></code><a class="headerlink" href="#kind" title="Permalink to this headline">¶</a></h3>
+<p>Always set to <code class="docutils literal notranslate"><span class="pre">prescription</span></code>.</p>
+</div>
+<div class="section" id="spec">
+<h3><code class="docutils literal notranslate"><span class="pre">spec</span></code><a class="headerlink" href="#spec" title="Permalink to this headline">¶</a></h3>
+<p>Prescription specification.</p>
+</div>
+<div class="section" id="spec-name">
+<h3><code class="docutils literal notranslate"><span class="pre">spec.name</span></code><a class="headerlink" href="#spec-name" title="Permalink to this headline">¶</a></h3>
+<p>Name of the prescription used to create namespace for declared prescription
+units.</p>
+<p><em>Example:</em> <code class="docutils literal notranslate"><span class="pre">thoth</span></code></p>
+</div>
+<div class="section" id="spec-release">
+<h3><code class="docutils literal notranslate"><span class="pre">spec.release</span></code><a class="headerlink" href="#spec-release" title="Permalink to this headline">¶</a></h3>
+<p>A release identifier for the prescription.</p>
+<p><em>Example:</em> A <a class="reference external" href="https://calver.org/">calver</a> can be used - <code class="docutils literal notranslate"><span class="pre">2020.03.30</span></code></p>
+</div>
+<div class="section" id="spec-units">
+<h3><code class="docutils literal notranslate"><span class="pre">spec.units</span></code><a class="headerlink" href="#spec-units" title="Permalink to this headline">¶</a></h3>
+<p>Units specified by the prescription grouped into categories based on their
+types.</p>
+</div>
+</div>
+<div class="section" id="unit-schema">
+<h2>Unit schema<a class="headerlink" href="#unit-schema" title="Permalink to this headline">¶</a></h2>
+<p>Each unit, regardless of its type, has the following schema:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="s">&#39;&lt;unit_name&gt;&#39;</span>
+<span class="nt">type</span><span class="p">:</span> <span class="s">&#39;&lt;unit_type&gt;&#39;</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="l l-Scalar l-Scalar-Plain">&lt;should_include_section&gt;</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="l l-Scalar l-Scalar-Plain">&lt;run_section&gt;</span>
+</pre></div>
+</div>
+<p>The semantics behind entries:</p>
+<div class="section" id="name">
+<h3><code class="docutils literal notranslate"><span class="pre">name</span></code><a class="headerlink" href="#name" title="Permalink to this headline">¶</a></h3>
+<p>Name of the unit that uniquely identifies the unit of the specific type.</p>
+<p>All the units created based on prescription live in their own namespace that is
+specified by the <code class="docutils literal notranslate"><span class="pre">name</span></code> of the prescription. This makes sure unit names do
+not clash across multiple prescriptions supplied.</p>
+</div>
+<div class="section" id="type">
+<h3><code class="docutils literal notranslate"><span class="pre">type</span></code><a class="headerlink" href="#type" title="Permalink to this headline">¶</a></h3>
+<p>Type of the unit, one of <code class="docutils literal notranslate"><span class="pre">boot</span></code>, <code class="docutils literal notranslate"><span class="pre">pseudonym</span></code>, <code class="docutils literal notranslate"><span class="pre">sieve</span></code>, <code class="docutils literal notranslate"><span class="pre">step</span></code>,
+<code class="docutils literal notranslate"><span class="pre">stride</span></code> and <code class="docutils literal notranslate"><span class="pre">wrap</span></code>.</p>
+</div>
+</div>
+<div class="section" id="including-a-unit-should-include">
+<h2>Including a unit - <code class="docutils literal notranslate"><span class="pre">should_include</span></code><a class="headerlink" href="#including-a-unit-should-include" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="should-include-times">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.times</span></code><a class="headerlink" href="#should-include-times" title="Permalink to this headline">¶</a></h3>
+<p>Number of times the given unit should be included in the resolution process.</p>
+<p>Possible values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">1</span></code> - the given pipeline unit should be included once in the resolution
+process if all the criteria for including it match (default)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">0</span></code> - the given pipeline unit will not be included in the resolution
+process - the given pipeline unit is off even thought it is stated in the
+YAML file</p></li>
+</ul>
+</div>
+<div class="section" id="should-include-adviser-pipeline">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.adviser_pipeline</span></code><a class="headerlink" href="#should-include-adviser-pipeline" title="Permalink to this headline">¶</a></h3>
+<p>Boolean stating whether the given pipeline pipeline unit will be part of
+“adviser” pipeline used for computing Thoth’s recommendations.</p>
+<p>Possible values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">false</span></code> - the given pipeline unit will not be part of the resolver pipeline
+when computing advises (default)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">true</span></code> - the given pipeline unit will be part of the resolver pipeline
+when computing advises</p></li>
+</ul>
+</div>
+<div class="section" id="should-include-recommendation-types">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.recommendation_types</span></code><a class="headerlink" href="#should-include-recommendation-types" title="Permalink to this headline">¶</a></h3>
+<p>A list of recommendation types that should be matched if the unit is registered
+for the adviser resolution pipeline.</p>
+<p>Alternatively, the list can be wrapped to a “not” statement which inverts
+the logic.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">adviser_pipeline</span></code> is set to <code class="docutils literal notranslate"><span class="pre">false</span></code>, this configuration option has no
+effect.</p>
+<p>See <a class="reference external" href="https://thoth-station.ninja/recommendation-types/">the listing of recommendation types available</a>.</p>
+</div>
+<div class="section" id="should-include-dependency-monkey-pipeline">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.dependency_monkey_pipeline</span></code><a class="headerlink" href="#should-include-dependency-monkey-pipeline" title="Permalink to this headline">¶</a></h3>
+<p>Boolean stating whether the given pipeline pipeline unit will base part of
+<a class="reference internal" href="dependency_monkey.html#dependency-monkey"><span class="std std-ref">Dependency Monkey</span></a> pipeline used for <a class="reference external" href="https://github.com/thoth-station/amun-api/">data
+acquisition and generation on Amun</a>.</p>
+<p>Possible values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">false</span></code> - the given pipeline unit will not be part of the resolver pipeline
+used for Dependency Monkey (default)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">true</span></code> - the given pipeline unit will be part of the resolver pipeline
+when running Dependency Monkey</p></li>
+</ul>
+</div>
+<div class="section" id="should-include-decision-types">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.decision_types</span></code><a class="headerlink" href="#should-include-decision-types" title="Permalink to this headline">¶</a></h3>
+<p>A list of decision types that should be matched if the unit is registered for
+the <a class="reference internal" href="dependency_monkey.html#dependency-monkey"><span class="std std-ref">Dependency Monkey</span></a> resolution pipeline used for
+<a class="reference external" href="https://github.com/thoth-station/amun-api/">data acquisition on Amun</a>.</p>
+<p>Alternatively, the list can be wrapped with a “not” statement which inverts
+the logic.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">dependency_monkey_pipeline</span></code> is set to <code class="docutils literal notranslate"><span class="pre">false</span></code>, this configuration
+option has no effect.</p>
+</div>
+</div>
+<div class="section" id="should-include-library-usage">
+<h2><code class="docutils literal notranslate"><span class="pre">should_include.library_usage</span></code><a class="headerlink" href="#should-include-library-usage" title="Permalink to this headline">¶</a></h2>
+<p>Library calls that should be present to include the pipeline unit. This
+creates an ability to include a pipeline unit only if some parts of a
+library are used that affect the application.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">library_usage</span><span class="p">:</span>
+  <span class="c1"># from flask import Flask</span>
+  <span class="nt">flask</span><span class="p">:</span>
+    <span class="l l-Scalar l-Scalar-Plain">Flask</span>
 </pre></div>
 </div>
 </div>
-<div class="section" id="registering-pipeline-units-should-include">
-<h2>Registering pipeline units - <code class="docutils literal notranslate"><span class="pre">should_include</span></code><a class="headerlink" href="#registering-pipeline-units-should-include" title="Permalink to this headline">¶</a></h2>
-<p>The document below describes how pipeline units can be configured for inclusion
-in the resolution process. This section is shared for pipeline units of any type.</p>
+<div class="section" id="should-include-dependencies">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.dependencies</span></code><a class="headerlink" href="#should-include-dependencies" title="Permalink to this headline">¶</a></h3>
+<p>Dependencies on other pipeline units. All the stated pipeline units have to be
+registered (<code class="docutils literal notranslate"><span class="pre">should_include</span></code> has to be evaluated as <code class="docutils literal notranslate"><span class="pre">true</span></code>) as listed
+dependencies are pre-requisites to register the stated pipeline unit.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">should_include</span><span class="p">:</span>
-  <span class="nt">times</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>                           <span class="c1"># How many times should be the pipeline unit included (accepts 0 or 1).</span>
-  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>             <span class="c1"># Register in the adviser resolution, defaults to false if not provided.</span>
-  <span class="nt">dependency_monkey_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>   <span class="c1"># Register for Dependency Monkey resolution, defaults to false if not provided.</span>
-  <span class="nt">dependencies</span><span class="p">:</span>                      <span class="c1"># Pipeline units that should be included in the configuration prior to including this unit. Defaults to no dependency restrictions if not provided.</span>
+  <span class="nt">dependencies</span><span class="p">:</span>
     <span class="nt">boots</span><span class="p">:</span>
-      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">SomeBoot1</span>
-      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">SomeBoot2</span>
-    <span class="nt">pseudonyms</span><span class="p">:</span>
-    <span class="nt">sieves</span><span class="p">:</span>
-    <span class="nt">steps</span><span class="p">:</span>
-    <span class="nt">strides</span><span class="p">:</span>
-    <span class="nt">wraps</span><span class="p">:</span>
-  <span class="nt">recommendation_types</span><span class="p">:</span>              <span class="c1"># Recommendation types for which the pipeline unit should be included if adviser_pipeline=true. Defaults to all available if not provided.</span>
-    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">latest</span>
-    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">performance</span>
-    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">security</span>
-    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">stable</span>
-    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">testing</span>
-  <span class="nt">decision_types</span><span class="p">:</span>                    <span class="c1"># Decision types for which the pipeline unit should be included if dependency_monkey_pipeline=true. Defaults to all available if not provided.</span>
-    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">random</span>
-    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">all</span>
-  <span class="nt">runtime_environments</span><span class="p">:</span>              <span class="c1"># User&#39;s runtime environment used for which the resolution is triggered.</span>
-    <span class="nt">operating_systems</span><span class="p">:</span>               <span class="c1"># Name and version of the user&#39;s operating system.</span>
-      <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="s">&#39;rhel&#39;</span>
-        <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;8&#39;</span>
-    <span class="nt">hardware</span><span class="p">:</span>                        <span class="c1"># Hardware information present on the user&#39;s machine.</span>
-      <span class="c1"># Included if any combination matches hardware configuration used.</span>
-      <span class="p p-Indicator">-</span> <span class="nt">cpu_families</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">]</span>
-        <span class="nt">cpu_models</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">2</span><span class="p p-Indicator">]</span>
-        <span class="nt">gpu_models</span><span class="p">:</span>
-          <span class="p p-Indicator">-</span> <span class="s">&#39;Nvidia</span><span class="nv"> </span><span class="s">GeForce</span><span class="nv"> </span><span class="s">GTX</span><span class="nv"> </span><span class="s">1060&#39;</span>
-    <span class="nt">python_versions</span><span class="p">:</span>                <span class="c1"># Python interpreter version used to run the application.</span>
-      <span class="p p-Indicator">-</span> <span class="s">&#39;3.8&#39;</span>
-      <span class="p p-Indicator">-</span> <span class="s">&#39;3.9&#39;</span>
-    <span class="nt">cuda_versions</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&#39;9.0&#39;</span><span class="p p-Indicator">]</span>
-    <span class="nt">platforms</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&#39;linux-x86_64&#39;</span><span class="p p-Indicator">]</span>
-    <span class="nt">openblas_versions</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&#39;0.3.13&#39;</span><span class="p p-Indicator">]</span>
-    <span class="nt">openmpi_versions</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&#39;4.1&#39;</span><span class="p p-Indicator">]</span>
-    <span class="nt">cudnn_versions</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&#39;8.1.0&#39;</span><span class="p p-Indicator">]</span>
-    <span class="nt">mkl_versions</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&#39;2021.1.1&#39;</span><span class="p p-Indicator">]</span>
-    <span class="nt">base_images</span><span class="p">:</span>
-      <span class="p p-Indicator">-</span> <span class="s">&#39;quay.io/thoth-station/s2i-thoth-ubi8-py36:v1.0.0&#39;</span>  <span class="c1"># Base image used for running the application.</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">thoth.ExampleBoot</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">CoreBoot</span>
 </pre></div>
 </div>
-<p>The configuration options not stated do not enforce the given configuration.
-For example, not stating <code class="docutils literal notranslate"><span class="pre">python_version</span></code> means that the pipeline unit will
-not consider Python interpreter version running as a restriction to be
-registered.</p>
+<p>This part of the <code class="docutils literal notranslate"><span class="pre">should_include</span></code> section is specific to a unit that states
+dependencies on two units of type <a class="reference internal" href="boots.html#boots"><span class="std std-ref">boot</span></a>. <code class="docutils literal notranslate"><span class="pre">ExampleBoot</span></code> is a boot
+pipeline unit from prescription named <code class="docutils literal notranslate"><span class="pre">thoth</span></code> and <code class="docutils literal notranslate"><span class="pre">CoreBoot</span></code> is a boot
+provided by the adviser Python implementation (corresponds to a name of the
+Python class).</p>
+</div>
+<p>Referencing unknown units evaluates always to <code class="docutils literal notranslate"><span class="pre">false</span></code>.</p>
+<p>If no dependencies are stated, the given pipeline unit is not dependent on
+any pipeline unit.</p>
+</div>
+<div class="section" id="should-include-dependencies-boots">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.boots</span></code><a class="headerlink" href="#should-include-dependencies-boots" title="Permalink to this headline">¶</a></h3>
+<p>A list of <a class="reference internal" href="boots.html#boots"><span class="std std-ref">boot pipeline units</span></a> that need to be present in the
+resolution process. Referenced by respective unit name and optional
+prescription name for referencing units from prescriptions (see above for more
+info).</p>
+</div>
+<div class="section" id="should-include-dependencies-pseudonyms">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.pseudonyms</span></code><a class="headerlink" href="#should-include-dependencies-pseudonyms" title="Permalink to this headline">¶</a></h3>
+<p>A list of <a class="reference internal" href="pseudonyms.html#pseudonyms"><span class="std std-ref">pseudonym pipeline units</span></a> that need to be present
+in the resolution process.  Referenced by respective unit name and optional
+prescription name for referencing units from prescriptions (see above for more
+info).</p>
+</div>
+<div class="section" id="should-include-dependencies-sieves">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.sieves</span></code><a class="headerlink" href="#should-include-dependencies-sieves" title="Permalink to this headline">¶</a></h3>
+<p>A list of <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieve pipeline units</span></a> that need to be present in the
+resolution process.  Referenced by respective unit name and optional
+prescription name for referencing units from prescriptions (see above for more
+info).</p>
+</div>
+<div class="section" id="should-include-dependencies-steps">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.steps</span></code><a class="headerlink" href="#should-include-dependencies-steps" title="Permalink to this headline">¶</a></h3>
+<p>A list of <a class="reference internal" href="steps.html#steps"><span class="std std-ref">step pipeline units</span></a> that need to be present in the
+resolution process.  Referenced by respective unit name and optional
+prescription name for referencing units from prescriptions (see above for more
+info).</p>
+</div>
+<div class="section" id="should-include-dependencies-strides">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.strides</span></code><a class="headerlink" href="#should-include-dependencies-strides" title="Permalink to this headline">¶</a></h3>
+<p>A list of <a class="reference internal" href="strides.html#strides"><span class="std std-ref">stride pipeline units</span></a> that need to be present in the
+resolution process.  Referenced by respective unit name and optional
+prescription name for referencing units from prescriptions (see above for more
+info).</p>
+</div>
+<div class="section" id="should-include-dependencies-wraps">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.wraps</span></code><a class="headerlink" href="#should-include-dependencies-wraps" title="Permalink to this headline">¶</a></h3>
+<p>A list of <a class="reference internal" href="wraps.html#wraps"><span class="std std-ref">wrap pipeline units</span></a> that need to be present in the
+resolution process.  Referenced by respective unit name and optional
+prescription name for referencing units from prescriptions (see above for more
+info).</p>
+</div>
+</div>
+<div class="section" id="runtime-environments-should-include-runtime-environments">
+<h2>Runtime environments - <code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments</span></code><a class="headerlink" href="#runtime-environments-should-include-runtime-environments" title="Permalink to this headline">¶</a></h2>
+<p>Matching runtime environment configurations for which pipeline units should be
+included in the resolution process. This configuration section is meant for
+units that are specific for runtime environments.</p>
+<div class="section" id="should-include-runtime-environments-operating-systems">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.operating_systems</span></code><a class="headerlink" href="#should-include-runtime-environments-operating-systems" title="Permalink to this headline">¶</a></h3>
+<p>A list of operating systems for which the pipeline unit should be included.
+Each entry optionally states <code class="docutils literal notranslate"><span class="pre">name</span></code> (operating system name) and <code class="docutils literal notranslate"><span class="pre">version</span></code>
+(operating system version). Not providing any of the two means matching <em>any</em>
+value.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">operating_systems</span><span class="p">:</span>
+  <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">rhel</span>     <span class="c1"># matches Red Hat Enterprise Linux in any version</span>
+  <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">fedora</span>   <span class="c1"># matches Fedora in version 33</span>
+    <span class="nt">version</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">33</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="should-include-runtime-environments-hardware">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.hardware</span></code><a class="headerlink" href="#should-include-runtime-environments-hardware" title="Permalink to this headline">¶</a></h3>
+<p>Matching hardware available when running the application. This
+configuration basically creates a matrix of hardware that should be
+available on user’s side to register the given pipeline unit in the
+resolution process.</p>
+<p>Alternatively, the list can be wrapped with a “not” statement which inverts
+the logic.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">hardware</span><span class="p">:</span>
+  <span class="c1"># Matches any GPU or no GPU available and</span>
+  <span class="c1"># CPU family 1 CPU model 9 or CPU family 2 and CPU model 8.</span>
+  <span class="p p-Indicator">-</span> <span class="nt">cpu_families</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">,</span> <span class="nv">2</span><span class="p p-Indicator">]</span>
+    <span class="nt">cpu_models</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">9</span><span class="p p-Indicator">,</span> <span class="nv">8</span><span class="p p-Indicator">]</span>
+
+  <span class="c1"># Matches CPU family 1, CPU model 9 running on GPU &quot;Foo&quot; or GPU &quot;Bar&quot;,</span>
+  <span class="p p-Indicator">-</span> <span class="nt">cpu_families</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">]</span>
+    <span class="nt">cpu_models</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">9</span><span class="p p-Indicator">]</span>
+    <span class="nt">gpu_models</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">Foo</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">Bar</span>
+
+  <span class="c1"># Matching any CPU family except for 1.</span>
+  <span class="p p-Indicator">-</span> <span class="nt">cpu_families</span><span class="p">:</span>
+      <span class="nt">not</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">1</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="should-include-runtime-environments-python-versions">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.python_versions</span></code><a class="headerlink" href="#should-include-runtime-environments-python-versions" title="Permalink to this headline">¶</a></h3>
+<p>A list of Python versions that need to be matched for including the
+given pipeline unit.</p>
+<p>Alternatively, the list can be wrapped with a “not” statement which inverts
+the logic.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">python_versions</span><span class="p">:</span>
+  <span class="c1"># Match when running 3.8 or 3.9:</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;3.8&#39;</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;3.9&#39;</span>
+
+<span class="nt">python_versions</span><span class="p">:</span>
+  <span class="c1"># Match all except for 3.8</span>
+  <span class="nt">not</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&#39;3.8&#39;</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</div>
+<p>If this configuration option is not provided, it defaults to any
+Python version.</p>
+<p>Python version is always in form of <code class="docutils literal notranslate"><span class="pre">&lt;major&gt;.&lt;minor&gt;</span></code>. Patch versions
+are not considered.</p>
+</div>
+<div class="section" id="should-include-runtime-environments-cuda-versions">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.cuda_versions</span></code><a class="headerlink" href="#should-include-runtime-environments-cuda-versions" title="Permalink to this headline">¶</a></h3>
+<p>A list of Nvidia CUDA versions that need to be matched for including the given
+pipeline unit.</p>
+<p>Alternatively the list can be wrapped with a “not” statement which inverts
+the logic.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">cuda_versions</span><span class="p">:</span>
+  <span class="c1"># Match when running CUDA 9.0 or 9.2.</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;9.0&#39;</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;9.2&#39;</span>
+
+<span class="nt">cuda_versions</span><span class="p">:</span>
+  <span class="c1"># Match all except for 9.0 and 9.2.</span>
+  <span class="nt">not</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&#39;9.0&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;9.2]</span>
+</pre></div>
+</div>
+<p>If this configuration option is not provided, it defaults to any
+CUDA version - even if none available.</p>
+</div>
+<p>A special value of <code class="docutils literal notranslate"><span class="pre">null</span></code> means no CUDA version available.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">cuda_versions</span><span class="p">:</span>
+  <span class="c1"># Match when running CUDA 9.1 or no CUDA available.</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;9.1&#39;</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">null</span>
+
+<span class="nt">cuda_versions</span><span class="p">:</span>
+  <span class="c1"># Match if any CUDA is available.</span>
+  <span class="nt">not</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">null</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="should-include-runtime-environments-platforms">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.platforms</span></code><a class="headerlink" href="#should-include-runtime-environments-platforms" title="Permalink to this headline">¶</a></h3>
+<p>A list of platforms for which the given pipeline unit should be registered.</p>
+<p>Alternatively, the list can be wrapped with a “not” statement which inverts
+the logic.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">platforms</span><span class="p">:</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">linux-x86_64</span>
+
+<span class="nt">platforms</span><span class="p">:</span>
+  <span class="c1"># Any except for linux-x86_64</span>
+  <span class="nt">not</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">linux-x86_64</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</div>
+<p>If this configuration option is not supplied, it defaults to <em>any</em> platform.</p>
+</div>
+<div class="section" id="should-include-runtime-environments-openblas-versions">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.openblas_versions</span></code><a class="headerlink" href="#should-include-runtime-environments-openblas-versions" title="Permalink to this headline">¶</a></h3>
+<p>A list of <a class="reference external" href="https://www.openblas.net/">OpenBLAS</a> versions that need to be
+matched for including the given pipeline unit.</p>
+<p>Alternatively, the list can be wrapped with a “not” statement which inverts
+the logic.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">openblas_versions</span><span class="p">:</span>
+  <span class="c1"># Match when running OpenBLAS 0.3.13, 0.3.0.</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;0.3.13&#39;</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;0.3.0&#39;</span>
+</pre></div>
+</div>
+<p>If this configuration option is not provided, it defaults to any OpenBLAS
+version - even none available.</p>
+</div>
+<p>A special value of <code class="docutils literal notranslate"><span class="pre">null</span></code> means no OpenBLAS version available.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">openblas_versions</span><span class="p">:</span>
+  <span class="c1"># Match when running OpenBLAS 0.3.13 or no OpenBLAS is available.</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;0.3.13&#39;</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">null</span>
+
+<span class="nt">openblas_versions</span><span class="p">:</span>
+  <span class="c1"># Match when any version of OpenBLAS is available.</span>
+  <span class="nt">not</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">null</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="should-include-runtime-environments-openmpi-versions">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.openmpi_versions</span></code><a class="headerlink" href="#should-include-runtime-environments-openmpi-versions" title="Permalink to this headline">¶</a></h3>
+<p>A list of <a class="reference external" href="https://www.open-mpi.org/">OpenMPI</a> versions that need to be
+matched for including the given pipeline unit.</p>
+<p>Alternatively, the list can be wrapped with a “not” statement which inverts
+the logic.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">openmpi_versions</span><span class="p">:</span>
+  <span class="c1"># Match when running OpenMPI 4.1.0 or 4.0.5</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;4.1.0&#39;</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;4.0.5&#39;</span>
+</pre></div>
+</div>
+<p>If this configuration option is not provided, it defaults to any OpenMPI
+version - even none available.</p>
+</div>
+<p>A special value of <code class="docutils literal notranslate"><span class="pre">null</span></code> means no OpenMPI version available.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">openblas_versions</span><span class="p">:</span>
+  <span class="c1"># Match when no OpenMPI is available.</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">null</span>
+
+<span class="nt">openblas_versions</span><span class="p">:</span>
+  <span class="c1"># Match when any version of OpenMPI is available.</span>
+  <span class="nt">not</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">null</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="should-include-runtime-environments-cudnn-versions">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.cudnn_versions</span></code><a class="headerlink" href="#should-include-runtime-environments-cudnn-versions" title="Permalink to this headline">¶</a></h3>
+<p>A list of Nvidia cuDNN versions that need to be matched for including the given
+pipeline unit.</p>
+<p>Alternatively, the list can be wrapped with a “not” statement which inverts
+the logic.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">cudnn_versions</span><span class="p">:</span>
+  <span class="c1"># Match when running cuDNN 8.0.5 or 7.6.5</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;8.0.5&#39;</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;7.6.5&#39;</span>
+</pre></div>
+</div>
+<p>If this configuration option is not provided, it defaults to any cuDNN version
+- even none available.</p>
+</div>
+<p>A special value of <code class="docutils literal notranslate"><span class="pre">null</span></code> means no cuDNN version available.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">cudnn_versions</span><span class="p">:</span>
+  <span class="c1"># Match when no cuDNN is available.</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">null</span>
+
+<span class="nt">cudnn_versions</span><span class="p">:</span>
+  <span class="c1"># Match when cuDNN is available.</span>
+  <span class="nt">not</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">null</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="should-include-runtime-environments-mkl-versions">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.mkl_versions</span></code><a class="headerlink" href="#should-include-runtime-environments-mkl-versions" title="Permalink to this headline">¶</a></h3>
+<p>A list of <a class="reference external" href="https://software.intel.com/content/www/us/en/develop/articles/oneapi-math-kernel-library-release-notes.html">Intel MKL</a>
+versions that need to be matched for including the given pipeline unit.</p>
+<p>Alternatively, the list can be wrapped with a “not” statement which inverts
+the logic.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">mkl_versions</span><span class="p">:</span>
+  <span class="c1"># Match when running MKL 2021.1</span>
+  <span class="p p-Indicator">-</span> <span class="s">&#39;2021.1&#39;</span>
+</pre></div>
+</div>
+<p>If this configuration option is not provided, it defaults to any MKL
+version - even none available.</p>
+</div>
+<p>A special value of <code class="docutils literal notranslate"><span class="pre">null</span></code> means no MKL version available.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">mkl_versions</span><span class="p">:</span>
+  <span class="c1"># Match when no Intel MKL is available.</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">null</span>
+
+<span class="nt">mkl_versions</span><span class="p">:</span>
+  <span class="c1"># Match when any Intel MKL is available.</span>
+  <span class="nt">not</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="nv">null</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="should-include-runtime-environments-base-images">
+<h3><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.base_images</span></code><a class="headerlink" href="#should-include-runtime-environments-base-images" title="Permalink to this headline">¶</a></h3>
+<p>A list of base images that are used as a runtime environment when running the
+application. These base images map to <a class="reference external" href="https://github.com/thoth-station/s2i-thoth">Thoth’s S2I container images</a> or container images produced by
+the <a class="reference external" href="https://github.com/AICoE/aicoe-ci">AICoE-CI pipeline</a>.</p>
+<p>Alternatively, the list can be wrapped with a “not” statement which inverts
+the logic.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">base_images</span><span class="p">:</span>
+  <span class="c1"># Match UBI8 Python 3.8 container environment or UBI8 Python 3.6 container</span>
+  <span class="c1"># environment in specific versions.</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">quay.io/thoth-station/s2i-thoth-ubi8-py38:v1.0.0</span>
+  <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">quay.io/thoth-station/s2i-thoth-ubi8-py36:v0.8.1</span>
+
+<span class="nt">base_images</span><span class="p">:</span>
+  <span class="c1"># Do not match UBI8 Python 3.8 container environment and UBI8 Python 3.6</span>
+  <span class="c1"># container environment in specific versions.</span>
+  <span class="nt">not</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">quay.io/thoth-station/s2i-thoth-ubi8-py38:v1.0.0</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">quay.io/thoth-station/s2i-thoth-ubi8-py36:v0.8.1</span>
+</pre></div>
+</div>
+</div>
+</div>
 </div>
 <div class="section" id="boots">
 <h2>Boots<a class="headerlink" href="#boots" title="Permalink to this headline">¶</a></h2>
-<p>See <a class="reference internal" href="boots.html#boots"><span class="std std-ref">boot pipeline unit</span></a> for more information on semantics.</p>
+<p>Declaring <a class="reference internal" href="boots.html#boots"><span class="std std-ref">pipeline units of type boot</span></a>.</p>
+<p>The following example shows all the configuration options that can be applied
+for a boot pipeline unit type. See respective sections described below for more
+info. Also note, the example shows all the options that can be supplied and is
+not semantically valid (not all options can be supplied at the same time
+semantically):</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">BootUnit</span>
 <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">boot</span>
-<span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="c1"># See should_include section for more info.</span>
 <span class="nt">run</span><span class="p">:</span>
   <span class="nt">match</span><span class="p">:</span>                                          <span class="c1"># Criteria to trigger run of this pipeline unit. Defaults to always running the boot pipeline unit if no package_name is provided.</span>
     <span class="nt">package_name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">flask</span>                           <span class="c1"># Name of the package that needs to be present in the direct dependency listing to run this unit.</span>
@@ -196,15 +629,120 @@ registered.</p>
     <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;WARNING&quot;</span>
 </pre></div>
 </div>
+<div class="section" id="boot-run-match-package-name">
+<h3>Boot <code class="docutils literal notranslate"><span class="pre">run.match.package_name</span></code><a class="headerlink" href="#boot-run-match-package-name" title="Permalink to this headline">¶</a></h3>
+<p>Optional name of the package that should be present in direct dependencies to
+trigger run of the pipeline unit.</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">BootUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">boot</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>
+    <span class="nt">package_name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">flask</span>
+  <span class="nt">log</span><span class="p">:</span>
+    <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+    <span class="nt">message</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Found package &#39;flask&#39; in the direct dependency listing</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="boot-run-stack-info">
+<span id="boot-stack-info"></span><h3>Boot <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code><a class="headerlink" href="#boot-run-stack-info" title="Permalink to this headline">¶</a></h3>
+<p>Optional a list of information added to the “stack info” field that is
+<a class="reference internal" href="justifications.html#stack-info"><span class="std std-ref">specific for the application stack</span></a>.</p>
+<p>Each entry in the list is specified by three attributes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span></code> - any of <code class="docutils literal notranslate"><span class="pre">INFO</span></code>, <code class="docutils literal notranslate"><span class="pre">WARNING</span></code>, and <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> specifying severity of the produced info</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">message</span></code> - a message in free text form printed to users</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">link</span></code> - a link to a document describing more information in detail</p></li>
+</ul>
+<p>The link can be in a form of a valid HTTP or HTTPS URL or a string which
+<a class="reference internal" href="justifications.html#jl"><span class="std std-ref">references justifications</span></a> available at
+<a class="reference external" href="https://thoth-station.ninja/justifications">thoth-station.ninja/justifications</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">BootUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">boot</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+  <span class="nt">recommendation_types</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">performance</span>
+  <span class="nt">runtime_environments</span><span class="p">:</span>
+    <span class="nt">operating_systems</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">rhel</span>
+        <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;8&#39;</span>
+    <span class="nt">python_versions</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&#39;3.6&#39;</span><span class="p p-Indicator">]</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">stack_info</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">It is recommended to switch to Python 3.8 to improve performance</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="s">&#39;https://developers.redhat.com/blog/2020/06/25/red-hat-enterprise-linux-8-2-brings-faster-python-3-8-run-speeds/&#39;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="boot-run-eager-stop-pipeline">
+<h3>Boot <code class="docutils literal notranslate"><span class="pre">run.eager_stop_pipeline</span></code><a class="headerlink" href="#boot-run-eager-stop-pipeline" title="Permalink to this headline">¶</a></h3>
+<p>An optional string describing exception that should be raised during resolver
+boot causing the resolution process to halt.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">BootUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">boot</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+  <span class="nt">recommendation_types</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">security</span>
+  <span class="nt">runtime_environments</span><span class="p">:</span>
+    <span class="nt">operating_systems</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">fedora</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">eager_stop_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Security recommendation types are disabled for Fedora, use RHEL instead</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="boot-run-log">
+<span id="id1"></span><h3>Boot <code class="docutils literal notranslate"><span class="pre">run.log</span></code><a class="headerlink" href="#boot-run-log" title="Permalink to this headline">¶</a></h3>
+<p>Print the given message to logs if the pipeline unit is included and run.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">BootUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">boot</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+  <span class="nt">dependency_monkey_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">log</span><span class="p">:</span>
+    <span class="nt">message</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Using prescriptions in the resolution process</span>
+    <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">INFO</span>
+</pre></div>
+</div>
+</div>
+</div>
 </div>
 <div class="section" id="pseudonyms">
 <h2>Pseudonyms<a class="headerlink" href="#pseudonyms" title="Permalink to this headline">¶</a></h2>
-<p>See <a class="reference internal" href="pseudonyms.html#pseudonyms"><span class="std std-ref">pseudonym pipeline unit</span></a> for more information on
-semantics.</p>
+<p>Declaring <a class="reference internal" href="pseudonyms.html#pseudonyms"><span class="std std-ref">pipeline units of type pseudonym</span></a>.</p>
+<p>The following example shows all the configuration options that can be applied
+for a pseudonym pipeline unit type. See respective sections described below for more
+info. Also note, the example shows all the options that can be supplied and is
+not semantically valid (not all options can be supplied at the same time
+semantically):</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">PseudonymUnit</span>
 <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">pseudonym</span>
 <span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
 <span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>                                          <span class="c1"># Criteria to trigger run of this pipeline unit. Defaults to always running the pseudonym pipeline unit if no package_version is provided.</span>
+    <span class="nt">package_version</span><span class="p">:</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">flask</span>                                 <span class="c1"># Mandatory, name of the package for which pseudonym should be registered.</span>
+      <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;&gt;1.0,&lt;=1.1.0&#39;</span>                     <span class="c1"># Version specifier for which the pseudonym should be run. If not provided, defaults to any version.</span>
+      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>        <span class="c1"># Package source index for which the pseudonym should be run. If not provided, defaults to any index.</span>
+
   <span class="nt">log</span><span class="p">:</span>                                            <span class="c1"># Optional text printed to logs when the unit gets called.</span>
     <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Some</span><span class="nv"> </span><span class="s">text</span><span class="nv"> </span><span class="s">printed</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">log</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">pipeline</span><span class="nv"> </span><span class="s">unit</span><span class="nv"> </span><span class="s">run.&quot;</span>
     <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;WARNING&quot;</span>
@@ -213,12 +751,6 @@ semantics.</p>
     <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
       <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">world&quot;</span>
       <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>           <span class="c1"># A link to justifications or a link to a web page.</span>
-
-  <span class="nt">match</span><span class="p">:</span>                                          <span class="c1"># Criteria to trigger run of this pipeline unit. Defaults to always running the pseudonym pipeline unit if no package_version is provided.</span>
-    <span class="nt">package_version</span><span class="p">:</span>
-      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">flask</span>                                 <span class="c1"># Mandatory, name of the package for which pseudonym should be registered.</span>
-      <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;&gt;1.0,&lt;=1.1.0&#39;</span>                     <span class="c1"># Version specifier for which the pseudonym should be run. If not provided, defaults to any version.</span>
-      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>        <span class="c1"># Package source index for which the pseudonym should be run. If not provided, defaults to any index.</span>
 
   <span class="nt">yield</span><span class="p">:</span>
     <span class="c1"># Pseudonym that should be registered.</span>
@@ -232,9 +764,53 @@ semantics.</p>
 <p>The pseudonym is registered for the specified criteria. The unit derived out of
 this declarative prescription will make sure the package yielded is known to
 the resolver.</p>
+<div class="section" id="pseudonym-run-log">
+<h3>Pseudonym <code class="docutils literal notranslate"><span class="pre">run.log</span></code><a class="headerlink" href="#pseudonym-run-log" title="Permalink to this headline">¶</a></h3>
+<p>Print the given message to logs if the pipeline unit is included and run.</p>
+<p>See <a class="reference internal" href="#boot-run-log"><span class="std std-ref">boot’s log</span></a> that has shared semantics.</p>
+</div>
+<div class="section" id="pseudonym-run-stack-info">
+<h3>Pseudonym <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code><a class="headerlink" href="#pseudonym-run-stack-info" title="Permalink to this headline">¶</a></h3>
+<p>See <a class="reference internal" href="#boot-stack-info"><span class="std std-ref">stack info</span></a> which semantics is shared with this unit.</p>
+<p>Note stack info is added only once even if the pipeline unit is
+run multiple times during the resolution process.</p>
+</div>
+<div class="section" id="pseudonym-run-match">
+<h3>Pseudonym <code class="docutils literal notranslate"><span class="pre">run.match</span></code><a class="headerlink" href="#pseudonym-run-match" title="Permalink to this headline">¶</a></h3>
+<p>Package described in <code class="docutils literal notranslate"><span class="pre">package_version</span></code> field that should be matched by three
+entries:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - mandatory, name of the package for which the pseudonym should be
+provided</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">version</span></code> - optional, version in a form of version specifier for which the
+pseudonym should be provided</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">index_url</span></code> - optional, Python package index URL for which the pseudonym
+should be provided</p></li>
+</ul>
+<p>See examples below for more info.</p>
+</div>
+<div class="section" id="pseudonym-run-yield">
+<h3>Pseudonym <code class="docutils literal notranslate"><span class="pre">run.yield</span></code><a class="headerlink" href="#pseudonym-run-yield" title="Permalink to this headline">¶</a></h3>
+<p>Description of a package that should be yielded. Made out of two entries:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">yield_matched_version</span></code> - yields version that was matched based on version
+specifier in the <code class="docutils literal notranslate"><span class="pre">match</span></code> section, defaults to <code class="docutils literal notranslate"><span class="pre">false</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">package_version</span></code> - description of a package that should be yielded</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - mandatory, name of the package that should be yielded</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">locked_version</span></code> - optional, disjoint with <code class="docutils literal notranslate"><span class="pre">yield_matched_version</span></code>;
+describes locked version of the package that should be yielded</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">index_url</span></code> - optional, Python package index to be used to provide
+pseudonyms</p></li>
+</ul>
+</li>
+</ul>
+<p>If no version provided or no index explicitly set, all found in the database
+(analyzed by Thoth) are yielded.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>An example pipeline unit that suggests <code class="docutils literal notranslate"><span class="pre">intel-tensorflow</span></code> coming from PyPI as an alternative to <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code>:</p>
+<p>An example pipeline unit that suggests <code class="docutils literal notranslate"><span class="pre">intel-tensorflow</span></code> coming from PyPI
+as an alternative to <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code>:</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">PseudonymUnit</span>
 <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">pseudonym</span>
 <span class="nt">should_include</span><span class="p">:</span>
@@ -242,8 +818,9 @@ the resolver.</p>
   <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
 <span class="nt">run</span><span class="p">:</span>
   <span class="nt">match</span><span class="p">:</span>
-    <span class="nt">package_name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">tensorflow</span>
-    <span class="nt">index_url</span><span class="p">:</span> <span class="s">&quot;https://pypi.org/simple&quot;</span>
+    <span class="nt">package_version</span><span class="p">:</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">tensorflow</span>
+      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&quot;https://pypi.org/simple&quot;</span>
 
   <span class="nt">stack_info</span><span class="p">:</span>
     <span class="p p-Indicator">-</span> <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Considering</span><span class="nv"> </span><span class="s">also</span><span class="nv"> </span><span class="s">intel-tensorflow</span><span class="nv"> </span><span class="s">as</span><span class="nv"> </span><span class="s">an</span><span class="nv"> </span><span class="s">alternative</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">tensorflow&quot;</span>
@@ -259,10 +836,15 @@ the resolver.</p>
 </div>
 </div>
 </div>
+</div>
 <div class="section" id="sieves">
 <h2>Sieves<a class="headerlink" href="#sieves" title="Permalink to this headline">¶</a></h2>
-<p>See <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieve pipeline unit</span></a> for more information on
-semantics.</p>
+<p>Declaring <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">pipeline units of type sieve</span></a>.</p>
+<p>The following example shows all the configuration options that can be applied
+for a sieve pipeline unit type. See respective sections described below for more
+info. Also note, the example shows all the options that can be supplied and is
+not semantically valid (not all options can be supplied at the same time
+semantically):</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">SieveUnit</span>
 <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">sieve</span>
 <span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
@@ -283,6 +865,76 @@ semantics.</p>
       <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>           <span class="c1"># A link to justifications or a link to a web page.</span>
 </pre></div>
 </div>
+<div class="section" id="sieve-run-match">
+<h3>Sieve <code class="docutils literal notranslate"><span class="pre">run.match</span></code><a class="headerlink" href="#sieve-run-match" title="Permalink to this headline">¶</a></h3>
+<p>Specifies a package version that should be matched to execute the given unit during
+in the resolution pipeline.</p>
+<p>The package is described by:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - name of the Python package that should be matched, any package
+name matched if not provided</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">version</span></code> - version in a form of version specification to be matched, any
+version matched if not provided</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">index_url</span></code> - URL of the Python package index from where the given package
+is consumed, matches any index if not provided</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">SieveUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">sieve</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+  <span class="nt">recommendation_types</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">security</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>
+    <span class="nt">package_version</span><span class="p">:</span>
+      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Filtering</span><span class="nv"> </span><span class="s">out</span><span class="nv"> </span><span class="s">all</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">packages</span><span class="nv"> </span><span class="s">from</span><span class="nv"> </span><span class="s">PyPI</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">security</span><span class="nv"> </span><span class="s">reasons&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="s">&quot;https://pypi.org/simple&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="sieve-run-log">
+<h3>Sieve <code class="docutils literal notranslate"><span class="pre">run.log</span></code><a class="headerlink" href="#sieve-run-log" title="Permalink to this headline">¶</a></h3>
+<p>Print the given message to logs if the pipeline unit is included and run.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">SieveUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">sieve</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">times</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+  <span class="nt">runtime_environments</span><span class="p">:</span>
+    <span class="nt">python_versions</span><span class="p">:</span> <span class="p p-Indicator">[</span><span class="s">&#39;3.5&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;3.6&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;3.7&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;3.8&#39;</span><span class="p p-Indicator">,</span> <span class="s">&#39;3.9&#39;</span><span class="p p-Indicator">]</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>
+    <span class="nt">package_version</span><span class="p">:</span>
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">enum34</span>
+  <span class="nt">log</span><span class="p">:</span>
+    <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+    <span class="nt">message</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">All releases of package &#39;enum34&#39; were filtered out</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">All releases of package &#39;enum34&#39; were filtered out</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="s">&#39;http://pypi.org/project/enum34&#39;</span>
+</pre></div>
+</div>
+</div>
+<p>See <a class="reference internal" href="#boot-run-log"><span class="std std-ref">boot’s log</span></a> that has shared semantics.</p>
+</div>
+<div class="section" id="sieve-run-stack-info">
+<h3>Sieve <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code><a class="headerlink" href="#sieve-run-stack-info" title="Permalink to this headline">¶</a></h3>
+<p>See <a class="reference internal" href="#boot-stack-info"><span class="std std-ref">stack info</span></a> which semantics is shared with this unit.</p>
+<p>Note stack info is added only once even if the pipeline unit is
+run multiple times during the resolution process.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>An example pipeline unit that filters out <code class="docutils literal notranslate"><span class="pre">pysaml2</span></code> with the reported CVE.</p>
@@ -309,10 +961,15 @@ semantics.</p>
 </div>
 </div>
 </div>
+</div>
 <div class="section" id="steps">
 <h2>Steps<a class="headerlink" href="#steps" title="Permalink to this headline">¶</a></h2>
-<p>See <a class="reference internal" href="steps.html#steps"><span class="std std-ref">step pipeline unit</span></a> for more information on
-semantics.</p>
+<p>Declaring <a class="reference internal" href="steps.html#steps"><span class="std std-ref">pipeline units of type step</span></a>.</p>
+<p>The following example shows all the configuration options that can be applied
+for a step pipeline unit type. See respective sections described below for more
+info. Also note, the example shows all the options that can be supplied and is
+not semantically valid (not all options can be supplied at the same time
+semantically):</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">StepUnit</span>
 <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">step</span>
 <span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
@@ -352,9 +1009,107 @@ semantics.</p>
       <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>           <span class="c1"># A link to justifications or a link to a web page.</span>
 </pre></div>
 </div>
+<div class="section" id="step-run-match">
+<h3>Step <code class="docutils literal notranslate"><span class="pre">run.match</span></code><a class="headerlink" href="#step-run-match" title="Permalink to this headline">¶</a></h3>
+<p>Match the given step performed in the resolution process. A step is described
+by state stating all the resolved dependencies so far and package that is
+about to be resolved:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">package_version</span></code> - package that is about to be resolved by adding it to
+the resolver’s state</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - optional, name of the package</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">version</span></code> - optional, version in a form of version specifier</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">index_url</span></code> - optional, Python package index URL</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">state</span></code> - internal resolver’s state with resolved dependencies</p></li>
+</ul>
+<p>A state that needs to be met to trigger the given step pipeline. The state
+states resolved dependencies where each entry in the resolved dependency
+listing is described as:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - optional package name that has to be stated in the resolved
+dependency listing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">version</span></code> - optional package version in a form of version specifier that
+has to be stated in the resolved dependency listing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">index_url</span></code> - optional package index from which the given package is
+consumed</p></li>
+</ul>
+<p>To run the given step, all the packages in the resolved dependency listing
+need to be present in the resolved software stack.</p>
+<p>To run the given step, both <code class="docutils literal notranslate"><span class="pre">state</span></code> and <code class="docutils literal notranslate"><span class="pre">package_version</span></code> need to be
+matched.</p>
+</div>
+<div class="section" id="step-run-log">
+<h3>Step <code class="docutils literal notranslate"><span class="pre">run.log</span></code><a class="headerlink" href="#step-run-log" title="Permalink to this headline">¶</a></h3>
+<p>Print the given message to logs if the pipeline unit is included and run.</p>
+<p>See <a class="reference internal" href="#boot-run-log"><span class="std std-ref">boot’s log</span></a> that has shared semantics.</p>
+</div>
+<div class="section" id="step-run-stack-info">
+<h3>Step <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code><a class="headerlink" href="#step-run-stack-info" title="Permalink to this headline">¶</a></h3>
+<p>See <a class="reference internal" href="#boot-stack-info"><span class="std std-ref">stack info</span></a> which semantics is shared with this unit.</p>
+<p>Note stack info is added only once even if the pipeline unit is
+run multiple times during the resolution process.</p>
+</div>
+<div class="section" id="step-run-multi-package-resolution">
+<h3>Step <code class="docutils literal notranslate"><span class="pre">run.multi_package_resolution</span></code><a class="headerlink" href="#step-run-multi-package-resolution" title="Permalink to this headline">¶</a></h3>
+<p>Boolean stating whether the given unit should be run if criteria match multiple
+times per resolution run. Defaults to false.</p>
+</div>
+<div class="section" id="step-run-justification">
+<span id="id2"></span><h3>Step <code class="docutils literal notranslate"><span class="pre">run.justification</span></code><a class="headerlink" href="#step-run-justification" title="Permalink to this headline">¶</a></h3>
+<p>Optional justification added to the resolved stack when the pipeline unit is
+run. This justification is added only if no <code class="docutils literal notranslate"><span class="pre">not_acceptable</span></code> and no
+<code class="docutils literal notranslate"><span class="pre">eager_stop_pipeline</span></code> are supplied - if the given step is a valid step in the
+resolution process. See <a class="reference internal" href="justifications.html#justification"><span class="std std-ref">Adding justifications to the recommended software</span></a> for more info on how to write
+justifications and their semantics.</p>
+<p>Each entry in the list is specified by three attributes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span></code> - any of <code class="docutils literal notranslate"><span class="pre">INFO</span></code>, <code class="docutils literal notranslate"><span class="pre">WARNING</span></code>, and <code class="docutils literal notranslate"><span class="pre">ERROR</span></code> specifying severity of
+the produced info</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">message</span></code> - a message in free text form printed to users</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">link</span></code> - a link to a document describing more information in detail</p></li>
+</ul>
+<p>The link can be in a form of a valid HTTP or HTTPS URL or a string which
+<a class="reference internal" href="justifications.html#jl"><span class="std std-ref">references justifications</span></a> available at
+<a class="reference external" href="https://thoth-station.ninja/justifications">thoth-station.ninja/justifications</a>.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>An example pipeline unit that filters out any <code class="docutils literal notranslate"><span class="pre">tensorflow~=2.4.0</span></code> when
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">StepUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">step</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">times</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">1</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>
+    <span class="nt">package_version</span><span class="p">:</span>
+      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://thoth-station.ninja/simple&#39;</span>
+
+  <span class="nt">score</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">+0.1</span>
+
+  <span class="nt">justification</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">INFO</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Builds</span><span class="nv"> </span><span class="s">available</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">index</span><span class="nv"> </span><span class="s">thoth-station.ninja/simple</span><span class="nv"> </span><span class="s">take</span><span class="nv"> </span><span class="s">precedence&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="s">&quot;https://thoth-station.ninja/&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="step-run-score">
+<h3>Step <code class="docutils literal notranslate"><span class="pre">run.score</span></code><a class="headerlink" href="#step-run-score" title="Permalink to this headline">¶</a></h3>
+<p>Optional score addition to penalize or prioritize resolving the given stack.
+Score has to be from interval -1.0 to +1.0 inclusively.</p>
+<p>See <a class="reference internal" href="#step-run-justification"><span class="std std-ref">justification</span></a> for an example.</p>
+</div>
+<div class="section" id="step-run-not-acceptable">
+<h3>Step <code class="docutils literal notranslate"><span class="pre">run.not_acceptable</span></code><a class="headerlink" href="#step-run-not-acceptable" title="Permalink to this headline">¶</a></h3>
+<p>Make the given step not acceptable in the resolution process.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<p>A pipeline unit that filters out any <code class="docutils literal notranslate"><span class="pre">tensorflow~=2.4.0</span></code> when
 <code class="docutils literal notranslate"><span class="pre">numpy==1.19.1</span></code> is in already resolved dependencies.</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">StepUnit</span>
 <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">step</span>
@@ -364,18 +1119,18 @@ semantics.</p>
 <span class="nt">run</span><span class="p">:</span>
   <span class="nt">match</span><span class="p">:</span>
     <span class="nt">package_version</span><span class="p">:</span>
-      <span class="c1"># Considering builds available also on other indexes than PyPI.</span>
-      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">tensorflow</span>
-      <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;~=2.4.0&#39;</span>
-
+      <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">numpy</span>
+      <span class="nt">version</span><span class="p">:</span> <span class="s">&quot;==1.19.1&quot;</span>
+      <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>
     <span class="nt">state</span><span class="p">:</span>
       <span class="nt">resolved_dependencies</span><span class="p">:</span>
-        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">numpy</span>
-          <span class="nt">locked_version</span><span class="p">:</span> <span class="s">&quot;==1.19.1&quot;</span>
-          <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>
+        <span class="c1"># Considering builds available also on other indexes than PyPI.</span>
+        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">tensorflow</span>
+          <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;~=2.4.0&#39;</span>
+
+  <span class="nt">multi_package_resolution</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
 
   <span class="nt">not_acceptable</span><span class="p">:</span> <span class="s">&quot;NumPy==1.19.5</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">causing</span><span class="nv"> </span><span class="s">issues</span><span class="nv"> </span><span class="s">when</span><span class="nv"> </span><span class="s">used</span><span class="nv"> </span><span class="s">with</span><span class="nv"> </span><span class="s">TensorFlow</span><span class="nv"> </span><span class="s">2.4&quot;</span>
-  <span class="nt">multi_package_resolution</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
 
   <span class="nt">stack_info</span><span class="p">:</span>
     <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
@@ -385,10 +1140,20 @@ semantics.</p>
 </div>
 </div>
 </div>
+<div class="section" id="step-run-eager-stop-pipeline">
+<h3>Step <code class="docutils literal notranslate"><span class="pre">run.eager_stop_pipeline</span></code><a class="headerlink" href="#step-run-eager-stop-pipeline" title="Permalink to this headline">¶</a></h3>
+<p>If the given pipeline unit is registered and matched, it will cause the whole
+resolution to halt and report back any results computed.</p>
+</div>
+</div>
 <div class="section" id="strides">
 <h2>Strides<a class="headerlink" href="#strides" title="Permalink to this headline">¶</a></h2>
-<p>See <a class="reference internal" href="strides.html#strides"><span class="std std-ref">strides pipeline unit</span></a> for more information on
-semantics.</p>
+<p>Declaring <a class="reference internal" href="strides.html#strides"><span class="std std-ref">pipeline units of type stride</span></a>.</p>
+<p>The following example shows all the configuration options that can be applied
+for a stride pipeline unit type. See respective sections described below for more
+info. Also note, the example shows all the options that can be supplied and is
+not semantically valid (not all options can be supplied at the same time
+semantically):</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">StrideUnit</span>
 <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">stride</span>
 <span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
@@ -400,11 +1165,6 @@ semantics.</p>
           <span class="nt">version</span><span class="p">:</span> <span class="s">&quot;~=1.0.0&quot;</span>
           <span class="nt">index_url</span><span class="p">:</span> <span class="s">&#39;https://pypi.org/simple&#39;</span>
 
-  <span class="nt">not_acceptable</span><span class="p">:</span> <span class="s">&quot;Bad</span><span class="nv"> </span><span class="s">package</span><span class="nv"> </span><span class="s">inclusion&quot;</span>         <span class="c1"># Block resolving the given stack.</span>
-
-  <span class="c1"># Configuration of prematurely terminating the resolution process.</span>
-  <span class="nt">eager_stop_pipeline</span><span class="p">:</span> <span class="s">&quot;Stop</span><span class="nv"> </span><span class="s">pipeline&quot;</span>
-
   <span class="nt">log</span><span class="p">:</span>                                            <span class="c1"># Optional text printed to logs when the unit gets called.</span>
     <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Some</span><span class="nv"> </span><span class="s">text</span><span class="nv"> </span><span class="s">printed</span><span class="nv"> </span><span class="s">to</span><span class="nv"> </span><span class="s">log</span><span class="nv"> </span><span class="s">on</span><span class="nv"> </span><span class="s">pipeline</span><span class="nv"> </span><span class="s">unit</span><span class="nv"> </span><span class="s">run.&quot;</span>
     <span class="nt">type</span><span class="p">:</span> <span class="s">&quot;WARNING&quot;</span>
@@ -413,13 +1173,59 @@ semantics.</p>
     <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
       <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">world&quot;</span>
       <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>           <span class="c1"># A link to justifications or a link to a web page.</span>
+
+  <span class="nt">not_acceptable</span><span class="p">:</span> <span class="s">&quot;Bad</span><span class="nv"> </span><span class="s">package</span><span class="nv"> </span><span class="s">inclusion&quot;</span>         <span class="c1"># Block resolving the given stack.</span>
+
+  <span class="c1"># Configuration of prematurely terminating the resolution process.</span>
+  <span class="nt">eager_stop_pipeline</span><span class="p">:</span> <span class="s">&quot;Stop</span><span class="nv"> </span><span class="s">pipeline&quot;</span>
 </pre></div>
+</div>
+<div class="section" id="stride-run-match">
+<h3>Stride <code class="docutils literal notranslate"><span class="pre">run.match</span></code><a class="headerlink" href="#stride-run-match" title="Permalink to this headline">¶</a></h3>
+<p>A state that needs to be met to trigger the given stride pipeline. The state
+states resolved dependencies where each entry in the resolved dependency
+listing is described as:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - optional package name that has to be stated in the resolved
+dependency listing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">version</span></code> - optional package version in a form of version specifier that
+has to be stated in the resolved dependency listing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">index_url</span></code> - optional package index from which the given package is
+consumed</p></li>
+</ul>
+<p>To run the given stride, all the packages in the resolved dependency listing
+need to be present in the resolved software stack.</p>
+</div>
+<div class="section" id="stride-run-log">
+<h3>Stride <code class="docutils literal notranslate"><span class="pre">run.log</span></code><a class="headerlink" href="#stride-run-log" title="Permalink to this headline">¶</a></h3>
+<p>Print the given message to logs if the pipeline unit is included and run.</p>
+<p>See <a class="reference internal" href="#boot-run-log"><span class="std std-ref">boot’s log</span></a> that has shared semantics.</p>
+</div>
+<div class="section" id="stride-run-stack-info">
+<h3>Stride <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code><a class="headerlink" href="#stride-run-stack-info" title="Permalink to this headline">¶</a></h3>
+<p>See <a class="reference internal" href="#boot-stack-info"><span class="std std-ref">stack info</span></a> which semantics is shared with this unit.</p>
+<p>Note stack info is added only once even if the pipeline unit is
+run multiple times during the resolution process.</p>
+</div>
+<div class="section" id="stride-run-not-acceptable">
+<h3>Stride <code class="docutils literal notranslate"><span class="pre">run.not_acceptable</span></code><a class="headerlink" href="#stride-run-not-acceptable" title="Permalink to this headline">¶</a></h3>
+<p>If the given pipeline unit is registered and matched, it will discard the
+resolved stack matched from the resolver’s results reported.</p>
+</div>
+<div class="section" id="stride-run-eager-stop-pipeline">
+<h3>Stride <code class="docutils literal notranslate"><span class="pre">run.eager_stop_pipeline</span></code><a class="headerlink" href="#stride-run-eager-stop-pipeline" title="Permalink to this headline">¶</a></h3>
+<p>If the given pipeline unit is registered and matched, it will cause the whole
+resolution to halt and report back any results computed.</p>
 </div>
 </div>
 <div class="section" id="wraps">
 <h2>Wraps<a class="headerlink" href="#wraps" title="Permalink to this headline">¶</a></h2>
-<p>See <a class="reference internal" href="wraps.html#wraps"><span class="std std-ref">wrap pipeline unit</span></a> for more information on
-semantics.</p>
+<p>Declaring <a class="reference internal" href="wraps.html#wraps"><span class="std std-ref">pipeline units of type wrap</span></a>.</p>
+<p>The following example shows all the configuration options that can be applied
+for a wrap pipeline unit type. See respective sections described below for more
+info. Also note, the example shows all the options that can be supplied and is
+not semantically valid (not all options can be supplied at the same time
+semantically):</p>
 <div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WrapUnit</span>
 <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">wrap</span>
 <span class="nt">should_include</span><span class="p">:</span>                                   <span class="c1"># See should_include section.</span>
@@ -449,7 +1255,126 @@ semantics.</p>
     <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">INFO</span>
       <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;Hello,</span><span class="nv"> </span><span class="s">Thoth!&quot;</span>
       <span class="nt">link</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://thoth-station.ninja</span>
+
+  <span class="nt">advised_manifest_changes</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">apiVersion</span><span class="p">:</span> <span class="s">&quot;apps.openshift.io/v1&quot;</span>
+      <span class="nt">kind</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">DeploymentConfig</span>
+      <span class="nt">patch</span><span class="p">:</span>
+        <span class="nt">op</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">add</span>
+        <span class="nt">path</span><span class="p">:</span> <span class="s">&quot;/spec/template/spec/containers/0/env/0&quot;</span>
+        <span class="nt">value</span><span class="p">:</span>
+          <span class="nt">name</span><span class="p">:</span> <span class="s">&quot;WORKDIR&quot;</span>
+          <span class="nt">value</span><span class="p">:</span> <span class="s">&quot;/home/workdir&quot;</span>
 </pre></div>
+</div>
+<div class="section" id="wrap-run-match">
+<h3>Wrap <code class="docutils literal notranslate"><span class="pre">run.match</span></code><a class="headerlink" href="#wrap-run-match" title="Permalink to this headline">¶</a></h3>
+<p>A state that needs to be met to trigger the given wrap pipeline unit. The state
+states resolved dependencies where each entry in the resolved dependency
+listing is described as:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - optional package name that has to be stated in the resolved
+dependency listing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">version</span></code> - optional package version in a form of version specifier that
+has to be stated in the resolved dependency listing</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">index_url</span></code> - optional package index from which the given package is
+consumed</p></li>
+</ul>
+<p>To run the given wrip unit, all the packages in the resolved dependency
+listing need to be present in the resolved software stack.</p>
+</div>
+<div class="section" id="wrap-run-log">
+<h3>Wrap <code class="docutils literal notranslate"><span class="pre">run.log</span></code><a class="headerlink" href="#wrap-run-log" title="Permalink to this headline">¶</a></h3>
+<p>Print the given message to logs if the pipeline unit is included and run.</p>
+<p>See <a class="reference internal" href="#boot-run-log"><span class="std std-ref">boot’s log</span></a> that has shared semantics.</p>
+</div>
+<div class="section" id="wrap-run-stack-info">
+<h3>Wrap <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code><a class="headerlink" href="#wrap-run-stack-info" title="Permalink to this headline">¶</a></h3>
+<p>See <a class="reference internal" href="#boot-stack-info"><span class="std std-ref">stack info</span></a> which semantics is shared with this unit.</p>
+<p>Note stack info is added only once even if the pipeline unit is
+run multiple times during the resolution process.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WrapUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">wrap</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+  <span class="nt">recommendation_types</span><span class="p">:</span>
+    <span class="c1"># Only warn here, in case of performance the corresponding resolution step can be penalized.</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">latest</span>
+    <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">testing</span>
+  <span class="nt">library_usage</span><span class="p">:</span>
+    <span class="nt">tensorflow</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="l l-Scalar l-Scalar-Plain">tensorflow.keras.layers.Embedding</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>
+    <span class="nt">state</span><span class="p">:</span>
+      <span class="nt">resolved_dependencies</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">tensorflow</span>
+          <span class="nt">version</span><span class="p">:</span> <span class="s">&quot;&lt;=2.4.0&quot;</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;TensorFlow</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">version</span><span class="nv"> </span><span class="s">&lt;=2.4</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">slow</span><span class="nv"> </span><span class="s">when</span><span class="nv"> </span><span class="s">tf.keras.layers.Embedding</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">used&quot;</span>
+      <span class="c1"># Can be replaced with just &quot;tf_42475&quot;.</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="s">&quot;https://thoth-station.ninja/j/tf_42475.html&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="wrap-run-not-acceptable">
+<h3>Wrap <code class="docutils literal notranslate"><span class="pre">run.not_acceptable</span></code><a class="headerlink" href="#wrap-run-not-acceptable" title="Permalink to this headline">¶</a></h3>
+<p>If the given pipeline unit is registered and matched, it will discard the
+resolved stack matched from the resolver’s results reported.</p>
+</div>
+<div class="section" id="wrap-run-eager-stop-pipeline">
+<h3>Wrap <code class="docutils literal notranslate"><span class="pre">run.eager_stop_pipeline</span></code><a class="headerlink" href="#wrap-run-eager-stop-pipeline" title="Permalink to this headline">¶</a></h3>
+<p>If the given pipeline unit is registered and matched, it will cause the whole
+resolution to halt and report back any results computed.</p>
+</div>
+<div class="section" id="wrap-run-justification">
+<h3>Wrap <code class="docutils literal notranslate"><span class="pre">run.justification</span></code><a class="headerlink" href="#wrap-run-justification" title="Permalink to this headline">¶</a></h3>
+<p>Justification added if the given wrap is matched and run. This justification is
+similar to the one <a class="reference internal" href="#step-run-justification"><span class="std std-ref">as provided by step</span></a>. It is
+added to the resolved stack if the match criteria are met. The unit cannot
+provide <code class="docutils literal notranslate"><span class="pre">eager_stop_pipeline</span></code> or <code class="docutils literal notranslate"><span class="pre">not_acceptable</span></code> to have justification
+available.</p>
+</div>
+<div class="section" id="wrap-run-advised-manifest-changes">
+<h3>Wrap <code class="docutils literal notranslate"><span class="pre">run.advised_manifest_changes</span></code><a class="headerlink" href="#wrap-run-advised-manifest-changes" title="Permalink to this headline">¶</a></h3>
+<p>Suggested changes to the manifest files used for deployment.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<p>A pipeline unit that adjusts environment variables if <code class="docutils literal notranslate"><span class="pre">intel-tensorflow</span></code> is resolved.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WrapUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">wrap</span>
+<span class="nt">should_include</span><span class="p">:</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="nt">match</span><span class="p">:</span>
+    <span class="nt">state</span><span class="p">:</span>
+      <span class="nt">resolved_dependencies</span><span class="p">:</span>
+        <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">intel-tensorflow</span>
+
+  <span class="nt">advised_manifest_changes</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">apiVersion</span><span class="p">:</span> <span class="s">&quot;apps.openshift.io/v1&quot;</span>
+      <span class="nt">kind</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">DeploymentConfig</span>
+      <span class="nt">patch</span><span class="p">:</span>
+        <span class="nt">op</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">add</span>
+        <span class="nt">path</span><span class="p">:</span> <span class="s">&quot;/spec/template/spec/containers/0/env/0&quot;</span>
+        <span class="nt">value</span><span class="p">:</span>
+          <span class="nt">name</span><span class="p">:</span> <span class="s">&quot;OMP_NUM_THREADS&quot;</span>
+          <span class="l l-Scalar l-Scalar-Plain">value&quot;</span><span class="p p-Indicator">:</span> <span class="s">&quot;1&quot;</span>
+
+  <span class="nt">stack_info</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">INFO</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">Adjst OMP_NUM_THREADS environment variable to make sure application behaves correctly in containerized environments</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="s">&quot;https://www.openmp.org/spec-html/5.0/openmpse50.html&quot;</span>
+</pre></div>
+</div>
+</div>
+<p>See <a class="reference internal" href="manifest_changes.html#manifest-changes"><span class="std std-ref">Advised manifest changes</span></a> section for more info and semantics.</p>
 </div>
 </div>
 </div>
@@ -463,14 +1388,100 @@ semantics.</p>
   <h3><a href="index.html">Table of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Declarative prescription for resolver</a><ul>
-<li><a class="reference internal" href="#prescription-yaml-v1">Prescription YAML v1</a></li>
-<li><a class="reference internal" href="#registering-pipeline-units-should-include">Registering pipeline units - <code class="docutils literal notranslate"><span class="pre">should_include</span></code></a></li>
-<li><a class="reference internal" href="#boots">Boots</a></li>
-<li><a class="reference internal" href="#pseudonyms">Pseudonyms</a></li>
-<li><a class="reference internal" href="#sieves">Sieves</a></li>
-<li><a class="reference internal" href="#steps">Steps</a></li>
-<li><a class="reference internal" href="#strides">Strides</a></li>
-<li><a class="reference internal" href="#wraps">Wraps</a></li>
+<li><a class="reference internal" href="#prescription-yaml-v1">Prescription YAML v1</a><ul>
+<li><a class="reference internal" href="#apiversion"><code class="docutils literal notranslate"><span class="pre">apiVersion</span></code></a></li>
+<li><a class="reference internal" href="#kind"><code class="docutils literal notranslate"><span class="pre">kind</span></code></a></li>
+<li><a class="reference internal" href="#spec"><code class="docutils literal notranslate"><span class="pre">spec</span></code></a></li>
+<li><a class="reference internal" href="#spec-name"><code class="docutils literal notranslate"><span class="pre">spec.name</span></code></a></li>
+<li><a class="reference internal" href="#spec-release"><code class="docutils literal notranslate"><span class="pre">spec.release</span></code></a></li>
+<li><a class="reference internal" href="#spec-units"><code class="docutils literal notranslate"><span class="pre">spec.units</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#unit-schema">Unit schema</a><ul>
+<li><a class="reference internal" href="#name"><code class="docutils literal notranslate"><span class="pre">name</span></code></a></li>
+<li><a class="reference internal" href="#type"><code class="docutils literal notranslate"><span class="pre">type</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#including-a-unit-should-include">Including a unit - <code class="docutils literal notranslate"><span class="pre">should_include</span></code></a><ul>
+<li><a class="reference internal" href="#should-include-times"><code class="docutils literal notranslate"><span class="pre">should_include.times</span></code></a></li>
+<li><a class="reference internal" href="#should-include-adviser-pipeline"><code class="docutils literal notranslate"><span class="pre">should_include.adviser_pipeline</span></code></a></li>
+<li><a class="reference internal" href="#should-include-recommendation-types"><code class="docutils literal notranslate"><span class="pre">should_include.recommendation_types</span></code></a></li>
+<li><a class="reference internal" href="#should-include-dependency-monkey-pipeline"><code class="docutils literal notranslate"><span class="pre">should_include.dependency_monkey_pipeline</span></code></a></li>
+<li><a class="reference internal" href="#should-include-decision-types"><code class="docutils literal notranslate"><span class="pre">should_include.decision_types</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#should-include-library-usage"><code class="docutils literal notranslate"><span class="pre">should_include.library_usage</span></code></a><ul>
+<li><a class="reference internal" href="#should-include-dependencies"><code class="docutils literal notranslate"><span class="pre">should_include.dependencies</span></code></a></li>
+<li><a class="reference internal" href="#should-include-dependencies-boots"><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.boots</span></code></a></li>
+<li><a class="reference internal" href="#should-include-dependencies-pseudonyms"><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.pseudonyms</span></code></a></li>
+<li><a class="reference internal" href="#should-include-dependencies-sieves"><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.sieves</span></code></a></li>
+<li><a class="reference internal" href="#should-include-dependencies-steps"><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.steps</span></code></a></li>
+<li><a class="reference internal" href="#should-include-dependencies-strides"><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.strides</span></code></a></li>
+<li><a class="reference internal" href="#should-include-dependencies-wraps"><code class="docutils literal notranslate"><span class="pre">should_include.dependencies.wraps</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#runtime-environments-should-include-runtime-environments">Runtime environments - <code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments</span></code></a><ul>
+<li><a class="reference internal" href="#should-include-runtime-environments-operating-systems"><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.operating_systems</span></code></a></li>
+<li><a class="reference internal" href="#should-include-runtime-environments-hardware"><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.hardware</span></code></a></li>
+<li><a class="reference internal" href="#should-include-runtime-environments-python-versions"><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.python_versions</span></code></a></li>
+<li><a class="reference internal" href="#should-include-runtime-environments-cuda-versions"><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.cuda_versions</span></code></a></li>
+<li><a class="reference internal" href="#should-include-runtime-environments-platforms"><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.platforms</span></code></a></li>
+<li><a class="reference internal" href="#should-include-runtime-environments-openblas-versions"><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.openblas_versions</span></code></a></li>
+<li><a class="reference internal" href="#should-include-runtime-environments-openmpi-versions"><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.openmpi_versions</span></code></a></li>
+<li><a class="reference internal" href="#should-include-runtime-environments-cudnn-versions"><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.cudnn_versions</span></code></a></li>
+<li><a class="reference internal" href="#should-include-runtime-environments-mkl-versions"><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.mkl_versions</span></code></a></li>
+<li><a class="reference internal" href="#should-include-runtime-environments-base-images"><code class="docutils literal notranslate"><span class="pre">should_include.runtime_environments.base_images</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#boots">Boots</a><ul>
+<li><a class="reference internal" href="#boot-run-match-package-name">Boot <code class="docutils literal notranslate"><span class="pre">run.match.package_name</span></code></a></li>
+<li><a class="reference internal" href="#boot-run-stack-info">Boot <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code></a></li>
+<li><a class="reference internal" href="#boot-run-eager-stop-pipeline">Boot <code class="docutils literal notranslate"><span class="pre">run.eager_stop_pipeline</span></code></a></li>
+<li><a class="reference internal" href="#boot-run-log">Boot <code class="docutils literal notranslate"><span class="pre">run.log</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#pseudonyms">Pseudonyms</a><ul>
+<li><a class="reference internal" href="#pseudonym-run-log">Pseudonym <code class="docutils literal notranslate"><span class="pre">run.log</span></code></a></li>
+<li><a class="reference internal" href="#pseudonym-run-stack-info">Pseudonym <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code></a></li>
+<li><a class="reference internal" href="#pseudonym-run-match">Pseudonym <code class="docutils literal notranslate"><span class="pre">run.match</span></code></a></li>
+<li><a class="reference internal" href="#pseudonym-run-yield">Pseudonym <code class="docutils literal notranslate"><span class="pre">run.yield</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#sieves">Sieves</a><ul>
+<li><a class="reference internal" href="#sieve-run-match">Sieve <code class="docutils literal notranslate"><span class="pre">run.match</span></code></a></li>
+<li><a class="reference internal" href="#sieve-run-log">Sieve <code class="docutils literal notranslate"><span class="pre">run.log</span></code></a></li>
+<li><a class="reference internal" href="#sieve-run-stack-info">Sieve <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#steps">Steps</a><ul>
+<li><a class="reference internal" href="#step-run-match">Step <code class="docutils literal notranslate"><span class="pre">run.match</span></code></a></li>
+<li><a class="reference internal" href="#step-run-log">Step <code class="docutils literal notranslate"><span class="pre">run.log</span></code></a></li>
+<li><a class="reference internal" href="#step-run-stack-info">Step <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code></a></li>
+<li><a class="reference internal" href="#step-run-multi-package-resolution">Step <code class="docutils literal notranslate"><span class="pre">run.multi_package_resolution</span></code></a></li>
+<li><a class="reference internal" href="#step-run-justification">Step <code class="docutils literal notranslate"><span class="pre">run.justification</span></code></a></li>
+<li><a class="reference internal" href="#step-run-score">Step <code class="docutils literal notranslate"><span class="pre">run.score</span></code></a></li>
+<li><a class="reference internal" href="#step-run-not-acceptable">Step <code class="docutils literal notranslate"><span class="pre">run.not_acceptable</span></code></a></li>
+<li><a class="reference internal" href="#step-run-eager-stop-pipeline">Step <code class="docutils literal notranslate"><span class="pre">run.eager_stop_pipeline</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#strides">Strides</a><ul>
+<li><a class="reference internal" href="#stride-run-match">Stride <code class="docutils literal notranslate"><span class="pre">run.match</span></code></a></li>
+<li><a class="reference internal" href="#stride-run-log">Stride <code class="docutils literal notranslate"><span class="pre">run.log</span></code></a></li>
+<li><a class="reference internal" href="#stride-run-stack-info">Stride <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code></a></li>
+<li><a class="reference internal" href="#stride-run-not-acceptable">Stride <code class="docutils literal notranslate"><span class="pre">run.not_acceptable</span></code></a></li>
+<li><a class="reference internal" href="#stride-run-eager-stop-pipeline">Stride <code class="docutils literal notranslate"><span class="pre">run.eager_stop_pipeline</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#wraps">Wraps</a><ul>
+<li><a class="reference internal" href="#wrap-run-match">Wrap <code class="docutils literal notranslate"><span class="pre">run.match</span></code></a></li>
+<li><a class="reference internal" href="#wrap-run-log">Wrap <code class="docutils literal notranslate"><span class="pre">run.log</span></code></a></li>
+<li><a class="reference internal" href="#wrap-run-stack-info">Wrap <code class="docutils literal notranslate"><span class="pre">run.stack_info</span></code></a></li>
+<li><a class="reference internal" href="#wrap-run-not-acceptable">Wrap <code class="docutils literal notranslate"><span class="pre">run.not_acceptable</span></code></a></li>
+<li><a class="reference internal" href="#wrap-run-eager-stop-pipeline">Wrap <code class="docutils literal notranslate"><span class="pre">run.eager_stop_pipeline</span></code></a></li>
+<li><a class="reference internal" href="#wrap-run-justification">Wrap <code class="docutils literal notranslate"><span class="pre">run.justification</span></code></a></li>
+<li><a class="reference internal" href="#wrap-run-advised-manifest-changes">Wrap <code class="docutils literal notranslate"><span class="pre">run.advised_manifest_changes</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
