@@ -86,6 +86,7 @@
 <span class="kn">import</span> <span class="nn">urllib3</span>
 <span class="kn">import</span> <span class="nn">requests</span>
 
+<span class="kn">import</span> <span class="nn">yaml</span>
 <span class="kn">import</span> <span class="nn">micropipenv</span>
 <span class="kn">from</span> <span class="nn">termcolor</span> <span class="kn">import</span> <span class="n">colored</span>
 <span class="kn">from</span> <span class="nn">yaspin</span> <span class="kn">import</span> <span class="n">yaspin</span>
@@ -186,7 +187,11 @@
     <span class="p">)</span></div>
 
 
-<span class="k">def</span> <span class="nf">_wait_for_analysis</span><span class="p">(</span><span class="n">status_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="k">def</span> <span class="nf">_wait_for_analysis</span><span class="p">(</span>
+    <span class="n">status_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Wait for ongoing analysis to finish.&quot;&quot;&quot;</span>
     <span class="c1"># noqa</span>
     <span class="nd">@contextmanager</span>
@@ -1027,9 +1032,14 @@
                 <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">runtime_environment_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">config_entry</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="p">)</span>
+            <span class="n">config_entry</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">(</span>
+                <span class="n">runtime_environment_name</span>
+            <span class="p">)</span>
             <span class="n">runtime_environment_name</span> <span class="o">=</span> <span class="n">config_entry</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Installing requirements for runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">runtime_environment_name</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Installing requirements for runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">runtime_environment_name</span><span class="p">,</span>
+        <span class="p">)</span>
 
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
             <span class="s2">&quot;Using </span><span class="si">%r</span><span class="s2"> installation method to install dependencies stated in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
@@ -1093,6 +1103,112 @@
     <span class="k">return</span> <span class="p">(</span>
         <span class="n">PythonPackagesApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span><span class="o">.</span><span class="n">list_python_package_indexes</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;indexes&quot;</span><span class="p">]</span>
     <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="write_files"><a class="viewcode-back" href="../../thamos.html#thamos.lib.write_files">[docs]</a><span class="k">def</span> <span class="nf">write_files</span><span class="p">(</span>
+    <span class="n">requirements</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">requirements_lock</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">requirements_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Write content of Pipfile/Pipfile.lock or requirements.in/txt to the current directory.&quot;&quot;&quot;</span>
+    <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">requirements</span><span class="p">,</span> <span class="n">requirements_lock</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Writing to Pipfile/Pipfile.lock in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">to_files</span><span class="p">(</span><span class="n">keep_thoth_section</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">requirements_format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;pip&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-tools&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-compile&quot;</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Writing to requirements.in/requirements.txt in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">to_pip_compile_files</span><span class="p">()</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No changes to Pipfile to write&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unknown requirements format, supported are &#39;pipenv&#39; and &#39;pip&#39;: </span><span class="si">{</span><span class="n">requirements_format</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="load_files"><a class="viewcode-back" href="../../thamos.html#thamos.lib.load_files">[docs]</a><span class="k">def</span> <span class="nf">load_files</span><span class="p">(</span><span class="n">requirements_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+    <span class="sd">&quot;&quot;&quot;Load Pipfile/Pipfile.lock or requirements.in/txt from the current directory.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using Pipenv files located in </span><span class="si">%r</span><span class="s2"> directory&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+        <span class="n">pipfile_lock_exists</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">pipfile_lock_exists</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Submitting Pipfile.lock as a base for user&#39;s stack scoring - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;user_stack&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_files</span><span class="p">(</span>
+            <span class="n">without_pipfile_lock</span><span class="o">=</span><span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">pipfile_lock_exists</span>
+            <span class="ow">and</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span>
+            <span class="o">!=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span>
+        <span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Pipfile hash stated in Pipfile.lock </span><span class="si">%r</span><span class="s2"> does not correspond to Pipfile hash </span><span class="si">%r</span><span class="s2"> - was Pipfile &quot;</span>
+                <span class="s2">&quot;adjusted? This error is not critical.&quot;</span><span class="p">,</span>
+                <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
+                <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
+            <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">requirements_format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;pip&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-tools&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-compile&quot;</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using requirements.txt file located in </span><span class="si">%r</span><span class="s2"> directory&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+        <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_pip_compile_files</span><span class="p">(</span><span class="n">allow_without_lock</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unknown configuration option for requirements format: </span><span class="si">{</span><span class="n">requirements_format</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_string</span><span class="p">(),</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="write_configuration"><a class="viewcode-back" href="../../thamos.html#thamos.lib.write_configuration">[docs]</a><span class="k">def</span> <span class="nf">write_configuration</span><span class="p">(</span>
+    <span class="n">advised_configuration</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+    <span class="n">recommendation_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Create thoth configuration file.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">advised_configuration</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No advises on configuration, nothing to adjust&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">advised_configuration</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot adjust Thoth&#39;s configuration based on advises: No name found in Thoth&#39;s configuration entry&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Reading Thoth&#39;s configuration file&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;.thoth.yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">thoth_yaml_file</span><span class="p">:</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">thoth_yaml_file</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">runtime_environment_entry</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+        <span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;runtime_environments&quot;</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">runtime_environment_entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">advised_configuration</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Adjusting configuration entry for </span><span class="si">%r</span><span class="s2"> based on recommendations&quot;</span><span class="p">,</span>
+                <span class="n">advised_configuration</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="n">runtime_environment_entry</span> <span class="o">=</span> <span class="n">advised_configuration</span>
+            <span class="k">if</span> <span class="n">recommendation_type</span><span class="p">:</span>
+                <span class="n">runtime_environment_entry</span><span class="p">[</span><span class="s2">&quot;recommendation_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">recommendation_type</span>
+            <span class="n">runtime_environment_entry</span><span class="p">[</span><span class="s2">&quot;dev&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dev</span>
+            <span class="n">content</span><span class="p">[</span><span class="s2">&quot;runtime_environments&quot;</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">runtime_environment_entry</span>
+            <span class="k">break</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot adjust Thoth&#39;s configuration based on advises: No runtime environment entry with name </span><span class="si">%r</span><span class="s2"> found&quot;</span><span class="p">,</span>
+            <span class="n">advised_configuration</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Writing adjusted Thoth&#39;s configuration file&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;.thoth.yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">thoth_yaml_file</span><span class="p">:</span>
+        <span class="n">yaml</span><span class="o">.</span><span class="n">safe_dump</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">thoth_yaml_file</span><span class="p">)</span></div>
 </pre></div>
 
           </div>
