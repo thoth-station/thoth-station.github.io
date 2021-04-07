@@ -1,0 +1,202 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.lab.graph &#8212; Thoth lab 0.2.6 documentation</title>
+    <link rel="stylesheet" href="/assets/lab/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/lab/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/lab/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/lab/jquery.js"></script>
+    <script type="text/javascript" src="/assets/lab/underscore.js"></script>
+    <script type="text/javascript" src="/assets/lab/doctools.js"></script>
+    <script type="text/javascript" src="/assets/lab/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth lab 0.2.6 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.lab.graph</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-lab</span>
+<span class="c1"># Copyright(C) 2018, 2019, 2020 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Various helpers and utils for interaction with the graph database.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">asyncio</span>
+<span class="kn">import</span> <span class="nn">typing</span>
+
+<span class="kn">import</span> <span class="nn">networkx</span> <span class="k">as</span> <span class="nn">nx</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
+
+<span class="kn">import</span> <span class="nn">plotly.graph_objs</span> <span class="k">as</span> <span class="nn">go</span>
+<span class="kn">from</span> <span class="nn">plotly.offline</span> <span class="kn">import</span> <span class="n">init_notebook_mode</span><span class="p">,</span> <span class="n">iplot</span>
+
+
+<div class="viewcode-block" id="DependencyGraph"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.graph.DependencyGraph">[docs]</a><span class="k">class</span> <span class="nc">DependencyGraph</span><span class="p">(</span><span class="n">nx</span><span class="o">.</span><span class="n">OrderedDiGraph</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Construct a dependency graph by extending nx.OrderedDiGraph.&quot;&quot;&quot;</span>
+
+    <span class="n">node_dict_factory</span> <span class="o">=</span> <span class="n">OrderedDict</span>
+    <span class="n">adjlist_dict_factory</span> <span class="o">=</span> <span class="n">OrderedDict</span>
+
+<div class="viewcode-block" id="DependencyGraph.get_root"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.graph.DependencyGraph.get_root">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_root</span><span class="p">(</span><span class="n">tree</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Return root of the current graph, if any.</span>
+
+<span class="sd">        By default, tree topology is considered as input,</span>
+<span class="sd">        so if there are multiple roots, only the first one is returned.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">root</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">node</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">tree</span><span class="o">.</span><span class="n">in_degree</span><span class="p">():</span>
+            <span class="n">root</span> <span class="o">=</span> <span class="n">node</span>
+            <span class="k">break</span>
+
+        <span class="k">return</span> <span class="n">root</span></div></div>
+
+
+<span class="n">get_root</span> <span class="o">=</span> <span class="n">DependencyGraph</span><span class="o">.</span><span class="n">get_root</span>
+<span class="n">get_root</span><span class="o">.</span><span class="vm">__doc__</span> <span class="o">=</span> <span class="n">DependencyGraph</span><span class="o">.</span><span class="n">get_root</span><span class="o">.</span><span class="vm">__doc__</span>
+
+
+<div class="viewcode-block" id="GraphQueryResult"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.graph.GraphQueryResult">[docs]</a><span class="k">class</span> <span class="nc">GraphQueryResult</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Wrap results of graph database queries.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Initialization.</span>
+
+<span class="sd">        :param result: the result to be used as a query result, can be directly coroutine that is fired.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Coroutine</span><span class="p">):</span>
+            <span class="n">loop</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">loop</span><span class="o">.</span><span class="n">run_until_complete</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">result</span> <span class="o">=</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">_get_items</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Get items from the result.&quot;&quot;&quot;</span>
+        <span class="n">items</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">]</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="p">[</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">items</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">labels</span><span class="p">,</span> <span class="n">values</span>
+
+<div class="viewcode-block" id="GraphQueryResult.to_dataframe"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.graph.GraphQueryResult.to_dataframe">[docs]</a>    <span class="k">def</span> <span class="nf">to_dataframe</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Construct a panda&#39;s dataframe on results.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="GraphQueryResult.plot_pie"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.graph.GraphQueryResult.plot_pie">[docs]</a>    <span class="k">def</span> <span class="nf">plot_pie</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Plot a pie of results into Jupyter notebook.&quot;&quot;&quot;</span>
+        <span class="n">init_notebook_mode</span><span class="p">(</span><span class="n">connected</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">labels</span><span class="p">,</span> <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_items</span><span class="p">()</span>
+        <span class="n">trace</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Pie</span><span class="p">(</span><span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">iplot</span><span class="p">([</span><span class="n">trace</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="GraphQueryResult.plot_bar"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.graph.GraphQueryResult.plot_bar">[docs]</a>    <span class="k">def</span> <span class="nf">plot_bar</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Plot histogram of results obtained.&quot;&quot;&quot;</span>
+        <span class="n">init_notebook_mode</span><span class="p">(</span><span class="n">connected</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">labels</span><span class="p">,</span> <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_items</span><span class="p">()</span>
+        <span class="n">trace</span> <span class="o">=</span> <span class="n">go</span><span class="o">.</span><span class="n">Bar</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">iplot</span><span class="p">([</span><span class="n">trace</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="GraphQueryResult.serialize"><a class="viewcode-back" href="../../../thoth.lab.html#thoth.lab.graph.GraphQueryResult.serialize">[docs]</a>    <span class="k">def</span> <span class="nf">serialize</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Serialize the output of graph query.&quot;&quot;&quot;</span>
+        <span class="c1"># It should be fine to just use one check for nested parts. We can extend this later on.</span>
+        <span class="k">def</span> <span class="nf">_serialize</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="s2">&quot;to_dict&quot;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">obj</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">obj</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">_serialize</span><span class="p">(</span><span class="n">x</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">_serialize</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">result</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation index</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
