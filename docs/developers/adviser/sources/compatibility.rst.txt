@@ -1,4 +1,4 @@
-.. _compatibility:
+. _compatibility:
 
 Thoth's adviser recommendation format
 =====================================
@@ -60,23 +60,42 @@ different software environment is used in comparision to the one provided to
 Thoth's adviser.
 
 Resolution of Thoth's adviser might come up with a software stack that would
-never be produced by pip or Pipenv. The reason is a known issue - `pip is
-lacking proper resolver <https://github.com/pypa/pip/issues/988>`_. As Pipenv
-uses pip (Pipenv actually bundles pip and virtualenv into one package) this
-issue is inherited and software stacks resolved by pip/Pipenv might be not
-correct (or can even fail). Thoth's adviser is a drop-in replacement which
-provides server side resolution with additional guidance on installed
-packages based on observations stored in Thoth's knowledge base.
+never be produced by pip or Pipenv. The reason is a different resolution
+algorithm used and the aggregated knowledge Thoth uses during the resolution
+process. Thoth's adviser is a drop-in replacement which provides server side
+resolution with additional guidance on installed packages based on observations
+stored in Thoth's knowledge base.
 
 .. note::
 
-  It's a good practice to create different Thoth configuration files (e.g.
-  different git branches) if you plan to run your application on different
-  software or hardware environments and use Thoth's recommendations.
+  It's a good practice to create overlays for different software or hardware
+  environments you want to run. Check `Thamos documentation
+  <https://github.com/thoth-station/thamos>`__ for more details.
 
 Environment markers applied on direct dependencies are not evaluated during
-resolution done on server but are taken into account once packages are
+the resolution done on server but are taken into account once packages are
 installed by Pipenv.
+
+Thoth's resolver considers also ``python_requires`` as provided by package
+maintainers, see `PEP-440 <https://www.python.org/dev/peps/pep-0440/>`__ or
+`packaging documentation
+<https://packaging.python.org/guides/distributing-packages-using-setuptools/?highlight=python_requires#python-requires>`__
+for more info and semantics. The Python requirement information is aggregated
+during `Thoth's solver <https://github.com/thoth-station/solver>`__ runs as
+part of data aggregation and considered during the resolution (implemented by
+``SolvedSieve`` pipeline unit).  As the interpreter information is evaluated
+during solver runs for the given package they are specific for the given solver
+(e.g. ubi-8 solver running Python 3.6).
+
+In some cases these Python requirements might give misleading results. For
+example, consider ``python_requires>3.9.1`` for some package. If solver is
+running Python interpreter in version 3.9.0, the given package fails to install
+and thus the recommendation engine never recommends the given package when
+running any Python 3.9. This is considered a corner case as this is not seen
+much in the Python ecosystem.
+
+Resolver also implements experimental features that extend the current feature
+set of Pipenv or pip. See :ref:`experimental_features` for more details.
 
 Python package indexes
 ======================
@@ -99,7 +118,7 @@ provided.
 
 An example of a ``Pipfile`` that configures two Python package indexes - `PyPI
 <https://pypi.org/simple>`_ and `AICoE Python package index
-<https://tensorflow.pypi.thoth-station.ninja/>`:
+<https://tensorflow.pypi.thoth-station.ninja/>`__:
 
 .. code-block:: toml
 
@@ -122,6 +141,8 @@ An example of a ``Pipfile`` that configures two Python package indexes - `PyPI
   [pipenv]
   allow_prereleases = true
 
+
+.. _shared_deps:
 
 A note on shared dependencies in a dependency graph
 ===================================================
@@ -156,8 +177,8 @@ figure bellow:
 To satisfy version range specification, the only valid resolution leads to
 ``wheel==0.33.1`` (not considering pre, post releases or release candidates).
 Note that the implementation does not necessarily need to include such version
-(or versions), especially considering ``limit_latest_versions``, state space
-sampling and state space restrictions in beam. In such cases, it is recommended
-to pin down versions of such packages (as ``wheel`` in the example) explicitly
-as a hint to resolver. Otherwise resolution might fail. See logs of an adviser
-run to spot such cases.
+(or versions), especially considering the state space sampling and state space
+restrictions in :class:`beam <thoth.adviser.beam.Beam>`. In such cases, it is
+recommended to pin down versions of such packages (as ``wheel`` in the example)
+explicitly as a hint to resolver.  Otherwise resolution might fail. See logs of
+an adviser run to spot such cases.
