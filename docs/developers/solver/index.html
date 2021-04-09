@@ -57,7 +57,7 @@
             
   <section id="thoth-solver">
 <h1>Thoth Solver<a class="headerlink" href="#thoth-solver" title="Permalink to this headline">¶</a></h1>
-<p>Dependency solver used in <a class="reference external" href="https://thoth-station.ninja">Thoth project</a>.</p>
+<p>Python dependency solver used in <a class="reference external" href="https://thoth-station.ninja">Thoth project</a>.</p>
 <p>As Python is a dynamic programming language, Thoth runs several types of
 solvers that differ in software environment (operating system, native packages
 present, system symbols and their versions and Python interpreter version). An
@@ -99,7 +99,8 @@ provided stack?</p>
 <span class="go">tensorflow</span>
 </pre></div>
 </div>
-<p>Tool provided by this project will tell you how dependencies could be resolved:</p>
+<p>Tool provided by this project will tell you what dependencies will be
+considered during resolution (the whole dependency graph):</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">thoth-solver -vvv pypi -r requirements.txt</span>
 </pre></div>
 </div>
@@ -107,26 +108,28 @@ provided stack?</p>
 - in the example above, package <code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> in any release with analysis of
 its all dependencies (direct and indirect ones) with additional information
 from Python ecosystem needed for a Python resolver to perform the actual
-<code class="docutils literal notranslate"><span class="pre">TensorFlow</span></code> installation.</p>
+<code class="docutils literal notranslate"><span class="pre">tensorflow</span></code> resolution.</p>
 <p>The tool also allows specifying custom Python package indexes which conform to
 <a class="reference external" href="https://www.python.org/dev/peps/pep-0503/">PEP-503</a> - see the <code class="docutils literal notranslate"><span class="pre">--index</span></code>
 option for analyzing your custom Python packages provided by your repositories.</p>
+<p>It is also possible to restrict version using standard Python version range
+specifiers and/or limit the output just to direct dependencies.</p>
 </section>
 <section id="produced-output">
 <h2>Produced output<a class="headerlink" href="#produced-output" title="Permalink to this headline">¶</a></h2>
-<p>This tool (unless <code class="docutils literal notranslate"><span class="pre">--no-transitive</span></code> is specified) analyzes recursively all the
-dependencies of the desired project. Dependencies to be analyzed can be defined
-in similar to <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> file or as a string in a form of:</p>
+<p>This tool (unless <code class="docutils literal notranslate"><span class="pre">--no-transitive</span></code> is specified) recursively analyzes all
+the dependencies of the desired package inside a specific environment.
+Dependencies to be analyzed can be defined in similar to <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code>
+file or as a string in a form of:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;package-name&gt;&lt;version-cmp&gt;&lt;version-identifier&gt;</span>
 </pre></div>
 </div>
 <p>Where <code class="docutils literal notranslate"><span class="pre">&lt;package-name&gt;</span></code> is the analyzed package name (as present on PyPI for
 example), part <code class="docutils literal notranslate"><span class="pre">&lt;version-cmp&gt;&lt;version-identifier&gt;</span></code> is optional and creates
 version specifier for the given package (if not specified, all versions are
-considered). As the solver analysis the project, other parts (such as extras)
-are not supported.</p>
-<p>An example output shown bellow can be reproduced by running the tool with the following
-arguments (with an example of produced log):</p>
+considered).</p>
+<p>An example output shown bellow can be reproduced by running the tool with the
+following arguments (with an example of produced log):</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>thoth-solver python --requirements <span class="s1">&#39;tensorflow==2.0.0&#39;</span> --index https://pypi.org/simple --no-transitive
 <span class="go">2019-10-01 14:01:02,756 [31432] INFO     root:128: Logging to a Sentry instance is turned off</span>
 <span class="go">2019-10-01 14:01:02,756 [31432] INFO     root:150: Logging to rsyslog endpoint is turned off</span>
@@ -176,7 +179,7 @@ interesting parts of the output using JSONPath:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">.metadata</span></code> - metadata assigned to the solver run - these metadata are especially useful within project Thoth, where analyzer is run in a cluster, the purpose of metadata is to capture information which could be beneficial when debugging issues which arise in the cluster due to different container environment (e.g. Python version)</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">.result</span></code> - the actual result as produced by this tool</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">.result.unparsed</span></code> - a list of requirements that failed to be parsed (wrong dependency specification not conforming to Python standards)</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">.result.unresolved</span></code> - a list of requirements that failed to be resolved - a reason behind failure can be for example non-existing package or its version on the given Python package index, or for example incompatibility of package distribution with the solver’s software environment (Python version, environment markers, …), or bogus distribution (e.g. forgotten <cite>requirements.txt</cite> in the distribution required by <cite>setup.py</cite> on package build).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.result.unresolved</span></code> - a list of requirements that failed to be resolved - the reason behind failure can be for example non-existing package or its version on the given Python package index, or for example incompatibility of package distribution with the solver’s software environment (Python version, environment markers, …), or bogus distribution (e.g. forgotten <code class="docutils literal notranslate"><span class="pre">requirements.txt</span></code> in the distribution required by <code class="docutils literal notranslate"><span class="pre">setup.py</span></code> on package build).</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">.result.tree</span></code> - the actual serialized dependency tree (broken dependency graph as cyclic dependencies are possible in Python ecosystem)</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].package_name</span></code> - name of the analyzed package</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">.result.tree[*].package_version</span></code> - version of the analyzed package</p></li>
@@ -371,16 +374,13 @@ specification, specifically the following section:</p>
 </section>
 <section id="installation-and-deployment">
 <h2>Installation and Deployment<a class="headerlink" href="#installation-and-deployment" title="Permalink to this headline">¶</a></h2>
-<p>This project is also released on
-<a class="reference external" href="https://pypi.org/project/thoth-solver">PyPI</a>, so the latest release can be
+<p>This project is also released on <a class="reference external" href="https://pypi.org/project/thoth-solver">PyPI</a>, so the latest release can be
 installed via pip or <a class="reference external" href="https://pipenv.readthedocs.io">Pipenv</a>:</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pipenv install thoth-solver</span>
 </pre></div>
 </div>
 <p>Solver is run in <a class="reference external" href="https://thoth-station.ninja">project Thoth</a> to gather
-information about package dependencies. You can find deployment templates in
-the <code class="docutils literal notranslate"><span class="pre">openshift/</span></code> directory present in the root of <a class="reference external" href="https://github.com/thoth-station/solver">solver’s Git repository</a>. Check
-<a class="reference external" href="https://github.com/thoth-station/thoth-application">thoth-station/thoth-application</a> repository for
+information about package dependencies. Check <a class="reference external" href="https://github.com/thoth-station/thoth-application">thoth-station/thoth-application</a> repository for
 deployment and installation instructions.</p>
 </section>
 <section id="running-solver-locally">
@@ -396,9 +396,6 @@ deployment and installation instructions.</p>
 <div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pipenv run python3 ./thoth-solver --verbose python -r &#39;selinon==1.0.0&#39; -i https://pypi.org/simple --no-transitive</span>
 </pre></div>
 </div>
-<p>Follow follow the developer’s guide docs to get <a class="reference external" href="https://github.com/thoth-station/thoth/blob/master/docs/developers_guide.rst">more
-information about developer’s setup</a>
-if you plan to develop this utility.</p>
 </section>
 <section id="crossroad">
 <h2>Crossroad<a class="headerlink" href="#crossroad" title="Permalink to this headline">¶</a></h2>
@@ -432,7 +429,7 @@ if you plan to develop this utility.</p>
 </ul>
 </div>
 <p>This documentation corresponds to implementation in version 1.7.2,
-documentation was generated on Apr 08, 2021.</p>
+documentation was generated on Apr 09, 2021.</p>
 </section>
 </section>
 

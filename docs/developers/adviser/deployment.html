@@ -78,14 +78,21 @@ implementation uses native extensions (<a class="reference external" href="https
 <code class="docutils literal notranslate"><span class="pre">dict</span></code> to be ordered. This is an implementation detail in CPython 3.6 and
 language feature onwards, but the code of adviser relies on this feature
 (especially its core resolver algorithm).</p>
-<p>The code was tested also on CPython 3.7 and CPython 3.8.</p>
+<p>The adviser code was tested also on CPython 3.7 and CPython 3.8.</p>
 </section>
 <section id="allocating-cpu-time">
 <h2>Allocating CPU time<a class="headerlink" href="#allocating-cpu-time" title="Permalink to this headline">¶</a></h2>
-<p>Adviser responds to <code class="docutils literal notranslate"><span class="pre">SIGINT</span></code> signal that is handled during the main
-resolution and pipeline run. If a <code class="docutils literal notranslate"><span class="pre">SIGINT</span></code> is captured, adviser gracefully
-stops the current pipeline run with resolution and gathers results obtained
-until that point.</p>
+<p>As resolver resolves multiple software stacks per run depending on the
+recommendation type, it requires a stop condition. The implementation has two
+main stop conditions:</p>
+<ol class="arabic simple">
+<li><p><a class="reference external" href="https://thoth-station.ninja/j/no_paths.html">No more paths to be explored during the resolution</a></p></li>
+<li><p><a class="reference external" href="https://thoth-station.ninja/j/cpu_time_exceeded.html">Allocated CPU time for resolution was exceeded</a></p></li>
+</ol>
+<p>Resolver responds to <code class="docutils literal notranslate"><span class="pre">SIGINT</span></code> signal that is handled during the main
+resolution and pipeline run to implement the second scenario. If a <code class="docutils literal notranslate"><span class="pre">SIGINT</span></code>
+is captured, adviser gracefully stops the current pipeline run with resolution
+and gathers results obtained until that point.</p>
 <p>This behavior can be naturally used with Kubernetes/OpenShift liveness probes.
 See <a class="reference external" href="https://github.com/thoth-station/adviser/blob/cb9b2f496308e4a44e1b3e102d0c5f2d71cffcbc/liveness.py#L18">liveness.py file used in deployments</a>.</p>
 </section>
@@ -96,11 +103,11 @@ in mind.</p>
 <p>Adviser can do a fork from its main process and perform memory expensive
 operations in a sub-process configured and triggered from the main process.
 This behavior is turned off by default to simplify development and debugging
-when running adviser locally. To enable
-forking set <code class="docutils literal notranslate"><span class="pre">THOTH_ADVISER_FORK=1</span></code>. When running adviser in the cluster, the
-OOM killer will kill the memory expensive sub-process leaving the main process
-untouched. The main process has a capability of detecting the OOM kill of the
-sub-process and construct corresponding report.</p>
+when running adviser locally. To enable forking set <code class="docutils literal notranslate"><span class="pre">THOTH_ADVISER_FORK=1</span></code>.
+When running adviser in the cluster, the OOM killer will kill the memory
+expensive sub-process leaving the main process untouched. The main process has
+a capability of <a class="reference external" href="https://thoth-station.ninja/j/oom.html">detecting the OOM kill of the sub-process and construct
+corresponding report</a>.</p>
 <section id="tweaking-limit">
 <h3>Tweaking limit<a class="headerlink" href="#tweaking-limit" title="Permalink to this headline">¶</a></h3>
 <p>This parameter limits number of stacks that are produced and scored per adviser
@@ -122,19 +129,19 @@ adviser to immidiatelly terminate once it finds the first latest stack.</p>
 <h3>Setting seed<a class="headerlink" href="#setting-seed" title="Permalink to this headline">¶</a></h3>
 <p>To make sure multiple adviser runs result in the same stack, it is a good idea
 to set adviser’s seed to the same value across mutliple adviser runs in a
-deployment.  Note the resolution is stochastic in some sense (this also depends
-on predictor used).</p>
-<p>Also note the adviser runs depend on results obtianed from Thoth’s knowledge
-graph. If some relevant parts of the knowledge graph change, different results
-might be produced by adviser even if the seed is set to a constant value across
-multiple adviser runs.</p>
+deployment.  Note the resolution is stochastic (this also depends on predictor
+used).</p>
+<p>Also note the adviser runs depend on results obtained from Thoth’s knowledge
+graph. If some relevant parts of the knowledge used during resolution change,
+different results might be produced by adviser even if the seed is set to a
+constant value across multiple adviser runs.</p>
 </section>
 <section id="beam-and-it-s-width">
 <span id="beam-width"></span><h3>Beam and it’s width<a class="headerlink" href="#beam-and-it-s-width" title="Permalink to this headline">¶</a></h3>
 <p>One of the core data structures keeping resolver’s internal states is beam (see
-<a class="reference internal" href="pipeline.html#pipeline"><span class="std std-ref">pipeline</span></a> and <a class="reference internal" href="predictor.html#predictor"><span class="std std-ref">predictor</span></a> docs for more info).
-Beam width is the maximum number of partially resolved states stored at the
-same time and can be configured using a hyperparameter during deployment.
+<a class="reference internal" href="pipeline.html#pipeline"><span class="std std-ref">pipeline</span></a> and <a class="reference internal" href="predictor.html#predictor"><span class="std std-ref">predictor</span></a> docs for more
+info).  Beam width is the maximum number of partially resolved states stored at
+the same time and can be configured using a hyperparameter during deployment.
 There are few pros and cons for large and small <em>width</em> numbers. The optimal
 beam width depends on the stack size, CPU time allocated and memory available
 per adviser run in a deployment.</p>
@@ -168,12 +175,14 @@ can be tweaked in deployment to obtain better results.</p>
 <h3>Development dependencies (dev flag)<a class="headerlink" href="#development-dependencies-dev-flag" title="Permalink to this headline">¶</a></h3>
 <p>In some cases, Thoth is recommending a software stack for application
 deployments. Development dependencies are usually not installed in such cases
-(if so, you should rething how the application is structured). By eliminating
-developement dependencies the dependency graph explored on Thoth’s side can be
-smaller which can narrow down the exploration to dependencies that go to the
-deployment. Naturally, this can have positive impact on the resulting software
-stack recommended (a better one can be found given the smaller state space
-explored).</p>
+(if so, you should rething how the application is structured). By <a class="reference external" href="https://thoth-station.ninja/j/no_dev.html">eliminating
+development dependencies</a> the
+dependency graph explored on Thoth’s side can be smaller which can narrow down
+the exploration to dependencies that go to the deployment. Naturally, this can
+have positive impact on the resulting software stack recommended (a better one
+can be found given the smaller state space explored). You can always force
+resolving also development dependencies by providing <code class="docutils literal notranslate"><span class="pre">--dev</span></code> flag to <a class="reference external" href="https://github.com/thoth-station/thamos">Thamos
+CLI</a>.</p>
 </section>
 </section>
 </section>
