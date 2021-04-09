@@ -1,0 +1,362 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.adviser.state &#8212; Thoth Adviser 0.27.0 documentation</title>
+    <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/adviser/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/adviser/jquery.js"></script>
+    <script type="text/javascript" src="/assets/adviser/underscore.js"></script>
+    <script type="text/javascript" src="/assets/adviser/doctools.js"></script>
+    <script type="text/javascript" src="/assets/adviser/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Adviser 0.27.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.adviser.state</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-adviser</span>
+<span class="c1"># Copyright(C) 2019, 2020 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;A state of not fully resolved software stack in adviser&#39;s recommendations implementation.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
+<span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">weakref</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">RuntimeEnvironment</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
+<span class="kn">import</span> <span class="nn">termial_random</span>
+
+
+<div class="viewcode-block" id="State"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">State</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Implementation of an adviser&#39;s state in state space.&quot;&quot;&quot;</span>
+
+    <span class="n">score</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+    <span class="c1"># Iteration in which the state was introduced.</span>
+    <span class="n">iteration</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+    <span class="c1"># States added in the given iteration.</span>
+    <span class="n">unresolved_dependencies</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>  <span class="c1"># type: Dict[str, Dict[int, Tuple[str, str, str]]]</span>
+    <span class="n">resolved_dependencies</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>  <span class="c1"># type: Dict[str, Tuple[str, str, str]]</span>
+    <span class="n">_parent</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>  <span class="c1"># type: weakref.ReferenceType[&#39;State&#39;]</span>
+    <span class="n">advised_runtime_environment</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">RuntimeEnvironment</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="c1"># See RFC-6902:</span>
+    <span class="c1">#   https://tools.ietf.org/html/rfc6902</span>
+    <span class="c1"># An example entry for a manifest change:</span>
+    <span class="c1">#   [</span>
+    <span class="c1">#     {</span>
+    <span class="c1">#       &quot;apiVersion&quot;: &quot;apps.openshift.io/v1&quot;,</span>
+    <span class="c1">#       &quot;kind&quot;: &quot;DeploymentConfig&quot;,</span>
+    <span class="c1">#       &quot;patch&quot;: {</span>
+    <span class="c1">#         &quot;op&quot;: &quot;add&quot;,</span>
+    <span class="c1">#         &quot;path&quot;: &quot;spec.template.spec.containers[0].env&quot;,</span>
+    <span class="c1">#         &quot;value&quot;: {&quot;name&quot;: &quot;OMP_NUM_THREADS&quot;, &quot;value&quot;: &quot;1&quot;},</span>
+    <span class="c1">#       }</span>
+    <span class="c1">#     }</span>
+    <span class="c1">#   ]</span>
+    <span class="c1"># See available yaml-patch operations at https://python-json-patch.readthedocs.io/en/latest/tutorial.html</span>
+    <span class="c1">#</span>
+    <span class="c1"># Each entry is a list of JSON patches to be applied. If any entry fails to</span>
+    <span class="c1"># patch, the patching can continue with the subsequent JSON patch as each</span>
+    <span class="c1"># entry corresponds to a list of atomic changes to be applied:</span>
+    <span class="c1">#</span>
+    <span class="c1">#  https://tools.ietf.org/html/rfc6902#section-5</span>
+    <span class="n">advised_manifest_changes</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">))</span>
+    <span class="n">justification</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">),</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">_EPSILON</span> <span class="o">=</span> <span class="mf">0.1</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">parent</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># type:(&#39;State&#39;) -&gt; Optional[&#39;State&#39;]</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve parent to this state.</span>
+
+<span class="sd">        If None the state is top level state or parent is no longer maintained. Note the return</span>
+<span class="sd">        value of None depends on actual gc runs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_parent</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="State.from_direct_dependencies"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.from_direct_dependencies">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_direct_dependencies</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">direct_dependencies</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="s2">&quot;State&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Create an initial state out of direct dependencies.&quot;&quot;&quot;</span>
+        <span class="n">unresolved_dependencies</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, Dict[int, Tuple[str, str, str]]]</span>
+
+        <span class="k">for</span> <span class="n">dependency_name</span><span class="p">,</span> <span class="n">dependency_versions</span> <span class="ow">in</span> <span class="n">direct_dependencies</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">dependency_version</span> <span class="ow">in</span> <span class="n">dependency_versions</span><span class="p">:</span>
+                <span class="n">dependency_tuple</span> <span class="o">=</span> <span class="n">dependency_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
+                <span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">][</span><span class="nb">hash</span><span class="p">(</span><span class="n">dependency_tuple</span><span class="p">)]</span> <span class="o">=</span> <span class="n">dependency_tuple</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">unresolved_dependencies</span><span class="o">=</span><span class="n">unresolved_dependencies</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="fm">__lt__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;State&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Compare two objects, comparision protocol used in the beam.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">score</span> <span class="o">&lt;</span> <span class="n">other</span><span class="o">.</span><span class="n">score</span>
+
+<div class="viewcode-block" id="State.to_dict"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Convert state to a dict representation.&quot;&quot;&quot;</span>
+        <span class="n">advised_runtime_environment</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">advised_runtime_environment</span><span class="p">:</span>
+            <span class="n">advised_runtime_environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">advised_runtime_environment</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+        <span class="c1"># Parent is removed intentionally.</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;advised_manifest_changes&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">advised_manifest_changes</span><span class="p">,</span>
+            <span class="s2">&quot;advised_runtime_environment&quot;</span><span class="p">:</span> <span class="n">advised_runtime_environment</span><span class="p">,</span>
+            <span class="s2">&quot;iteration&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span>
+            <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">justification</span><span class="p">,</span>
+            <span class="s2">&quot;resolved_dependencies&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="p">,</span>
+            <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+            <span class="s2">&quot;unresolved_dependencies&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+<div class="viewcode-block" id="State.is_final"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.is_final">[docs]</a>    <span class="k">def</span> <span class="nf">is_final</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if the given state is a final state.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span></div>
+
+<div class="viewcode-block" id="State.add_justification"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.add_justification">[docs]</a>    <span class="k">def</span> <span class="nf">add_justification</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">justification</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add new entries to the justification field.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">justification</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">justification</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="State.add_unresolved_dependency"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.add_unresolved_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">add_unresolved_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add unresolved dependency into the state.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="nb">hash</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)]</span> <span class="o">=</span> <span class="n">package_tuple</span></div>
+
+<div class="viewcode-block" id="State.set_unresolved_dependencies"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.set_unresolved_dependencies">[docs]</a>    <span class="k">def</span> <span class="nf">set_unresolved_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Set unresolved dependencies - any unresolved dependencies will be overwritten.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">dependency_name</span><span class="p">,</span> <span class="n">dependency_tuples</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="nb">hash</span><span class="p">(</span><span class="n">d</span><span class="p">):</span> <span class="n">d</span> <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">dependency_tuples</span><span class="p">}</span></div>
+
+<div class="viewcode-block" id="State.update_unresolved_dependencies"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.update_unresolved_dependencies">[docs]</a>    <span class="k">def</span> <span class="nf">update_unresolved_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Update unresolved dependencies respecting the ones passed in as parameters.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">dependency_name</span><span class="p">,</span> <span class="n">dependency_tuples</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">dependency_tuples</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">dependency_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">dependency_tuples</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">][</span><span class="nb">hash</span><span class="p">(</span><span class="n">d</span><span class="p">)]</span> <span class="o">=</span> <span class="n">d</span></div>
+
+<div class="viewcode-block" id="State.remove_unresolved_dependency"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.remove_unresolved_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">remove_unresolved_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Remove the given unresolved dependency from state.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="nb">hash</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]:</span>
+            <span class="c1"># Last item, remove records about it.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="State.remove_unresolved_dependency_subtree"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.remove_unresolved_dependency_subtree">[docs]</a>    <span class="k">def</span> <span class="nf">remove_unresolved_dependency_subtree</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Remove the whole dependency sub-tree from the state.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="State.add_resolved_dependency"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.add_resolved_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">add_resolved_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add a resolved dependency into the state.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolved_dependencies</span>
+            <span class="ow">and</span> <span class="n">package_tuple</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Package </span><span class="si">{</span><span class="n">package_tuple</span><span class="si">!r}</span><span class="s2"> is already present in the state &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;in different version </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">package_tuple</span></div>
+
+<div class="viewcode-block" id="State.mark_dependency_resolved"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.mark_dependency_resolved">[docs]</a>    <span class="k">def</span> <span class="nf">mark_dependency_resolved</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Mark the given dependency as resolved in the current state.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">remove_unresolved_dependency</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">remove_unresolved_dependency_subtree</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="c1"># The logic behind state manipulation makes sure there is no package version or package source clash.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">add_resolved_dependency</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="State.get_first_unresolved_dependency"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.get_first_unresolved_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">get_first_unresolved_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dependency_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get a very first unresolved dependency tuple.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">dependency_name</span> <span class="o">=</span> <span class="n">dependency_name</span> <span class="ow">or</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">))</span>
+            <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]))</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">][</span><span class="n">unresolved_dependency_id</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">StopIteration</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No unresolved dependency found in state: </span><span class="si">{</span><span class="bp">self</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span></div>
+
+<div class="viewcode-block" id="State.get_random_first_unresolved_dependency"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.get_random_first_unresolved_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">get_random_first_unresolved_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dependency_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get a very first unresolved dependency tuple.&quot;&quot;&quot;</span>
+        <span class="n">dependency_name</span> <span class="o">=</span> <span class="n">dependency_name</span> <span class="ow">or</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]))</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">][</span><span class="n">unresolved_dependency_id</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">StopIteration</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No unresolved dependency found in state: </span><span class="si">{</span><span class="bp">self</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span></div>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_termial_function</span><span class="p">(</span><span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute termial function, with red hats off to Donald Knuth.</span>
+
+<span class="sd">        Termial function is:</span>
+
+<span class="sd">          \sum_{k=0}^n k</span>
+
+<span class="sd">        Let&#39;s use arithmetic progression to get termial of n.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Termial function used with negative number&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">int</span><span class="p">((</span><span class="mi">1</span> <span class="o">+</span> <span class="n">n</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">n</span> <span class="o">/</span> <span class="mi">2</span><span class="p">))</span>
+
+<div class="viewcode-block" id="State.get_random_unresolved_dependency"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.get_random_unresolved_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">get_random_unresolved_dependency</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">dependency_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">prefer_recent</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get a very first unresolved dependency tuple.&quot;&quot;&quot;</span>
+        <span class="n">dependency_name</span> <span class="o">=</span> <span class="n">dependency_name</span> <span class="ow">or</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">))</span>
+
+        <span class="n">choices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">prefer_recent</span><span class="p">:</span>
+            <span class="c1"># perform multi-armed bandit - epsilon-greedy strategy</span>
+            <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">choices</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_EPSILON</span> <span class="o">&gt;=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">():</span>
+                <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="n">choices</span><span class="p">[</span><span class="n">termial_random</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">choices</span><span class="p">))]</span>
+
+            <span class="k">if</span> <span class="n">unresolved_dependency_id</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="n">choices</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">unresolved_dependency_id</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">choices</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">][</span><span class="n">unresolved_dependency_id</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="State.iter_unresolved_dependencies"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.iter_unresolved_dependencies">[docs]</a>    <span class="k">def</span> <span class="nf">iter_unresolved_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Iterate over unresolved dependencies.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">nested</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">yield from</span> <span class="n">nested</span><span class="o">.</span><span class="n">values</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="State.iter_resolved_dependencies"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.iter_resolved_dependencies">[docs]</a>    <span class="k">def</span> <span class="nf">iter_resolved_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Iterate over resolved dependencies.&quot;&quot;&quot;</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">values</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="State.clone"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.state.State.clone">[docs]</a>    <span class="k">def</span> <span class="nf">clone</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;State&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Return a swallow copy of this state that can be used as a next state.&quot;&quot;&quot;</span>
+        <span class="n">cloned_advised_environment</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">advised_runtime_environment</span><span class="p">:</span>
+            <span class="n">cloned_advised_environment</span> <span class="o">=</span> <span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">advised_runtime_environment</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+
+        <span class="n">unresolved_dependencies</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">dependency_name</span> <span class="ow">in</span> <span class="n">unresolved_dependencies</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">unresolved_dependencies</span><span class="p">[</span><span class="n">dependency_name</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">(</span>
+            <span class="n">score</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+            <span class="n">iteration</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span>
+            <span class="n">unresolved_dependencies</span><span class="o">=</span><span class="n">unresolved_dependencies</span><span class="p">,</span>
+            <span class="n">resolved_dependencies</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span>
+            <span class="n">advised_runtime_environment</span><span class="o">=</span><span class="n">cloned_advised_environment</span><span class="p">,</span>
+            <span class="n">advised_manifest_changes</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">advised_manifest_changes</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span>
+            <span class="n">justification</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">justification</span><span class="o">.</span><span class="n">copy</span><span class="p">(),</span>
+            <span class="n">parent</span><span class="o">=</span><span class="n">weakref</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="bp">self</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Destruct self.&quot;&quot;&quot;</span>
+        <span class="c1"># Destruct parts that are not eventually populated to the pipeline product abstraction.</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">unresolved_dependencies</span>
+        <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolved_dependencies</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation index</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
