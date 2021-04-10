@@ -4,14 +4,14 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.predictors.annealing &#8212; Thoth Adviser 0.16.0 documentation</title>
-    <link rel="stylesheet" href="/assets/nameko.css" type="text/css" />
-    <link rel="stylesheet" href="/assets/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="/assets/documentation_options.js"></script>
-    <script type="text/javascript" src="/assets/jquery.js"></script>
-    <script type="text/javascript" src="/assets/underscore.js"></script>
-    <script type="text/javascript" src="/assets/doctools.js"></script>
-    <script type="text/javascript" src="/assets/language_data.js"></script>
+    <title>thoth.adviser.predictors.annealing &#8212; Thoth Adviser 0.27.0 documentation</title>
+    <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="/assets/adviser/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/adviser/jquery.js"></script>
+    <script type="text/javascript" src="/assets/adviser/underscore.js"></script>
+    <script type="text/javascript" src="/assets/adviser/doctools.js"></script>
+    <script type="text/javascript" src="/assets/adviser/language_data.js"></script>
     <link rel="index" title="Index" href="../../../../genindex.html" />
     <link rel="search" title="Search" href="../../../../search.html" />
 
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Adviser 0.16.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Adviser 0.27.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -70,8 +70,9 @@
 <span class="sd">&quot;&quot;&quot;Implementation of Adaptive Simulated Annealing (ASA) used to resolve software stacks.&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">random</span>
 <span class="kn">import</span> <span class="nn">math</span>
@@ -94,13 +95,19 @@
 <span class="k">class</span> <span class="nc">AdaptiveSimulatedAnnealing</span><span class="p">(</span><span class="n">Predictor</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Implementation of adaptive simulated annealing looking for stacks based on the scoring function.&quot;&quot;&quot;</span>
 
-    <span class="n">_temperature_history</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">bool</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">list</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,)</span>
+    <span class="n">temperature_coefficient</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.999</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="n">_temperature_history</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="nb">int</span><span class="p">]],</span>
+        <span class="n">factory</span><span class="o">=</span><span class="nb">list</span><span class="p">,</span>
+        <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="n">_temperature</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">_temperature_function</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t0</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Temperature function used to compute new temperature.&quot;&quot;&quot;</span>
         <span class="n">k</span> <span class="o">=</span> <span class="p">(</span><span class="n">context</span><span class="o">.</span><span class="n">accepted_final_states_count</span> <span class="o">+</span> <span class="n">math</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span> <span class="o">/</span> <span class="n">context</span><span class="o">.</span><span class="n">limit</span>
-        <span class="n">temperature</span> <span class="o">=</span> <span class="n">t0</span> <span class="o">*</span> <span class="mf">0.97</span> <span class="o">**</span> <span class="n">k</span>
+        <span class="n">temperature</span> <span class="o">=</span> <span class="n">t0</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">temperature_coefficient</span> <span class="o">**</span> <span class="n">k</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
             <span class="s2">&quot;New temperature for (iteration=</span><span class="si">%d</span><span class="s2">, t0=</span><span class="si">%g</span><span class="s2">, accepted final states=</span><span class="si">%d</span><span class="s2">, limit=</span><span class="si">%d</span><span class="s2">, beam size= </span><span class="si">%d</span><span class="s2">, k=</span><span class="si">%f</span><span class="s2">) = </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span>
             <span class="n">context</span><span class="o">.</span><span class="n">iteration</span><span class="p">,</span>
@@ -151,7 +158,8 @@
         <span class="k">if</span> <span class="n">probable_state_idx</span> <span class="o">!=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">acceptance_probability</span> <span class="o">&gt;=</span> <span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">():</span>
             <span class="c1"># Skip to probable state, do not use the top rated state.</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                <span class="s2">&quot;Performing transition to a neighbour state with score </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">probable_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
+                <span class="s2">&quot;Performing transition to a neighbour state with score </span><span class="si">%g</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">probable_state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="c1"># state_expansion_idx = probable_state_idx</span>
             <span class="n">state</span> <span class="o">=</span> <span class="n">probable_state</span>
@@ -249,7 +257,12 @@
         <span class="n">font_prop</span> <span class="o">=</span> <span class="n">FontProperties</span><span class="p">()</span>
         <span class="n">font_prop</span><span class="o">.</span><span class="n">set_size</span><span class="p">(</span><span class="s2">&quot;small&quot;</span><span class="p">)</span>
         <span class="n">fig</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span>
-            <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper center&quot;</span><span class="p">,</span> <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span> <span class="n">ncol</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">fancybox</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">shadow</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">prop</span><span class="o">=</span><span class="n">font_prop</span><span class="p">,</span>
+            <span class="n">loc</span><span class="o">=</span><span class="s2">&quot;upper center&quot;</span><span class="p">,</span>
+            <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mf">0.50</span><span class="p">,</span> <span class="mf">1.00</span><span class="p">),</span>
+            <span class="n">ncol</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+            <span class="n">fancybox</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">shadow</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">prop</span><span class="o">=</span><span class="n">font_prop</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">fig</span></div></div>
 </pre></div>
