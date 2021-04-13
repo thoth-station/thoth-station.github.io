@@ -1,0 +1,1296 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thamos.lib &#8212; Thamos 1.16.1 documentation</title>
+    <link rel="stylesheet" href="/assets/thamos/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/thamos/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../" src="/assets/thamos/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/thamos/jquery.js"></script>
+    <script type="text/javascript" src="/assets/thamos/underscore.js"></script>
+    <script type="text/javascript" src="/assets/thamos/doctools.js"></script>
+    <script type="text/javascript" src="/assets/thamos/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../http-routingtable.html" title="HTTP Routing Table"
+             >routing table</a> |</li>
+        <li class="right" >
+          <a href="../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.16.1 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thamos.lib</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thamos</span>
+<span class="c1"># Copyright(C) 2018, 2019, 2020 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Core parts of library for interacting with Thoth.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">typing</span>
+<span class="kn">import</span> <span class="nn">platform</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">sleep</span>
+<span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">monotonic</span>
+<span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
+<span class="kn">import</span> <span class="nn">pprint</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">urllib3</span>
+<span class="kn">import</span> <span class="nn">requests</span>
+
+<span class="kn">import</span> <span class="nn">yaml</span>
+<span class="kn">import</span> <span class="nn">micropipenv</span>
+<span class="kn">from</span> <span class="nn">termcolor</span> <span class="kn">import</span> <span class="n">colored</span>
+<span class="kn">from</span> <span class="nn">yaspin</span> <span class="kn">import</span> <span class="n">yaspin</span>
+<span class="kn">from</span> <span class="nn">yaspin.spinners</span> <span class="kn">import</span> <span class="n">Spinners</span>
+<span class="kn">from</span> <span class="nn">invectio</span> <span class="kn">import</span> <span class="n">gather_library_usage</span>
+<span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="kn">import</span> <span class="n">run_command</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Project</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">ThothAdviserIntegrationEnum</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">cwd</span>
+
+<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">__version__</span> <span class="k">as</span> <span class="n">thamos_version</span>
+<span class="kn">from</span> <span class="nn">.swagger_client.rest</span> <span class="kn">import</span> <span class="n">ApiException</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">ApiClient</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">BuildAnalysisApi</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">Configuration</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">PythonStack</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">AdviseInput</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">ProvenanceInput</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">AdviseApi</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">ImageAnalysisApi</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">ProvenanceApi</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">HardwareApi</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">S2iApi</span>
+<span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">PythonPackagesApi</span>
+<span class="kn">from</span> <span class="nn">.swagger_client.models</span> <span class="kn">import</span> <span class="n">AnalysisResultResponse</span>
+<span class="kn">from</span> <span class="nn">.config</span> <span class="kn">import</span> <span class="n">config</span> <span class="k">as</span> <span class="n">thoth_config</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">UnknownAnalysisType</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="ne">TimeoutError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">ApiError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NoDevRequirements</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NoRequirementsFile</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Dict</span>
+
+<span class="n">urllib3</span><span class="o">.</span><span class="n">disable_warnings</span><span class="p">(</span><span class="n">urllib3</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">InsecureRequestWarning</span><span class="p">)</span>
+
+<span class="n">LAST_ANALYSIS_ID_FILE</span> <span class="o">=</span> <span class="s2">&quot;.thoth_last_analysis_id&quot;</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">_RETRY_ON_ERROR_COUNT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_RETRY_ON_ERROR_COUNT&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="n">_RETRY_ON_ERROR_SLEEP</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_RETRY_ON_ERROR_SLEEP&quot;</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">))</span>
+<span class="n">_THAMOS_TIMEOUT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_TIMEOUT&quot;</span><span class="p">,</span> <span class="mi">2000</span><span class="p">))</span>
+<span class="n">_THAMOS_TOKEN</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_TOKEN&quot;</span><span class="p">)</span>
+<span class="n">_SOURCE</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;adviser&quot;</span><span class="p">:</span> <span class="s2">&quot;advise/python&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;provenance-checker&quot;</span><span class="p">:</span> <span class="s2">&quot;provenance/python&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;package-extract&quot;</span><span class="p">:</span> <span class="s2">&quot;analyze&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="with_api_client"><a class="viewcode-back" href="../../thamos.html#thamos.lib.with_api_client">[docs]</a><span class="k">def</span> <span class="nf">with_api_client</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Callable</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Load configuration entries from Thoth configuration file.&quot;&quot;&quot;</span>
+    <span class="c1"># noqa</span>
+    <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">wrapper</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">config</span> <span class="o">=</span> <span class="n">Configuration</span><span class="p">()</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">explicit_host</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">host</span><span class="p">:</span>
+            <span class="n">thoth_config</span><span class="o">.</span><span class="n">load_config</span><span class="p">()</span>
+            <span class="n">host</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;host&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">config</span><span class="o">.</span><span class="n">host</span>
+        <span class="n">thoth_config</span><span class="o">.</span><span class="n">api_discovery</span><span class="p">(</span><span class="n">host</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Using API: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">api_url</span><span class="p">)</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">host</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">api_url</span>
+        <span class="n">config</span><span class="o">.</span><span class="n">verify_ssl</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">tls_verify</span>
+
+        <span class="n">start</span> <span class="o">=</span> <span class="n">monotonic</span><span class="p">()</span>
+        <span class="n">api_client</span> <span class="o">=</span> <span class="n">ApiClient</span><span class="p">(</span><span class="n">configuration</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
+        <span class="c1"># Override default user-agent.</span>
+        <span class="n">api_client</span><span class="o">.</span><span class="n">user_agent</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Thamos/</span><span class="si">{</span><span class="n">thamos_version</span><span class="si">}</span><span class="s2"> (Python </span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">python_version</span><span class="p">()</span><span class="si">}</span><span class="s2">; &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">platform</span><span class="o">.</span><span class="n">release</span><span class="p">()</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">func</span><span class="p">(</span><span class="n">api_client</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Elapsed seconds processing request: </span><span class="si">%f</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">monotonic</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">return</span> <span class="n">wrapper</span></div>
+
+
+<div class="viewcode-block" id="is_analysis_ready"><a class="viewcode-back" href="../../thamos.html#thamos.lib.is_analysis_ready">[docs]</a><span class="k">def</span> <span class="nf">is_analysis_ready</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Handle the the multiple response types available while asking for result of a anaylsis result.&quot;&quot;&quot;</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">Configuration</span><span class="p">()</span>
+    <span class="n">host</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">explicit_host</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">host</span><span class="p">:</span>
+        <span class="n">thoth_config</span><span class="o">.</span><span class="n">load_config</span><span class="p">()</span>
+        <span class="n">host</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;host&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">config</span><span class="o">.</span><span class="n">host</span>
+    <span class="n">source</span> <span class="o">=</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">2</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">source_url</span> <span class="o">=</span> <span class="n">_SOURCE</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;https://</span><span class="si">{</span><span class="n">host</span><span class="si">}</span><span class="s2">/api/v1/</span><span class="si">{</span><span class="n">source_url</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">analysis_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="o">==</span> <span class="mi">202</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">elif</span> <span class="n">response</span><span class="o">.</span><span class="n">status_code</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">200</span><span class="p">,</span> <span class="mi">400</span><span class="p">):</span>
+        <span class="c1"># Return true if result is ready.</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">raise</span> <span class="n">ApiError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Thoth Backend didn&#39;t respond with correct status code. Returned code - &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">_wait_for_analysis</span><span class="p">(</span>
+    <span class="n">status_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Wait for ongoing analysis to finish.&quot;&quot;&quot;</span>
+    <span class="c1"># noqa</span>
+    <span class="nd">@contextmanager</span>
+    <span class="k">def</span> <span class="nf">_no_spinner</span><span class="p">():</span>
+        <span class="k">yield</span>
+
+    <span class="n">spinner</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span>
+        <span class="n">yaspin</span><span class="p">,</span>
+        <span class="n">Spinners</span><span class="o">.</span><span class="n">clock</span><span class="p">,</span>
+        <span class="n">text</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Waiting for response from Thoth (analysis: </span><span class="si">{</span><span class="n">analysis_id</span><span class="si">}</span><span class="s2">)...&quot;</span><span class="p">,</span>
+    <span class="p">)</span>  <span class="c1"># type: Union[Callable[..., Any], partial[Any]]</span>
+    <span class="k">if</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span> <span class="o">==</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span> <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_NO_PROGRESSBAR&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="p">):</span>
+        <span class="c1"># CLI automatically injects THAMOS_NO_PROGRESSBAR=0 if user did not turned it off explictily.</span>
+        <span class="n">spinner</span> <span class="o">=</span> <span class="n">_no_spinner</span>
+
+    <span class="n">sleep_time</span> <span class="o">=</span> <span class="mf">0.5</span>
+    <span class="n">retries</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">timeout</span> <span class="o">=</span> <span class="n">timeout</span> <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_THAMOS_TIMEOUT</span>
+    <span class="k">with</span> <span class="n">spinner</span><span class="p">():</span>
+        <span class="n">start_time</span> <span class="o">=</span> <span class="n">monotonic</span><span class="p">()</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">timeout</span> <span class="ow">and</span> <span class="n">monotonic</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span> <span class="o">&gt;</span> <span class="n">timeout</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TimeoutError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Thoth backend did not respond in time, timeout set &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;to </span><span class="si">{</span><span class="n">timeout</span><span class="si">}</span><span class="s2"> - see </span><span class="si">{</span><span class="n">jl</span><span class="p">(</span><span class="s1">&#39;thamos_timeout&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">response</span> <span class="o">=</span> <span class="n">status_func</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">retries</span> <span class="o">&gt;=</span> <span class="n">_RETRY_ON_ERROR_COUNT</span><span class="p">:</span>
+                    <span class="k">raise</span>
+
+                <span class="n">retries</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to obtain status from Thoth: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Retrying in a few moments... (attempt </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
+                    <span class="n">retries</span><span class="p">,</span>
+                    <span class="n">_RETRY_ON_ERROR_COUNT</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">sleep</span><span class="p">(</span><span class="n">_RETRY_ON_ERROR_SLEEP</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">retries</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># Reset counter as we obtained a valid response.</span>
+            <span class="k">if</span> <span class="n">response</span><span class="p">:</span>
+                <span class="k">break</span>
+
+            <span class="k">if</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Waiting for </span><span class="si">%r</span><span class="s2"> to finish for </span><span class="si">%g</span><span class="s2"> seconds (state: </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span>
+                    <span class="n">analysis_id</span><span class="p">,</span>
+                    <span class="n">sleep_time</span><span class="p">,</span>
+                    <span class="p">(</span><span class="n">get_status</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;state&quot;</span><span class="p">,</span> <span class="s2">&quot;N/A&quot;</span><span class="p">),</span>
+                <span class="p">)</span>
+
+            <span class="n">sleep</span><span class="p">(</span><span class="n">sleep_time</span><span class="p">)</span>
+            <span class="n">sleep_time</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">sleep_time</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_note_last_analysis_id</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Store analysis id in a temporary file to keep analysis id for thamos log optional.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_DISABLE_LAST_ANALYSIS_ID_FILE&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Last analysis id will not be noted&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Noting last analysis id </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">LAST_ANALYSIS_ID_FILE</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">analysis_id_file</span><span class="p">:</span>
+            <span class="n">analysis_id_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Failed to write analysis id to a temporary file: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
+
+
+<span class="k">def</span> <span class="nf">_get_last_analysis_id</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Retrieve last analysis id from a temporary file.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">LAST_ANALYSIS_ID_FILE</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">analysis_id_file</span><span class="p">:</span>
+            <span class="n">analysis_id</span> <span class="o">=</span> <span class="n">analysis_id_file</span><span class="o">.</span><span class="n">readline</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot retrieve last analysis id, you need to provide analysis id explicitly&quot;</span>
+        <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+    <span class="k">return</span> <span class="n">analysis_id</span>
+
+
+<span class="k">def</span> <span class="nf">_retrieve_analysis_result</span><span class="p">(</span>
+    <span class="n">retrieve_func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Retrieve analysis result, raise error if analysis failed.&quot;&quot;&quot;</span>
+    <span class="n">retries</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">retrieve_func</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">ApiException</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">400</span><span class="p">:</span>
+                <span class="c1"># Re-raise if the exception is bad request (e.g. analysis did not finish successfully).</span>
+                <span class="k">raise</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Retrieved error response </span><span class="si">%s</span><span class="s2"> from server: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc</span><span class="o">.</span><span class="n">status</span><span class="p">,</span> <span class="n">exc</span><span class="o">.</span><span class="n">reason</span>
+            <span class="p">)</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">exc</span><span class="o">.</span><span class="n">body</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="s2">&quot;error&quot;</span> <span class="ow">in</span> <span class="n">response</span><span class="p">:</span>
+                <span class="c1"># Error produced based on API endpoints semantics...</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Error from Thoth: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="p">)</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> (analysis: </span><span class="si">%s</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">],</span> <span class="n">analysis_id</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Other errors (e.g. internal server error).</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Error from Thoth: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">retries</span> <span class="o">&gt;=</span> <span class="n">_RETRY_ON_ERROR_COUNT</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+
+            <span class="n">retries</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="s2">&quot;Retrying in a few moments... (attempt </span><span class="si">%d</span><span class="s2">/</span><span class="si">%d</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">retries</span><span class="p">,</span>
+                <span class="n">_RETRY_ON_ERROR_COUNT</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">sleep</span><span class="p">(</span><span class="n">_RETRY_ON_ERROR_SLEEP</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_static_analysis</span><span class="p">(</span><span class="n">src_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Get static analysis of files used in project.&quot;&quot;&quot;</span>
+    <span class="c1"># We are running in the root directory of project, use the root part for gathering static analysis.</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Performing static analysis of sources to gather library usage&quot;</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">library_usage</span> <span class="o">=</span> <span class="n">gather_library_usage</span><span class="p">(</span>
+            <span class="n">src_path</span><span class="p">,</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">without_standard_imports</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;No library usage was aggregated - no Python sources found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">report</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[Any, Any]</span>
+    <span class="k">for</span> <span class="n">file_record</span> <span class="ow">in</span> <span class="n">library_usage</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">library</span><span class="p">,</span> <span class="n">usage</span> <span class="ow">in</span> <span class="n">file_record</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># We could filter out some of the libraries which were used.</span>
+            <span class="k">if</span> <span class="n">library</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">report</span><span class="p">:</span>
+                <span class="n">report</span><span class="p">[</span><span class="n">library</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+            <span class="n">report</span><span class="p">[</span><span class="n">library</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">usage</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;report&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">report</span><span class="o">.</span><span class="n">items</span><span class="p">()},</span>
+        <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">library_usage</span><span class="p">[</span><span class="s2">&quot;version&quot;</span><span class="p">],</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span> <span class="nf">_is_s2i</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Check if we run in an OpenShift s2i build.&quot;&quot;&quot;</span>
+    <span class="c1"># This environment variable is used by OpenShift&#39;s s2i build process.</span>
+    <span class="k">return</span> <span class="s2">&quot;STI_SCRIPTS_PATH&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span>
+
+
+<span class="k">def</span> <span class="nf">_get_origin</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Check git origin configured.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span><span class="s2">&quot;git config --get remote.origin.url&quot;</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">return_code</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Failed to obtain information about git origin: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">stderr</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">origin</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">origin</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Found git origin </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">origin</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">origin</span>
+
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="advise_using_config"><a class="viewcode-back" href="../../thamos.html#thamos.lib.advise_using_config">[docs]</a><span class="k">def</span> <span class="nf">advise_using_config</span><span class="p">(</span>
+    <span class="n">pipfile</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">pipfile_lock</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">config</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">runtime_environment_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">src_path</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">recommendation_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">no_static_analysis</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">no_user_stack</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">nowait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">limit</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_event_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_check_run_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_installation_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_base_repo_url</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">source_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">ThothAdviserIntegrationEnum</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Tuple</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">],</span> <span class="nb">bool</span><span class="p">]]:</span>
+    <span class="sd">&quot;&quot;&quot;Trigger advise, respecting the configuration file supplied directly as a string or as a file path.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">thoth_config</span><span class="o">.</span><span class="n">load_config_from_file</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="ne">IOError</span><span class="p">):</span>
+        <span class="n">thoth_config</span><span class="o">.</span><span class="n">load_config_from_string</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">advise</span><span class="p">(</span>
+        <span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span>
+        <span class="n">pipfile_lock</span><span class="o">=</span><span class="n">pipfile_lock</span><span class="p">,</span>
+        <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span><span class="p">,</span>
+        <span class="n">src_path</span><span class="o">=</span><span class="n">src_path</span> <span class="k">if</span> <span class="n">src_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">config_path</span><span class="p">,</span>
+        <span class="n">runtime_environment</span><span class="o">=</span><span class="n">thoth_config</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">(</span>
+            <span class="n">runtime_environment_name</span>
+        <span class="p">),</span>
+        <span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment_name</span><span class="p">,</span>
+        <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span>
+        <span class="n">no_static_analysis</span><span class="o">=</span><span class="n">no_static_analysis</span><span class="p">,</span>
+        <span class="n">no_user_stack</span><span class="o">=</span><span class="n">no_user_stack</span><span class="p">,</span>
+        <span class="n">nowait</span><span class="o">=</span><span class="n">nowait</span><span class="p">,</span>
+        <span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span>
+        <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span>
+        <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
+        <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+        <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+        <span class="n">github_event_type</span><span class="o">=</span><span class="n">github_event_type</span><span class="p">,</span>
+        <span class="n">github_check_run_id</span><span class="o">=</span><span class="n">github_check_run_id</span><span class="p">,</span>
+        <span class="n">github_installation_id</span><span class="o">=</span><span class="n">github_installation_id</span><span class="p">,</span>
+        <span class="n">github_base_repo_url</span><span class="o">=</span><span class="n">github_base_repo_url</span><span class="p">,</span>
+        <span class="n">source_type</span><span class="o">=</span><span class="n">source_type</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="advise"><a class="viewcode-back" href="../../thamos.html#thamos.lib.advise">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">advise</span><span class="p">(</span>
+    <span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span>
+    <span class="n">pipfile</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">pipfile_lock</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">recommendation_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">src_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
+    <span class="n">runtime_environment_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">no_static_analysis</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">no_user_stack</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">nowait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">limit</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_event_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_check_run_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_installation_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_base_repo_url</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">source_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">ThothAdviserIntegrationEnum</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">justification</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">stack_info</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kebechet_metadata</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Submit a stack for adviser checks and wait for results.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">pipfile</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No Pipfile content provided for advises&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">runtime_environment</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">runtime_environment</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">(</span>
+            <span class="n">runtime_environment_name</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">runtime_environment_name</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_environment</span><span class="p">:</span>
+        <span class="n">runtime_environment_name</span> <span class="o">=</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">runtime_environment</span> <span class="ow">and</span> <span class="n">runtime_environment_name</span><span class="p">)</span> <span class="ow">and</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">&quot;name&quot;</span>
+    <span class="p">)</span> <span class="o">!=</span> <span class="n">runtime_environment_name</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Runtime environment name supplied does not match with the one stated in the config file&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">recommendation_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">priority</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">runtime_environment</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;recommendation_type&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="n">thoth_config</span><span class="o">.</span><span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;recommendation_type&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+            <span class="s2">&quot;stable&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">recommendation_type</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span><span class="nb">bool</span><span class="p">,</span> <span class="n">priority</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">no_user_stack</span> <span class="ow">and</span> <span class="n">pipfile_lock</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;The user stack found in the lock file will not be supplied as requested&quot;</span>
+        <span class="p">)</span>
+        <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="n">library_usage</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">no_static_analysis</span><span class="p">:</span>
+        <span class="n">library_usage</span> <span class="o">=</span> <span class="n">_get_static_analysis</span><span class="p">(</span><span class="n">src_path</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Library usage:</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">library_usage</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span> <span class="k">if</span> <span class="n">library_usage</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">stack</span> <span class="o">=</span> <span class="n">PythonStack</span><span class="p">(</span><span class="n">requirements</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">requirements_lock</span><span class="o">=</span><span class="n">pipfile_lock</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">runtime_environment</span><span class="p">:</span>
+        <span class="c1"># Override recommendation type specified explicitly in the runtime environment entry.</span>
+        <span class="n">runtime_environment</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;recommendation_type&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="n">input_args</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;application_stack&quot;</span><span class="p">:</span> <span class="n">stack</span><span class="p">,</span>
+        <span class="s2">&quot;runtime_environment&quot;</span><span class="p">:</span> <span class="n">runtime_environment</span><span class="p">,</span>
+        <span class="s2">&quot;library_usage&quot;</span><span class="p">:</span> <span class="n">library_usage</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="k">if</span> <span class="n">kebechet_metadata</span><span class="p">:</span>
+        <span class="n">input_args</span><span class="p">[</span><span class="s2">&quot;kebechet_metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kebechet_metadata</span>
+    <span class="k">if</span> <span class="n">justification</span><span class="p">:</span>
+        <span class="n">input_args</span><span class="p">[</span><span class="s2">&quot;justification&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">justification</span>
+    <span class="k">if</span> <span class="n">stack_info</span><span class="p">:</span>
+        <span class="n">input_args</span><span class="p">[</span><span class="s2">&quot;stack_info&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stack_info</span>
+
+    <span class="n">advise_input</span> <span class="o">=</span> <span class="n">AdviseInput</span><span class="p">(</span><span class="o">**</span><span class="n">input_args</span><span class="p">)</span>
+    <span class="n">api_instance</span> <span class="o">=</span> <span class="n">AdviseApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">recommendation_type</span><span class="p">:</span>
+        <span class="n">recommendation_type</span> <span class="o">=</span> <span class="n">recommendation_type</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">source_type</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">_is_s2i</span><span class="p">():</span>
+        <span class="n">source_type</span> <span class="o">=</span> <span class="n">ThothAdviserIntegrationEnum</span><span class="o">.</span><span class="n">S2I</span>
+
+    <span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;recommendation_type&quot;</span><span class="p">:</span> <span class="n">recommendation_type</span><span class="p">,</span>
+        <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
+        <span class="s2">&quot;force&quot;</span><span class="p">:</span> <span class="n">force</span><span class="p">,</span>
+        <span class="s2">&quot;source_type&quot;</span><span class="p">:</span> <span class="n">source_type</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="k">if</span> <span class="n">source_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;origin&quot;</span><span class="p">:</span> <span class="n">_get_origin</span><span class="p">(),</span>
+        <span class="s2">&quot;dev&quot;</span><span class="p">:</span> <span class="n">dev</span><span class="p">,</span>
+    <span class="p">}</span>  <span class="c1"># type: Dict[str, Any]</span>
+
+    <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;limit&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">limit</span>
+
+    <span class="k">if</span> <span class="n">count</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;count&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">count</span>
+
+    <span class="k">if</span> <span class="n">origin</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;origin&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">origin</span>
+
+    <span class="k">if</span> <span class="n">github_event_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;github_event_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">github_event_type</span>
+
+    <span class="k">if</span> <span class="n">github_check_run_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;github_check_run_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">github_check_run_id</span>
+
+    <span class="k">if</span> <span class="n">github_installation_id</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;github_installation_id&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">github_installation_id</span>
+
+    <span class="k">if</span> <span class="n">github_base_repo_url</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;github_base_repo_url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">github_base_repo_url</span>
+
+    <span class="k">if</span> <span class="n">_THAMOS_TOKEN</span><span class="p">:</span>
+        <span class="n">parameters</span><span class="p">[</span><span class="s2">&quot;token&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_THAMOS_TOKEN</span>
+
+    <span class="n">response</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">post_advise_python</span><span class="p">(</span><span class="n">advise_input</span><span class="p">,</span> <span class="o">**</span><span class="n">parameters</span><span class="p">)</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;Successfully submitted advise analysis </span><span class="si">%r</span><span class="s2"> to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">,</span>
+        <span class="n">thoth_config</span><span class="o">.</span><span class="n">api_url</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">_note_last_analysis_id</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Analysis parameters:</span><span class="se">\n</span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">pprint</span><span class="o">.</span><span class="n">pformat</span><span class="p">(</span><span class="n">parameters</span><span class="p">))</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Adviser input:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">advise_input</span><span class="o">.</span><span class="n">to_str</span><span class="p">())</span>
+
+    <span class="k">if</span> <span class="n">nowait</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
+    <span class="c1"># We call custom status function for advise until swagger client supports mulitple response codes.</span>
+    <span class="n">_wait_for_analysis</span><span class="p">(</span><span class="n">is_analysis_ready</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">,</span> <span class="n">timeout</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Retrieving adviser result for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">_retrieve_analysis_result</span><span class="p">(</span>
+        <span class="n">api_instance</span><span class="o">.</span><span class="n">get_advise_python</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">response</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Adviser check metadata: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">metadata</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="advise_here"><a class="viewcode-back" href="../../thamos.html#thamos.lib.advise_here">[docs]</a><span class="k">def</span> <span class="nf">advise_here</span><span class="p">(</span>
+    <span class="n">recommendation_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">src_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
+    <span class="n">runtime_environment_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">no_static_analysis</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">no_user_stack</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">nowait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">limit</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_event_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_check_run_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_installation_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">github_base_repo_url</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">source_type</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">ThothAdviserIntegrationEnum</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">justification</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">stack_info</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kebechet_metadata</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Run advise in current directory, requires no arguments.&quot;&quot;&quot;</span>
+    <span class="n">requirements_format</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">requirements_format</span>
+    <span class="k">if</span> <span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Using Pipenv files to manage dependencies located in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="n">pipfile_lock_exists</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">pipfile_lock_exists</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Submitting Pipfile.lock as a base for user&#39;s stack scoring - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;user_stack&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_files</span><span class="p">(</span>
+            <span class="n">without_pipfile_lock</span><span class="o">=</span><span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">pipfile_lock_exists</span>
+            <span class="ow">and</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span>
+            <span class="o">!=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span>
+        <span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Pipfile hash stated in Pipfile.lock </span><span class="si">%r</span><span class="s2"> does not correspond to Pipfile hash </span><span class="si">%r</span><span class="s2"> - was Pipfile &quot;</span>
+                <span class="s2">&quot;adjusted? This error is not critical.&quot;</span><span class="p">,</span>
+                <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
+                <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
+            <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">requirements_format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;pip&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-tools&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-compile&quot;</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Using requirements.txt file to manage dependencies located in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_pip_compile_files</span><span class="p">(</span><span class="n">allow_without_lock</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unknown configuration option for requirements format: </span><span class="si">{</span><span class="n">requirements_format</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">pipfile</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span>
+    <span class="n">pipfile_lock_str</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="k">return</span> <span class="n">advise</span><span class="p">(</span>
+        <span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span>
+        <span class="n">pipfile_lock</span><span class="o">=</span><span class="n">pipfile_lock_str</span><span class="p">,</span>
+        <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span><span class="p">,</span>
+        <span class="n">src_path</span><span class="o">=</span><span class="n">src_path</span><span class="p">,</span>
+        <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
+        <span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment_name</span><span class="p">,</span>
+        <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span>
+        <span class="n">no_static_analysis</span><span class="o">=</span><span class="n">no_static_analysis</span><span class="p">,</span>
+        <span class="n">no_user_stack</span><span class="o">=</span><span class="n">no_user_stack</span><span class="p">,</span>
+        <span class="n">nowait</span><span class="o">=</span><span class="n">nowait</span><span class="p">,</span>
+        <span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span>
+        <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span>
+        <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
+        <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+        <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+        <span class="n">source_type</span><span class="o">=</span><span class="n">source_type</span><span class="p">,</span>
+        <span class="n">github_event_type</span><span class="o">=</span><span class="n">github_event_type</span><span class="p">,</span>
+        <span class="n">github_check_run_id</span><span class="o">=</span><span class="n">github_check_run_id</span><span class="p">,</span>
+        <span class="n">github_installation_id</span><span class="o">=</span><span class="n">github_installation_id</span><span class="p">,</span>
+        <span class="n">github_base_repo_url</span><span class="o">=</span><span class="n">github_base_repo_url</span><span class="p">,</span>
+        <span class="n">justification</span><span class="o">=</span><span class="n">justification</span><span class="p">,</span>
+        <span class="n">stack_info</span><span class="o">=</span><span class="n">stack_info</span><span class="p">,</span>
+        <span class="n">kebechet_metadata</span><span class="o">=</span><span class="n">kebechet_metadata</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="provenance_check"><a class="viewcode-back" href="../../thamos.html#thamos.lib.provenance_check">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">provenance_check</span><span class="p">(</span>
+    <span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span>
+    <span class="n">pipfile</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">pipfile_lock</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">nowait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">justification</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">stack_info</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kebechet_metadata</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Submit a stack for provenance checks and wait for results.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">pipfile</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No Pipfile content provided for provenance checks&quot;</span><span class="p">)</span>
+
+    <span class="n">input_args</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;application_stack&quot;</span><span class="p">:</span> <span class="n">PythonStack</span><span class="p">(</span>
+            <span class="n">requirements</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">requirements_lock</span><span class="o">=</span><span class="n">pipfile_lock</span>
+        <span class="p">),</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">justification</span><span class="p">:</span>
+        <span class="n">input_args</span><span class="p">[</span><span class="s2">&quot;justification&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">justification</span>
+    <span class="k">if</span> <span class="n">stack_info</span><span class="p">:</span>
+        <span class="n">input_args</span><span class="p">[</span><span class="s2">&quot;stack_info&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stack_info</span>
+    <span class="k">if</span> <span class="n">kebechet_metadata</span><span class="p">:</span>
+        <span class="n">input_args</span><span class="p">[</span><span class="s2">&quot;kebechet_metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">kebechet_metadata</span>
+
+    <span class="n">provenance_input</span> <span class="o">=</span> <span class="n">ProvenanceInput</span><span class="p">(</span><span class="o">**</span><span class="n">input_args</span><span class="p">)</span>
+
+    <span class="n">provenance_kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;debug&quot;</span><span class="p">:</span> <span class="n">debug</span><span class="p">,</span>
+        <span class="s2">&quot;force&quot;</span><span class="p">:</span> <span class="n">force</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">origin</span><span class="p">:</span>
+        <span class="n">provenance_kwargs</span><span class="p">[</span><span class="s2">&quot;origin&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">origin</span>
+    <span class="k">if</span> <span class="n">_THAMOS_TOKEN</span><span class="p">:</span>
+        <span class="n">provenance_kwargs</span><span class="p">[</span><span class="s2">&quot;token&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_THAMOS_TOKEN</span>
+
+    <span class="n">api_instance</span> <span class="o">=</span> <span class="n">ProvenanceApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">post_provenance_python</span><span class="p">(</span><span class="n">provenance_input</span><span class="p">,</span> <span class="o">**</span><span class="n">provenance_kwargs</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;Successfully submitted provenance check analysis </span><span class="si">%r</span><span class="s2"> to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">,</span>
+        <span class="n">thoth_config</span><span class="o">.</span><span class="n">api_url</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">_note_last_analysis_id</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">nowait</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
+
+    <span class="n">_wait_for_analysis</span><span class="p">(</span><span class="n">is_analysis_ready</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">,</span> <span class="n">timeout</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Retrieving provenance check result for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">_retrieve_analysis_result</span><span class="p">(</span>
+        <span class="n">api_instance</span><span class="o">.</span><span class="n">get_provenance_python</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">response</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Provenance check metadata: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">metadata</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">],</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="provenance_check_here"><a class="viewcode-back" href="../../thamos.html#thamos.lib.provenance_check_here">[docs]</a><span class="k">def</span> <span class="nf">provenance_check_here</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">nowait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">justification</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">stack_info</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">kebechet_metadata</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Submit a provenance check in current directory.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s2">&quot;Pipfile&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="s2">&quot;No Pipfile found in current directory&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="s2">&quot;No Pipfile.lock found in current directory&quot;</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;Pipfile&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pipfile</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">piplock</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">provenance_check</span><span class="p">(</span>
+            <span class="n">pipfile</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span>
+            <span class="n">piplock</span><span class="o">.</span><span class="n">read</span><span class="p">(),</span>
+            <span class="n">nowait</span><span class="o">=</span><span class="n">nowait</span><span class="p">,</span>
+            <span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span>
+            <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+            <span class="n">justification</span><span class="o">=</span><span class="n">justification</span><span class="p">,</span>
+            <span class="n">stack_info</span><span class="o">=</span><span class="n">stack_info</span><span class="p">,</span>
+            <span class="n">kebechet_metadata</span><span class="o">=</span><span class="n">kebechet_metadata</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="image_analysis"><a class="viewcode-back" href="../../thamos.html#thamos.lib.image_analysis">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">image_analysis</span><span class="p">(</span>
+    <span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span>
+    <span class="n">image</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">environment_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">registry_user</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">registry_password</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">verify_tls</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">nowait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">Dict</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Submit an image for analysis to Thoth.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">image</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No image provided&quot;</span><span class="p">)</span>
+
+    <span class="n">api_instance</span> <span class="o">=</span> <span class="n">ImageAnalysisApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">registry_user</span> <span class="ow">or</span> <span class="n">registry_password</span><span class="p">:</span>
+        <span class="c1"># Swagger client handles None in a different way - we need to explicitly avoid passing</span>
+        <span class="c1"># registry user and registry password if they are not set.</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">post_analyze</span><span class="p">(</span>
+            <span class="n">image</span><span class="o">=</span><span class="n">image</span><span class="p">,</span>
+            <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+            <span class="n">registry_user</span><span class="o">=</span><span class="n">registry_user</span><span class="p">,</span>
+            <span class="n">registry_password</span><span class="o">=</span><span class="n">registry_password</span><span class="p">,</span>
+            <span class="n">verify_tls</span><span class="o">=</span><span class="n">verify_tls</span><span class="p">,</span>
+            <span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span>
+            <span class="n">environment_type</span><span class="o">=</span><span class="n">environment_type</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">post_analyze</span><span class="p">(</span>
+            <span class="n">image</span><span class="o">=</span><span class="n">image</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span> <span class="n">verify_tls</span><span class="o">=</span><span class="n">verify_tls</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="n">force</span>
+        <span class="p">)</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">&quot;Successfully submitted provenance check analysis </span><span class="si">%r</span><span class="s2"> to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">,</span>
+        <span class="n">thoth_config</span><span class="o">.</span><span class="n">api_url</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">nowait</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
+
+    <span class="n">_wait_for_analysis</span><span class="p">(</span><span class="n">is_analysis_ready</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">,</span> <span class="n">timeout</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+        <span class="s2">&quot;Retrieving image analysis result result for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span>
+    <span class="p">)</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">_retrieve_analysis_result</span><span class="p">(</span><span class="n">api_instance</span><span class="o">.</span><span class="n">get_analyze</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">analysis_id</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">response</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Image analysis metadata: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">metadata</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="build_analysis"><a class="viewcode-back" href="../../thamos.html#thamos.lib.build_analysis">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">build_analysis</span><span class="p">(</span>
+    <span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span>
+    <span class="n">build_log</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+    <span class="n">base_image</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">output_image</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">environment_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">base_registry_user</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">base_registry_password</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">base_registry_verify_tls</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">output_registry_user</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">output_registry_password</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">output_registry_verify_tls</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">origin</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">nowait</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Union</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Submit a build image and logs for analysis to Thoth.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">build_log</span> <span class="ow">or</span> <span class="n">base_image</span> <span class="ow">or</span> <span class="n">output_image</span><span class="p">:</span>
+        <span class="n">build_detail</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;build_log&quot;</span><span class="p">:</span> <span class="n">build_log</span><span class="p">,</span>
+            <span class="s2">&quot;base_image&quot;</span><span class="p">:</span> <span class="n">base_image</span><span class="p">,</span>
+            <span class="s2">&quot;output_image&quot;</span><span class="p">:</span> <span class="n">output_image</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No build info provided&quot;</span><span class="p">)</span>
+
+    <span class="n">params</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">body</span><span class="o">=</span><span class="n">build_detail</span><span class="p">,</span>
+        <span class="n">base_registry_user</span><span class="o">=</span><span class="n">base_registry_user</span><span class="p">,</span>
+        <span class="n">base_registry_password</span><span class="o">=</span><span class="n">base_registry_password</span><span class="p">,</span>
+        <span class="n">base_registry_verify_tls</span><span class="o">=</span><span class="n">base_registry_verify_tls</span><span class="p">,</span>
+        <span class="n">output_registry_user</span><span class="o">=</span><span class="n">output_registry_user</span><span class="p">,</span>
+        <span class="n">output_registry_password</span><span class="o">=</span><span class="n">output_registry_password</span><span class="p">,</span>
+        <span class="n">output_registry_verify_tls</span><span class="o">=</span><span class="n">output_registry_verify_tls</span><span class="p">,</span>
+        <span class="n">environment_type</span><span class="o">=</span><span class="n">environment_type</span><span class="p">,</span>
+        <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+        <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+        <span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Swagger client handles None in a different way - we need to explicitly avoid passing</span>
+    <span class="c1"># values that are not present.</span>
+    <span class="n">params</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">params</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">}</span>
+
+    <span class="n">api_instance</span> <span class="o">=</span> <span class="n">BuildAnalysisApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">post_build</span><span class="p">(</span><span class="o">**</span><span class="n">params</span><span class="p">)</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Successfully submitted build analysis to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">api_url</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Build analysis parameters: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">nowait</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">response</span>
+
+    <span class="k">return</span> <span class="n">response</span></div>
+
+
+<div class="viewcode-block" id="get_log"><a class="viewcode-back" href="../../thamos.html#thamos.lib.get_log">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">get_log</span><span class="p">(</span><span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get log of an analysis - the analysis type and endpoint are automatically derived from analysis id.</span>
+
+<span class="sd">    If analysis_id is not provided, its get from the last thamos call which stores it in a temporary file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_id</span><span class="p">:</span>
+        <span class="n">analysis_id</span> <span class="o">=</span> <span class="n">_get_last_analysis_id</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;package-extract-&quot;</span><span class="p">):</span>
+        <span class="n">api_instance</span> <span class="o">=</span> <span class="n">ImageAnalysisApi</span><span class="p">(</span>
+            <span class="n">api_client</span>
+        <span class="p">)</span>  <span class="c1"># type: Union[ImageAnalysisApi, ProvenanceApi, AdviseApi]</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_analyze_log</span>  <span class="c1"># type: ignore</span>
+    <span class="k">elif</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;provenance-checker-&quot;</span><span class="p">):</span>
+        <span class="n">api_instance</span> <span class="o">=</span> <span class="n">ProvenanceApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_provenance_python_log</span>  <span class="c1"># type: ignore</span>
+    <span class="k">elif</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;adviser-&quot;</span><span class="p">):</span>
+        <span class="n">api_instance</span> <span class="o">=</span> <span class="n">AdviseApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_advise_python_log</span>  <span class="c1"># type: ignore</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">UnknownAnalysisType</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot determine analysis type from identifier: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">analysis_id</span>
+        <span class="p">)</span>
+
+    <span class="n">json_log</span> <span class="o">=</span> <span class="n">method</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">)</span><span class="o">.</span><span class="n">log</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">json_log</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">json_log</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">json_log</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">content</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_NO_EMOJI&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)):</span>
+                <span class="k">if</span> <span class="n">content</span><span class="p">[</span><span class="s2">&quot;levelname&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;DEBUG&quot;</span><span class="p">:</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">colored</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">],</span> <span class="s2">&quot;green&quot;</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">content</span><span class="p">[</span><span class="s2">&quot;levelname&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;INFO&quot;</span><span class="p">:</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">colored</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">],</span> <span class="s2">&quot;cyan&quot;</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">content</span><span class="p">[</span><span class="s2">&quot;levelname&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">:</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">colored</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">],</span> <span class="s2">&quot;yellow&quot;</span><span class="p">,</span> <span class="n">attrs</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;bold&quot;</span><span class="p">])</span>
+                <span class="k">elif</span> <span class="n">content</span><span class="p">[</span><span class="s2">&quot;levelname&quot;</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;ERROR&quot;</span><span class="p">,</span> <span class="s2">&quot;CRITICAL&quot;</span><span class="p">):</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">colored</span><span class="p">(</span><span class="n">content</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">],</span> <span class="s2">&quot;red&quot;</span><span class="p">,</span> <span class="n">attrs</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;bold&quot;</span><span class="p">])</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">content</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">]</span>
+
+                <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> </span><span class="si">{:&lt;27}</span><span class="s2"> </span><span class="si">{}</span><span class="s2">: </span><span class="si">{}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">content</span><span class="p">[</span><span class="s2">&quot;asctime&quot;</span><span class="p">],</span> <span class="n">content</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="n">content</span><span class="p">[</span><span class="s2">&quot;levelname&quot;</span><span class="p">],</span> <span class="n">message</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">+=</span> <span class="s2">&quot;</span><span class="si">{}</span><span class="s2"> </span><span class="si">{:&lt;27}</span><span class="s2"> </span><span class="si">{}</span><span class="s2">: </span><span class="si">{}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+                    <span class="n">content</span><span class="p">[</span><span class="s2">&quot;asctime&quot;</span><span class="p">],</span>
+                    <span class="n">content</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                    <span class="n">content</span><span class="p">[</span><span class="s2">&quot;levelname&quot;</span><span class="p">],</span>
+                    <span class="n">content</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="c1"># If the content parsed does not carry logger information or has not relevant</span>
+            <span class="c1"># entries, log the original message.</span>
+            <span class="n">result</span> <span class="o">+=</span> <span class="n">line</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="k">continue</span>
+
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="get_status"><a class="viewcode-back" href="../../thamos.html#thamos.lib.get_status">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">get_status</span><span class="p">(</span><span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get status of an analysis - the analysis type and endpoint are automatically derived from analysis id.</span>
+
+<span class="sd">    If analysis_id is not provided, its get from the last thamos call which stores it in a temporary file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_id</span><span class="p">:</span>
+        <span class="n">analysis_id</span> <span class="o">=</span> <span class="n">_get_last_analysis_id</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;package-extract-&quot;</span><span class="p">):</span>
+        <span class="n">api_instance</span> <span class="o">=</span> <span class="n">ImageAnalysisApi</span><span class="p">(</span>
+            <span class="n">api_client</span>
+        <span class="p">)</span>  <span class="c1"># type: Union[ImageAnalysisApi, ProvenanceApi, AdviseApi]</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_analyze_status</span>  <span class="c1"># type: ignore</span>
+    <span class="k">elif</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;provenance-checker-&quot;</span><span class="p">):</span>
+        <span class="n">api_instance</span> <span class="o">=</span> <span class="n">ProvenanceApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_provenance_python_status</span>  <span class="c1"># type: ignore</span>
+    <span class="k">elif</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;adviser-&quot;</span><span class="p">):</span>
+        <span class="n">api_instance</span> <span class="o">=</span> <span class="n">AdviseApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_advise_python_status</span>  <span class="c1"># type: ignore</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">UnknownAnalysisType</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot determine analysis type from identifier: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">analysis_id</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">method</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">)</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="get_analysis_results"><a class="viewcode-back" href="../../thamos.html#thamos.lib.get_analysis_results">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">get_analysis_results</span><span class="p">(</span><span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get the analysis result from a given id.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;package-extract-&quot;</span><span class="p">):</span>
+        <span class="n">api_instance</span> <span class="o">=</span> <span class="n">ImageAnalysisApi</span><span class="p">(</span>
+            <span class="n">api_client</span>
+        <span class="p">)</span>  <span class="c1"># type: Union[ImageAnalysisApi, ProvenanceApi, AdviseApi]</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_analyze</span>  <span class="c1"># type: ignore</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">_retrieve_analysis_result</span><span class="p">(</span>
+            <span class="n">method</span><span class="p">,</span> <span class="n">analysis_id</span>
+        <span class="p">)</span>  <span class="c1"># type: AnalysisResultResponse</span>
+        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span>
+    <span class="k">elif</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;provenance-checker-&quot;</span><span class="p">):</span>
+        <span class="n">api_instance</span> <span class="o">=</span> <span class="n">ProvenanceApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_provenance_python</span>  <span class="c1"># type: ignore</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">_retrieve_analysis_result</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">],</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;adviser-&quot;</span><span class="p">):</span>
+        <span class="n">api_instance</span> <span class="o">=</span> <span class="n">AdviseApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_advise_python</span>  <span class="c1"># type: ignore</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">_retrieve_analysis_result</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">UnknownAnalysisType</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot determine analysis type from identifier: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">analysis_id</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="install_using_config"><a class="viewcode-back" href="../../thamos.html#thamos.lib.install_using_config">[docs]</a><span class="k">def</span> <span class="nf">install_using_config</span><span class="p">(</span>
+    <span class="n">config</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">runtime_environment_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Perform installation given the configuration supplied.&quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">thoth_config</span><span class="o">.</span><span class="n">load_config_from_file</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="ne">IOError</span><span class="p">):</span>
+        <span class="n">thoth_config</span><span class="o">.</span><span class="n">load_config_from_string</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+
+    <span class="n">install</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment_name</span><span class="p">,</span> <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="install"><a class="viewcode-back" href="../../thamos.html#thamos.lib.install">[docs]</a><span class="k">def</span> <span class="nf">install</span><span class="p">(</span>
+    <span class="n">runtime_environment_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">pip_args</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Perform installation of packages for the given runtime environment.</span>
+
+<span class="sd">    If the runtime environment is not specified, the first environment stated in the configuration is used.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">method</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">&quot;pipenv&quot;</span> <span class="k">if</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span> <span class="k">else</span> <span class="s2">&quot;requirements&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">dev</span> <span class="ow">and</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;Development dependencies will not be installed - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;no_dev&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">thoth_config</span><span class="o">.</span><span class="n">get_overlays_directory</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">NoRequirementsFile</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;No Pipfile.lock found in </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span><span class="si">!r}</span><span class="s2"> needed to install dependencies, &quot;</span>
+                    <span class="s2">&quot;issue `thamos advise` resolve dpeendencies&quot;</span>
+                <span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s2">&quot;Pipfile&quot;</span><span class="p">):</span>  <span class="c1"># Required for computing digests.</span>
+                <span class="k">raise</span> <span class="n">NoRequirementsFile</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;No Pipfile found in </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span><span class="si">!r}</span><span class="s2"> needed for the installation process&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">dev</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pipfile_lock_file</span><span class="p">:</span>
+                    <span class="n">content</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">pipfile_lock_file</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;develop&quot;</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="n">NoDevRequirements</span><span class="p">(</span>
+                        <span class="s2">&quot;No development requirements found in the lock file, make sure development &quot;</span>
+                        <span class="s2">&quot;requirements are stated and the resolved stack preserves them by &quot;</span>
+                        <span class="s2">&quot;using `thamos advise --dev`&quot;</span>
+                    <span class="p">)</span>
+
+                <span class="k">del</span> <span class="n">content</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="s2">&quot;requirements.txt&quot;</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">NoRequirementsFile</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;No requirements.txt file found in </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span><span class="si">!r}</span><span class="s2"> needed to install dependencies&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">runtime_environment_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">config_entry</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">(</span>
+                <span class="n">runtime_environment_name</span>
+            <span class="p">)</span>
+            <span class="n">runtime_environment_name</span> <span class="o">=</span> <span class="n">config_entry</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Installing requirements for runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">runtime_environment_name</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Using </span><span class="si">%r</span><span class="s2"> installation method to install dependencies stated in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">method</span><span class="p">,</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span>
+        <span class="p">)</span>
+
+        <span class="n">micropipenv_kwargs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;method&quot;</span><span class="p">:</span> <span class="n">method</span><span class="p">,</span>
+            <span class="s2">&quot;deploy&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">&quot;dev&quot;</span><span class="p">:</span> <span class="n">dev</span><span class="p">,</span>
+            <span class="s2">&quot;pip_args&quot;</span><span class="p">:</span> <span class="n">pip_args</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="n">virtualenv_path</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">get_virtualenv_path</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">virtualenv_path</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">):</span>
+                <span class="n">thoth_config</span><span class="o">.</span><span class="n">create_virtualenv</span><span class="p">()</span>
+
+            <span class="n">micropipenv_kwargs</span><span class="p">[</span><span class="s2">&quot;pip_bin&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">,</span> <span class="s2">&quot;bin&quot;</span><span class="p">,</span> <span class="s2">&quot;pip3&quot;</span><span class="p">)</span>
+
+        <span class="c1"># micropipenv writes and prints the lockfile which is not very user friendly when thamos is used by a user.</span>
+        <span class="c1"># Suppress this behavior unless these environment variables options are supplied explicitly.</span>
+        <span class="n">old_write</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_WRITE&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">old_write</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_WRITE&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+
+        <span class="n">old_print</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_PRINT&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">old_print</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_PRINT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1&quot;</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">micropipenv</span><span class="o">.</span><span class="n">install</span><span class="p">(</span><span class="o">**</span><span class="n">micropipenv_kwargs</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">old_write</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_WRITE&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">old_print</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;MICROPIPENV_NO_LOCKFILE_PRINT&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="list_hardware_environments"><a class="viewcode-back" href="../../thamos.html#thamos.lib.list_hardware_environments">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">list_hardware_environments</span><span class="p">(</span><span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Get information about hardware for which Thoth can give recommendations.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">HardwareApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">list_hardware_environments</span><span class="p">()</span>
+        <span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;hardware_environments&quot;</span><span class="p">]</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="list_thoth_s2i"><a class="viewcode-back" href="../../thamos.html#thamos.lib.list_thoth_s2i">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">list_thoth_s2i</span><span class="p">(</span><span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Get information about hardware for which Thoth can give recommendations.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">S2iApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span><span class="o">.</span><span class="n">list_s2i_python</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;s2i&quot;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="list_python_package_indexes"><a class="viewcode-back" href="../../thamos.html#thamos.lib.list_python_package_indexes">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">list_python_package_indexes</span><span class="p">(</span><span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Get information about hardware for which Thoth can give recommendations.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">PythonPackagesApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span><span class="o">.</span><span class="n">list_python_package_indexes</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;indexes&quot;</span><span class="p">]</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="write_files"><a class="viewcode-back" href="../../thamos.html#thamos.lib.write_files">[docs]</a><span class="k">def</span> <span class="nf">write_files</span><span class="p">(</span>
+    <span class="n">requirements</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">requirements_lock</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">requirements_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Write content of Pipfile/Pipfile.lock or requirements.in/txt to the current directory.&quot;&quot;&quot;</span>
+    <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">requirements</span><span class="p">,</span> <span class="n">requirements_lock</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Writing to Pipfile/Pipfile.lock in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">to_files</span><span class="p">(</span><span class="n">keep_thoth_section</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">requirements_format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;pip&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-tools&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-compile&quot;</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Writing to requirements.in/requirements.txt in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">to_pip_compile_files</span><span class="p">()</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No changes to Pipfile to write&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unknown requirements format, supported are &#39;pipenv&#39; and &#39;pip&#39;: </span><span class="si">{</span><span class="n">requirements_format</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="load_files"><a class="viewcode-back" href="../../thamos.html#thamos.lib.load_files">[docs]</a><span class="k">def</span> <span class="nf">load_files</span><span class="p">(</span><span class="n">requirements_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+    <span class="sd">&quot;&quot;&quot;Load Pipfile/Pipfile.lock or requirements.in/txt from the current directory.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using Pipenv files located in </span><span class="si">%r</span><span class="s2"> directory&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+        <span class="n">pipfile_lock_exists</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">pipfile_lock_exists</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Submitting Pipfile.lock as a base for user&#39;s stack scoring - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;user_stack&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_files</span><span class="p">(</span>
+            <span class="n">without_pipfile_lock</span><span class="o">=</span><span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">pipfile_lock_exists</span>
+            <span class="ow">and</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span>
+            <span class="o">!=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span>
+        <span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Pipfile hash stated in Pipfile.lock </span><span class="si">%r</span><span class="s2"> does not correspond to Pipfile hash </span><span class="si">%r</span><span class="s2"> - was Pipfile &quot;</span>
+                <span class="s2">&quot;adjusted? This error is not critical.&quot;</span><span class="p">,</span>
+                <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
+                <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
+            <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">requirements_format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;pip&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-tools&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-compile&quot;</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using requirements.txt file located in </span><span class="si">%r</span><span class="s2"> directory&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+        <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_pip_compile_files</span><span class="p">(</span><span class="n">allow_without_lock</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unknown configuration option for requirements format: </span><span class="si">{</span><span class="n">requirements_format</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_string</span><span class="p">(),</span>
+        <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="write_configuration"><a class="viewcode-back" href="../../thamos.html#thamos.lib.write_configuration">[docs]</a><span class="k">def</span> <span class="nf">write_configuration</span><span class="p">(</span>
+    <span class="n">advised_configuration</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+    <span class="n">recommendation_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Create thoth configuration file.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">advised_configuration</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No advises on configuration, nothing to adjust&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">advised_configuration</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot adjust Thoth&#39;s configuration based on advises: No name found in Thoth&#39;s configuration entry&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Reading Thoth&#39;s configuration file&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;.thoth.yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">thoth_yaml_file</span><span class="p">:</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">thoth_yaml_file</span><span class="o">.</span><span class="n">read</span><span class="p">())</span>
+
+    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">runtime_environment_entry</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span>
+        <span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;runtime_environments&quot;</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="p">):</span>
+        <span class="k">if</span> <span class="n">runtime_environment_entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">advised_configuration</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Adjusting configuration entry for </span><span class="si">%r</span><span class="s2"> based on recommendations&quot;</span><span class="p">,</span>
+                <span class="n">advised_configuration</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="n">runtime_environment_entry</span> <span class="o">=</span> <span class="n">advised_configuration</span>
+            <span class="k">if</span> <span class="n">recommendation_type</span><span class="p">:</span>
+                <span class="n">runtime_environment_entry</span><span class="p">[</span><span class="s2">&quot;recommendation_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">recommendation_type</span>
+            <span class="n">runtime_environment_entry</span><span class="p">[</span><span class="s2">&quot;dev&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dev</span>
+            <span class="n">content</span><span class="p">[</span><span class="s2">&quot;runtime_environments&quot;</span><span class="p">][</span><span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">runtime_environment_entry</span>
+            <span class="k">break</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot adjust Thoth&#39;s configuration based on advises: No runtime environment entry with name </span><span class="si">%r</span><span class="s2"> found&quot;</span><span class="p">,</span>
+            <span class="n">advised_configuration</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Writing adjusted Thoth&#39;s configuration file&quot;</span><span class="p">)</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;.thoth.yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">thoth_yaml_file</span><span class="p">:</span>
+        <span class="n">yaml</span><span class="o">.</span><span class="n">safe_dump</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">thoth_yaml_file</span><span class="p">)</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation index</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-123174547-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+
+        function gtag() {
+            dataLayer.push(arguments);
+        }
+        gtag('js', new Date());
+
+        gtag('config', 'UA-123174547-1');
+    </script>
+
+  </body>
+</html>

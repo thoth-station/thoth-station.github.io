@@ -1,0 +1,624 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.adviser.pipeline_builder &#8212; Thoth Adviser 0.28.0 documentation</title>
+    <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/adviser/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/adviser/jquery.js"></script>
+    <script type="text/javascript" src="/assets/adviser/underscore.js"></script>
+    <script type="text/javascript" src="/assets/adviser/doctools.js"></script>
+    <script type="text/javascript" src="/assets/adviser/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Adviser 0.28.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.adviser.pipeline_builder</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-adviser</span>
+<span class="c1"># Copyright(C) 2019, 2020 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Implementation of pipeline builder - create pipeline configuration based on the project and its library usage.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Project</span>
+<span class="kn">from</span> <span class="nn">thoth.storages</span> <span class="kn">import</span> <span class="n">GraphDatabase</span>
+<span class="kn">import</span> <span class="nn">yaml</span>
+
+<span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">DecisionType</span>
+<span class="kn">from</span> <span class="nn">.enums</span> <span class="kn">import</span> <span class="n">RecommendationType</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">InternalError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">UnknownPipelineUnitError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">PipelineConfigurationError</span>
+<span class="kn">from</span> <span class="nn">.pipeline_config</span> <span class="kn">import</span> <span class="n">PipelineConfig</span>
+<span class="kn">from</span> <span class="nn">.prescription</span> <span class="kn">import</span> <span class="n">Prescription</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">.unit_types</span> <span class="kn">import</span> <span class="n">UnitType</span>
+    <span class="kn">from</span> <span class="nn">.unit_types</span> <span class="kn">import</span> <span class="n">BootType</span>
+    <span class="kn">from</span> <span class="nn">.unit_types</span> <span class="kn">import</span> <span class="n">PseudonymType</span>
+    <span class="kn">from</span> <span class="nn">.unit_types</span> <span class="kn">import</span> <span class="n">SieveType</span>
+    <span class="kn">from</span> <span class="nn">.unit_types</span> <span class="kn">import</span> <span class="n">StepType</span>
+    <span class="kn">from</span> <span class="nn">.unit_types</span> <span class="kn">import</span> <span class="n">StrideType</span>
+    <span class="kn">from</span> <span class="nn">.unit_types</span> <span class="kn">import</span> <span class="n">WrapType</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="PipelineBuilderContext"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">PipelineBuilderContext</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;A context passed to units to determine if they want to participate in a pipeline.&quot;&quot;&quot;</span>
+
+    <span class="n">graph</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">GraphDatabase</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">project</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Project</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">library_usage</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">decision_type</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">DecisionType</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">recommendation_type</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">RecommendationType</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">cli_parameters</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">dict</span><span class="p">))</span>
+    <span class="n">prescription</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Prescription</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+    <span class="n">_boots</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;BootType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_pseudonyms</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;PseudonymType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_sieves</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;SieveType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_steps</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;StepType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_strides</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;StrideType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_wraps</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;WrapType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_boots_included</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;BootType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_pseudonyms_included</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;PseudonymType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_sieves_included</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;SieveType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_steps_included</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;StepType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_strides_included</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;StrideType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">_wraps_included</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;WrapType&quot;</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boots</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;BootType&quot;</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get all boots registered to this pipeline builder context.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_boots</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boots_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;BootType&quot;</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get boots as a dictionary mapping.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_boots</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">pseudonyms</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;PseudonymType&quot;</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get all pseudonyms registered to this pipeline builder context.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">pseudonyms_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;PseudonymType&quot;</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get pseudonyms as a dictionary mapping.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">sieves</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;SieveType&quot;</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get all sieves registered to this pipeline builder context.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_sieves</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">sieves_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;SieveType&quot;</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get sieves as a dictionary mapping.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sieves</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">steps</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;StepType&quot;</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get all steps registered to this pipeline builder context.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_steps</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">steps_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;StepType&quot;</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get steps as a dictionary mapping.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_steps</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">strides</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;StrideType&quot;</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get all strides registered to this pipeline builder context.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_strides</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">strides_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;StrideType&quot;</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get strides as a dictionary mapping.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_strides</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">wraps</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;WrapType&quot;</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get all wraps registered to this pipeline builder context.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_wraps</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">wraps_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;WrapType&quot;</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get wraps as a dictionary mapping.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wraps</span>
+
+    <span class="k">def</span> <span class="nf">__attrs_post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Verify we have only adviser or dependency monkey specific builder.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot instantiate builder for adviser and dependency monkey at the same time&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_type</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Cannot instantiate builder context not specific to adviser nor dependency monkey&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PipelineBuilderContext.is_included"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.is_included">[docs]</a>    <span class="k">def</span> <span class="nf">is_included</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">unit_class</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="s2">&quot;UnitType&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if the given pipeline unit is already included in the pipeline configuration.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">is_boot_unit_type</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_boots_included</span>
+        <span class="k">elif</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">is_pseudonym_unit_type</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms_included</span>
+        <span class="k">elif</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">is_sieve_unit_type</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sieves_included</span>
+        <span class="k">elif</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">is_step_unit_type</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_steps_included</span>
+        <span class="k">elif</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">is_stride_unit_type</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_strides_included</span>
+        <span class="k">elif</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">is_wrap_unit_type</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">()</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wraps_included</span>
+
+        <span class="k">raise</span> <span class="n">InternalError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown unit </span><span class="si">{</span><span class="n">unit_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">()</span><span class="si">!r}</span><span class="s2"> of type </span><span class="si">{</span><span class="n">unit_class</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_boots"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_boots">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_boots</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">boot_class</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="s2">&quot;UnitType&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="s2">&quot;BootType&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get included boots of the provided boot class.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">boot_class</span><span class="o">.</span><span class="n">is_boot_unit_type</span><span class="p">()</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_boots_included</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">boot_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">(),</span> <span class="p">[])</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_boot_names"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_boot_names">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_boot_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get names of included boots.&quot;&quot;&quot;</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_boots_included</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_pseudonyms"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_pseudonyms">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_pseudonyms</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pseudonym_class</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="s2">&quot;PseudonymType&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="s2">&quot;PseudonymType&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get included sieves of the provided sieve class.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">pseudonym_class</span><span class="o">.</span><span class="n">is_pseudonym_unit_type</span><span class="p">()</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms_included</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pseudonym_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">(),</span> <span class="p">[])</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_pseudonym_names"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_pseudonym_names">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_pseudonym_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get names of included pseudonyms.&quot;&quot;&quot;</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms_included</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_sieves"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_sieves">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_sieves</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sieve_class</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="s2">&quot;SieveType&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="s2">&quot;SieveType&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get included sieves of the provided sieve class.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">sieve_class</span><span class="o">.</span><span class="n">is_sieve_unit_type</span><span class="p">()</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sieves_included</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">sieve_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">(),</span> <span class="p">[])</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_sieve_names"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_sieve_names">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_sieve_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get names of included sieves.&quot;&quot;&quot;</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sieves_included</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_steps"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_steps">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_steps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">step_class</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="s2">&quot;StepType&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="s2">&quot;StepType&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get included steps of the provided step class.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">step_class</span><span class="o">.</span><span class="n">is_step_unit_type</span><span class="p">()</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_steps_included</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">step_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">(),</span> <span class="p">[])</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_step_names"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_step_names">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_step_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get names of included steps.&quot;&quot;&quot;</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_steps_included</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_strides"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_strides">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_strides</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stride_class</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="s2">&quot;StrideType&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="s2">&quot;StrideType&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get included strides of the provided stride class.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">stride_class</span><span class="o">.</span><span class="n">is_stride_unit_type</span><span class="p">()</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_strides_included</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stride_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">(),</span> <span class="p">[])</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_stride_names"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_stride_names">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_stride_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get names of included strides.&quot;&quot;&quot;</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_strides_included</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_wraps"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_wraps">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_wraps</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wrap_class</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="s2">&quot;WrapType&quot;</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="s2">&quot;WrapType&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get included wraps of the provided wrap class.&quot;&quot;&quot;</span>
+        <span class="k">assert</span> <span class="n">wrap_class</span><span class="o">.</span><span class="n">is_wrap_unit_type</span><span class="p">()</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wraps_included</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">wrap_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">(),</span> <span class="p">[])</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.get_included_wrap_names"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.get_included_wrap_names">[docs]</a>    <span class="k">def</span> <span class="nf">get_included_wrap_names</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get names of included wraps.&quot;&quot;&quot;</span>
+        <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">_wraps_included</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.is_adviser_pipeline"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.is_adviser_pipeline">[docs]</a>    <span class="k">def</span> <span class="nf">is_adviser_pipeline</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if the pipeline built is meant for adviser.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_type</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.is_dependency_monkey_pipeline"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.is_dependency_monkey_pipeline">[docs]</a>    <span class="k">def</span> <span class="nf">is_dependency_monkey_pipeline</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if the pipeline built is meant for Dependency Monkey.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decision_type</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="ow">is</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="PipelineBuilderContext.add_unit"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilderContext.add_unit">[docs]</a>    <span class="k">def</span> <span class="nf">add_unit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">unit</span><span class="p">:</span> <span class="s2">&quot;UnitType&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add the given unit to pipeline configuration.&quot;&quot;&quot;</span>
+        <span class="n">package_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">unit</span><span class="o">.</span><span class="n">configuration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">unit</span><span class="o">.</span><span class="n">is_boot_unit_type</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_boots_included</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_boots</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">elif</span> <span class="n">unit</span><span class="o">.</span><span class="n">is_pseudonym_unit_type</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">package_name</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">PipelineConfigurationError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Pipeline cannot be constructed as unit </span><span class="si">{</span><span class="n">unit</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> of type Pseudonym &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;did not provide any package name configuration: </span><span class="si">{</span><span class="n">unit</span><span class="o">.</span><span class="n">configuration</span><span class="si">!r}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms_included</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_pseudonyms</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">elif</span> <span class="n">unit</span><span class="o">.</span><span class="n">is_sieve_unit_type</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sieves_included</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sieves</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">elif</span> <span class="n">unit</span><span class="o">.</span><span class="n">is_step_unit_type</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_steps_included</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_steps</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">elif</span> <span class="n">unit</span><span class="o">.</span><span class="n">is_stride_unit_type</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_strides_included</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_strides</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="k">elif</span> <span class="n">unit</span><span class="o">.</span><span class="n">is_wrap_unit_type</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_wraps_included</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">unit</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_wraps</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="k">raise</span> <span class="n">InternalError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown unit </span><span class="si">{</span><span class="n">unit</span><span class="si">!r}</span><span class="s2"> of type </span><span class="si">{</span><span class="n">unit</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="PipelineBuilder"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilder">[docs]</a><span class="k">class</span> <span class="nc">PipelineBuilder</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Builder responsible for creating pipeline configuration from the project and its library usage.&quot;&quot;&quot;</span>
+
+    <span class="vm">__slots__</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Instantiate of the pipeline builder - do NOT instantiate this class.&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Cannot instantiate pipeline builder&quot;</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_iter_units</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">PipelineBuilderContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="s2">&quot;UnitType&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Iterate over pipeline units available in this implementation.&quot;&quot;&quot;</span>
+        <span class="c1"># Imports placed here to simplify tests.</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.boots</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.pseudonyms</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.sieves</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.steps</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.strides</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.wraps</span>
+
+        <span class="k">for</span> <span class="n">boot_name</span> <span class="ow">in</span> <span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">boots</span><span class="o">.</span><span class="n">__all__</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">boots</span><span class="p">,</span> <span class="n">boot_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="o">.</span><span class="n">iter_boot_units</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">pseudonym_name</span> <span class="ow">in</span> <span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">pseudonyms</span><span class="o">.</span><span class="n">__all__</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">pseudonyms</span><span class="p">,</span> <span class="n">pseudonym_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="o">.</span><span class="n">iter_pseudonym_units</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">sieve_name</span> <span class="ow">in</span> <span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">sieves</span><span class="o">.</span><span class="n">__all__</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">sieves</span><span class="p">,</span> <span class="n">sieve_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="o">.</span><span class="n">iter_sieve_units</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">step_name</span> <span class="ow">in</span> <span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">steps</span><span class="o">.</span><span class="n">__all__</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">steps</span><span class="p">,</span> <span class="n">step_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="o">.</span><span class="n">iter_step_units</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">stride_name</span> <span class="ow">in</span> <span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">strides</span><span class="o">.</span><span class="n">__all__</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">strides</span><span class="p">,</span> <span class="n">stride_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="o">.</span><span class="n">iter_stride_units</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">wrap_name</span> <span class="ow">in</span> <span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">wraps</span><span class="o">.</span><span class="n">__all__</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">wraps</span><span class="p">,</span> <span class="n">wrap_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">ctx</span><span class="o">.</span><span class="n">prescription</span><span class="o">.</span><span class="n">iter_wrap_units</span><span class="p">()</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_build_configuration</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">PipelineBuilderContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PipelineConfig</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Instantiate units and return the actual pipeline configuration.&quot;&quot;&quot;</span>
+        <span class="c1"># As pipeline steps can have dependencies on each other, iterate over them until we have any change done</span>
+        <span class="c1"># to the pipeline configuration.</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Creating pipeline configuration&quot;</span><span class="p">)</span>
+
+        <span class="n">blocked_units</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="nb">set</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THOTH_ADVISER_BLOCKED_UNITS&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="s2">&quot;THOTH_ADVISER_BLOCKED_UNITS&quot;</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span>
+            <span class="k">else</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="n">change</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">while</span> <span class="n">change</span><span class="p">:</span>
+            <span class="n">change</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">for</span> <span class="n">unit_class</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_iter_units</span><span class="p">(</span><span class="n">ctx</span><span class="p">):</span>
+                <span class="n">unit_name</span> <span class="o">=</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">unit_name</span> <span class="ow">in</span> <span class="n">blocked_units</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;Avoiding adding pipeline unit </span><span class="si">%r</span><span class="s2"> based on blocked units configuration&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">continue</span>
+
+                <span class="k">for</span> <span class="n">unit_configuration</span> <span class="ow">in</span> <span class="n">unit_class</span><span class="o">.</span><span class="n">should_include</span><span class="p">(</span><span class="n">ctx</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">unit_configuration</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;Pipeline unit </span><span class="si">%r</span><span class="s2"> will not be included in the pipeline configuration in this round&quot;</span><span class="p">,</span>
+                            <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">change</span> <span class="o">=</span> <span class="kc">True</span>
+
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;Including pipeline unit </span><span class="si">%r</span><span class="s2"> in pipeline configuration with unit configuration </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">unit_configuration</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="n">unit_instance</span> <span class="o">=</span> <span class="n">unit_class</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
+
+                    <span class="c1"># Always perform update, even with an empty dict. Update triggers a schema check.</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">unit_instance</span><span class="o">.</span><span class="n">update_configuration</span><span class="p">(</span><span class="n">unit_configuration</span><span class="p">)</span>
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                        <span class="k">raise</span> <span class="n">PipelineConfigurationError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Filed to initialize pipeline unit configuration for </span><span class="si">{</span><span class="n">unit_name</span><span class="si">!r}</span><span class="s2"> &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;with configuration </span><span class="si">{</span><span class="n">unit_configuration</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+                    <span class="n">ctx</span><span class="o">.</span><span class="n">add_unit</span><span class="p">(</span><span class="n">unit_instance</span><span class="p">)</span>
+
+        <span class="n">pipeline</span> <span class="o">=</span> <span class="n">PipelineConfig</span><span class="p">(</span>
+            <span class="n">boots</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">boots_dict</span><span class="p">,</span>
+            <span class="n">pseudonyms</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">pseudonyms_dict</span><span class="p">,</span>
+            <span class="n">sieves</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">sieves_dict</span><span class="p">,</span>
+            <span class="n">steps</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">steps_dict</span><span class="p">,</span>
+            <span class="n">strides</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">strides_dict</span><span class="p">,</span>
+            <span class="n">wraps</span><span class="o">=</span><span class="n">ctx</span><span class="o">.</span><span class="n">wraps_dict</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">_LOGGER</span><span class="o">.</span><span class="n">getEffectiveLevel</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Pipeline configuration creation ended, configuration:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pipeline</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">module</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span> <span class="n">configuration_entry</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;UnitType&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Instantiate a pipeline unit from a dict representation.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="s2">&quot;name&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">configuration_entry</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No pipeline unit name provided in the configuration entry: </span><span class="si">{</span><span class="n">configuration_entry</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">unit_class</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">configuration_entry</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
+        <span class="k">except</span> <span class="ne">AttributeError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UnknownPipelineUnitError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot import unit </span><span class="si">{</span><span class="n">configuration_entry</span><span class="p">[</span><span class="s1">&#39;name&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="n">unit</span><span class="p">:</span> <span class="s2">&quot;UnitType&quot;</span> <span class="o">=</span> <span class="n">unit_class</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">configuration_entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;configuration&quot;</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">unit</span><span class="o">.</span><span class="n">update_configuration</span><span class="p">(</span><span class="n">configuration_entry</span><span class="p">[</span><span class="s2">&quot;configuration&quot;</span><span class="p">])</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">PipelineConfigurationError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Filed to initialize pipeline unit configuration for </span><span class="si">{</span><span class="n">unit</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;with configuration </span><span class="si">{</span><span class="n">configuration_entry</span><span class="p">[</span><span class="s1">&#39;configuration&#39;</span><span class="p">]</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="k">return</span> <span class="n">unit</span>
+
+<div class="viewcode-block" id="PipelineBuilder.from_dict"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilder.from_dict">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_dict</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">dict_</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;PipelineConfig&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Instantiate pipeline configuration based on dictionary supplied.&quot;&quot;&quot;</span>
+        <span class="c1"># Imports placed here to simplify tests.</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.boots</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.pseudonyms</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.sieves</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.steps</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.strides</span>
+        <span class="kn">import</span> <span class="nn">thoth.adviser.wraps</span>
+
+        <span class="n">boots</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;BootType&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">boot_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;boots&quot;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="n">boot_unit</span><span class="p">:</span> <span class="s2">&quot;BootType&quot;</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">boots</span><span class="p">,</span> <span class="n">boot_entry</span><span class="p">)</span>
+            <span class="n">package_name</span> <span class="o">=</span> <span class="n">boot_unit</span><span class="o">.</span><span class="n">configuration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">)</span>
+            <span class="n">boots</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">boot_unit</span><span class="p">)</span>
+
+        <span class="n">pseudonyms</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;PseudonymType&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">pseudonym_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;pseudonyms&quot;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="n">unit</span><span class="p">:</span> <span class="s2">&quot;PseudonymType&quot;</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">pseudonyms</span><span class="p">,</span> <span class="n">pseudonym_entry</span><span class="p">)</span>
+
+            <span class="n">package_name</span> <span class="o">=</span> <span class="n">unit</span><span class="o">.</span><span class="n">configuration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">package_name</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">PipelineConfigurationError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Pipeline cannot be constructed as unit </span><span class="si">{</span><span class="n">unit</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> of type Pseudonym &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;did not provide any package name configuration: </span><span class="si">{</span><span class="n">unit</span><span class="o">.</span><span class="n">configuration</span><span class="si">!r}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+            <span class="n">pseudonyms</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unit</span><span class="p">)</span>
+
+        <span class="n">sieves</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;SieveType&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">sieve_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;sieves&quot;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="n">sieve_unit</span><span class="p">:</span> <span class="s2">&quot;SieveType&quot;</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">sieves</span><span class="p">,</span> <span class="n">sieve_entry</span><span class="p">)</span>
+            <span class="n">package_name</span> <span class="o">=</span> <span class="n">sieve_unit</span><span class="o">.</span><span class="n">configuration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">)</span>
+            <span class="n">sieves</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">sieve_unit</span><span class="p">)</span>
+
+        <span class="n">steps</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;StepType&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">step_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;steps&quot;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="n">step_unit</span><span class="p">:</span> <span class="s2">&quot;StepType&quot;</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">steps</span><span class="p">,</span> <span class="n">step_entry</span><span class="p">)</span>
+            <span class="n">package_name</span> <span class="o">=</span> <span class="n">step_unit</span><span class="o">.</span><span class="n">configuration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">)</span>
+            <span class="n">steps</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">step_unit</span><span class="p">)</span>
+
+        <span class="n">strides</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;StrideType&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">stride_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;strides&quot;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="n">stride_unit</span><span class="p">:</span> <span class="s2">&quot;StrideType&quot;</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">strides</span><span class="p">,</span> <span class="n">stride_entry</span><span class="p">)</span>
+            <span class="n">package_name</span> <span class="o">=</span> <span class="n">stride_unit</span><span class="o">.</span><span class="n">configuration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">)</span>
+            <span class="n">strides</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stride_unit</span><span class="p">)</span>
+
+        <span class="n">wraps</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="s2">&quot;WrapType&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">wrap_entry</span> <span class="ow">in</span> <span class="n">dict_</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;wraps&quot;</span><span class="p">,</span> <span class="p">[])</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="n">wrap_unit</span><span class="p">:</span> <span class="s2">&quot;WrapType&quot;</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_do_instantiate_from_dict</span><span class="p">(</span><span class="n">thoth</span><span class="o">.</span><span class="n">adviser</span><span class="o">.</span><span class="n">wraps</span><span class="p">,</span> <span class="n">wrap_entry</span><span class="p">)</span>
+            <span class="n">package_name</span> <span class="o">=</span> <span class="n">wrap_unit</span><span class="o">.</span><span class="n">configuration</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">)</span>
+            <span class="n">wraps</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">wrap_unit</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">dict_</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Unknown entry in pipeline configuration: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dict_</span><span class="p">)</span>
+
+        <span class="n">pipeline</span> <span class="o">=</span> <span class="n">PipelineConfig</span><span class="p">(</span>
+            <span class="n">boots</span><span class="o">=</span><span class="n">boots</span><span class="p">,</span>
+            <span class="n">pseudonyms</span><span class="o">=</span><span class="n">pseudonyms</span><span class="p">,</span>
+            <span class="n">sieves</span><span class="o">=</span><span class="n">sieves</span><span class="p">,</span>
+            <span class="n">steps</span><span class="o">=</span><span class="n">steps</span><span class="p">,</span>
+            <span class="n">strides</span><span class="o">=</span><span class="n">strides</span><span class="p">,</span>
+            <span class="n">wraps</span><span class="o">=</span><span class="n">wraps</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Pipeline configuration creation ended, configuration:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">pipeline</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">pipeline</span></div>
+
+<div class="viewcode-block" id="PipelineBuilder.load"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilder.load">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">load</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;PipelineConfig&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Load pipeline configuration from a file or a string.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">config</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading pipeline configuration from file </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
+                <span class="n">config</span> <span class="o">=</span> <span class="n">config_file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">yaml</span><span class="o">.</span><span class="n">safe_load</span><span class="p">(</span><span class="n">config</span><span class="p">))</span></div>
+
+<div class="viewcode-block" id="PipelineBuilder.get_adviser_pipeline_config"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilder.get_adviser_pipeline_config">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">get_adviser_pipeline_config</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">recommendation_type</span><span class="p">:</span> <span class="n">RecommendationType</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span><span class="p">,</span>
+        <span class="n">project</span><span class="p">:</span> <span class="n">Project</span><span class="p">,</span>
+        <span class="n">library_usage</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+        <span class="n">prescription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Prescription</span><span class="p">],</span>
+        <span class="n">cli_parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PipelineConfig</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get adviser&#39;s pipeline configuration.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_build_configuration</span><span class="p">(</span>
+            <span class="n">PipelineBuilderContext</span><span class="p">(</span>
+                <span class="n">graph</span><span class="o">=</span><span class="n">graph</span><span class="p">,</span>
+                <span class="n">project</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+                <span class="n">library_usage</span><span class="o">=</span><span class="n">library_usage</span><span class="p">,</span>
+                <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span><span class="p">,</span>
+                <span class="n">prescription</span><span class="o">=</span><span class="n">prescription</span><span class="p">,</span>
+                <span class="n">cli_parameters</span><span class="o">=</span><span class="n">cli_parameters</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="PipelineBuilder.get_dependency_monkey_pipeline_config"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.pipeline_builder.PipelineBuilder.get_dependency_monkey_pipeline_config">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">get_dependency_monkey_pipeline_config</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">decision_type</span><span class="p">:</span> <span class="n">DecisionType</span><span class="p">,</span>
+        <span class="n">graph</span><span class="p">:</span> <span class="n">GraphDatabase</span><span class="p">,</span>
+        <span class="n">project</span><span class="p">:</span> <span class="n">Project</span><span class="p">,</span>
+        <span class="n">library_usage</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+        <span class="n">prescription</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Prescription</span><span class="p">],</span>
+        <span class="n">cli_parameters</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PipelineConfig</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get dependency-monkey&#39;s pipeline configuration.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_build_configuration</span><span class="p">(</span>
+            <span class="n">PipelineBuilderContext</span><span class="p">(</span>
+                <span class="n">graph</span><span class="o">=</span><span class="n">graph</span><span class="p">,</span>
+                <span class="n">project</span><span class="o">=</span><span class="n">project</span><span class="p">,</span>
+                <span class="n">library_usage</span><span class="o">=</span><span class="n">library_usage</span><span class="p">,</span>
+                <span class="n">decision_type</span><span class="o">=</span><span class="n">decision_type</span><span class="p">,</span>
+                <span class="n">prescription</span><span class="o">=</span><span class="n">prescription</span><span class="p">,</span>
+                <span class="n">cli_parameters</span><span class="o">=</span><span class="n">cli_parameters</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation index</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-123174547-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+
+        function gtag() {
+            dataLayer.push(arguments);
+        }
+        gtag('js', new Date());
+
+        gtag('config', 'UA-123174547-1');
+    </script>
+
+  </body>
+</html>

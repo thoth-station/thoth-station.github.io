@@ -1,0 +1,792 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.python.project &#8212; Thoth&#39;s Python library 0.15.6 documentation</title>
+    <link rel="stylesheet" href="/assets/python/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/python/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/python/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/python/jquery.js"></script>
+    <script type="text/javascript" src="/assets/python/underscore.js"></script>
+    <script type="text/javascript" src="/assets/python/doctools.js"></script>
+    <script type="text/javascript" src="/assets/python/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth&#39;s Python library 0.15.6 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.python.project</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-python</span>
+<span class="c1"># Copyright(C) 2018, 2019, 2020 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Project abstraction and operations on project dependencies.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
+<span class="kn">import</span> <span class="nn">tempfile</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Tuple</span>
+
+<span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">cwd</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">RuntimeEnvironment</span>
+<span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="kn">import</span> <span class="n">run_command</span>
+<span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="kn">import</span> <span class="n">CommandError</span>
+
+<span class="kn">from</span> <span class="nn">.digests_fetcher</span> <span class="kn">import</span> <span class="n">DigestsFetcherBase</span>
+<span class="kn">from</span> <span class="nn">.digests_fetcher</span> <span class="kn">import</span> <span class="n">PythonDigestsFetcher</span>
+<span class="kn">from</span> <span class="nn">.pipfile</span> <span class="kn">import</span> <span class="n">Pipfile</span>
+<span class="kn">from</span> <span class="nn">.pipfile</span> <span class="kn">import</span> <span class="n">PipfileLock</span>
+<span class="kn">from</span> <span class="nn">.pipfile</span> <span class="kn">import</span> <span class="n">PipfileMeta</span>
+<span class="kn">from</span> <span class="nn">.source</span> <span class="kn">import</span> <span class="n">Source</span>
+<span class="kn">from</span> <span class="nn">.package_version</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">UnableLock</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">InternalError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NotFound</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">FileLoadError</span>
+<span class="kn">from</span> <span class="nn">.helpers</span> <span class="kn">import</span> <span class="n">parse_requirements</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="Project"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">Project</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;A representation of a Python project.&quot;&quot;&quot;</span>
+
+    <span class="n">pipfile</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Pipfile</span><span class="p">)</span>
+    <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">PipfileLock</span><span class="p">])</span>
+    <span class="n">runtime_environment</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">RuntimeEnvironment</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">from_dict</span><span class="p">))</span>
+    <span class="n">_graph_db</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">_workdir</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">workdir</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Access working directory of project.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_workdir</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_workdir</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_workdir</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_workdir</span>
+
+<div class="viewcode-block" id="Project.from_files"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.from_files">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_files</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">pipfile_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">pipfile_lock_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">RuntimeEnvironment</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">without_pipfile_lock</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create project from Pipfile and Pipfile.lock files.&quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">pipfile</span> <span class="o">=</span> <span class="n">Pipfile</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">pipfile_path</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">FileLoadError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Failed to load Pipfile (path: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">pipfile_path</span> <span class="k">else</span> <span class="n">pipfile_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">without_pipfile_lock</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">PipfileLock</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">pipfile_lock_path</span><span class="p">,</span> <span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">FileLoadError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Failed to load Pipfile.lock &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;(path: </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">pipfile_lock_path</span> <span class="k">else</span> <span class="n">pipfile_lock_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">pipfile</span><span class="p">,</span>
+            <span class="n">pipfile_lock</span><span class="p">,</span>
+            <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span> <span class="k">if</span> <span class="n">runtime_environment</span> <span class="k">else</span> <span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">from_dict</span><span class="p">({}),</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="Project.from_dict"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.from_dict">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_dict</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">pipfile</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">pipfile_lock</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">RuntimeEnvironment</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Project&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Construct project out of a dict representation.&quot;&quot;&quot;</span>
+        <span class="n">pip</span> <span class="o">=</span> <span class="n">Pipfile</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">pipfile</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">runtime_environment</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+                <span class="n">pipfile</span><span class="o">=</span><span class="n">pip</span><span class="p">,</span>
+                <span class="n">pipfile_lock</span><span class="o">=</span><span class="n">PipfileLock</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">pipfile_lock</span><span class="p">,</span> <span class="n">pipfile</span><span class="o">=</span><span class="n">pip</span><span class="p">),</span>
+                <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">pipfile</span><span class="o">=</span><span class="n">pip</span><span class="p">,</span>
+            <span class="n">pipfile_lock</span><span class="o">=</span><span class="n">PipfileLock</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">pipfile_lock</span><span class="p">,</span> <span class="n">pipfile</span><span class="o">=</span><span class="n">pip</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="Project.from_strings"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.from_strings">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_strings</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">pipfile_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">pipfile_lock_str</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">RuntimeEnvironment</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create project from Pipfile and Pipfile.lock loaded into strings.&quot;&quot;&quot;</span>
+        <span class="n">pipfile</span> <span class="o">=</span> <span class="n">Pipfile</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">pipfile_str</span><span class="p">)</span>
+
+        <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">pipfile_lock_str</span><span class="p">:</span>
+            <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">PipfileLock</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">pipfile_lock_str</span><span class="p">,</span> <span class="n">pipfile</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">pipfile</span><span class="p">,</span>
+            <span class="n">pipfile_lock</span><span class="p">,</span>
+            <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span> <span class="k">if</span> <span class="n">runtime_environment</span> <span class="k">else</span> <span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">from_dict</span><span class="p">({}),</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="Project.to_files"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.to_files">[docs]</a>    <span class="k">def</span> <span class="nf">to_files</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">pipfile_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">pipfile_lock_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">without_pipfile_lock</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">keep_thoth_section</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Write the current state of project into Pipfile and Pipfile.lock files.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">pipfile_path</span> <span class="ow">or</span> <span class="s2">&quot;Pipfile&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pipfile_file</span><span class="p">:</span>
+            <span class="n">pipfile_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_string</span><span class="p">(</span><span class="n">keep_thoth_section</span><span class="o">=</span><span class="n">keep_thoth_section</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">without_pipfile_lock</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">pipfile_lock_path</span> <span class="ow">or</span> <span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pipfile_lock_file</span><span class="p">:</span>
+                <span class="n">pipfile_lock_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>  <span class="c1"># type: ignore</span></div>
+
+<div class="viewcode-block" id="Project.construct_requirements_in"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.construct_requirements_in">[docs]</a>    <span class="k">def</span> <span class="nf">construct_requirements_in</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Construct requirements.in file for the current project.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">construct_requirements_in</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Project.construct_requirements_txt"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.construct_requirements_txt">[docs]</a>    <span class="k">def</span> <span class="nf">construct_requirements_txt</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Construct requirements.txt file for the current project - pip-tools compatible.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">construct_requirements_txt</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;PipfileLock was not provided.&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Project.to_pip_compile_files"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.to_pip_compile_files">[docs]</a>    <span class="k">def</span> <span class="nf">to_pip_compile_files</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">requirements_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;requirements.in&quot;</span><span class="p">,</span>
+        <span class="n">requirements_lock_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;requirements.txt&quot;</span><span class="p">,</span>
+        <span class="n">without_lock</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Write the current state of project into requirements.in and requirements.txt files.</span>
+
+<span class="sd">        Files created are compatible with pip/pip-tools. If no lock is specified, requirements.txt</span>
+<span class="sd">        hold unpinned direct dependencies as in case of pip.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">without_lock</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">requirements_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">requirements_file</span><span class="p">:</span>
+                <span class="n">requirements_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">construct_requirements_in</span><span class="p">())</span>
+            <span class="k">return</span>
+
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">requirements_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">requirements_file</span><span class="p">:</span>
+            <span class="n">requirements_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">construct_requirements_in</span><span class="p">())</span>
+
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">requirements_lock_path</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">requirements_lock_file</span><span class="p">:</span>
+            <span class="n">requirements_lock_file</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">construct_requirements_txt</span><span class="p">())</span></div>
+
+<div class="viewcode-block" id="Project.from_pip_compile_files"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.from_pip_compile_files">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_pip_compile_files</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">requirements_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;requirements.in&quot;</span><span class="p">,</span>
+        <span class="n">requirements_lock_path</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">allow_without_lock</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">RuntimeEnvironment</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Project&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Parse project from files compatible with pip/pip-tools.&quot;&quot;&quot;</span>
+        <span class="n">sources_lock</span><span class="p">,</span> <span class="n">package_versions_lock</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">allow_without_lock</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">requirements_path</span><span class="p">):</span>
+                <span class="n">requirements_lock_path</span> <span class="o">=</span> <span class="n">requirements_lock_path</span> <span class="ow">or</span> <span class="s2">&quot;requirements.txt&quot;</span>
+                <span class="n">sources</span><span class="p">,</span> <span class="n">package_versions</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="n">requirements_lock_path</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">sources</span><span class="p">,</span> <span class="n">package_versions</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="n">requirements_path</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">requirements_lock_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">sources_lock</span><span class="p">,</span> <span class="n">package_versions_lock</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="n">requirements_lock_path</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;requirements.txt&quot;</span><span class="p">):</span>
+                    <span class="n">sources_lock</span><span class="p">,</span> <span class="n">package_versions_lock</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="s2">&quot;requirements.txt&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">requirements_lock_path</span> <span class="o">=</span> <span class="n">requirements_lock_path</span> <span class="ow">or</span> <span class="s2">&quot;requirements.txt&quot;</span>
+            <span class="n">sources</span><span class="p">,</span> <span class="n">package_versions</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="n">requirements_path</span><span class="p">)</span>
+            <span class="n">sources_lock</span><span class="p">,</span> <span class="n">package_versions_lock</span> <span class="o">=</span> <span class="n">parse_requirements</span><span class="p">(</span><span class="n">requirements_lock_path</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions_lock</span> <span class="ow">or</span> <span class="p">[]:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">is_locked</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Package </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> in lockfile does not &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;use locked version: </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="si">!r}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">hashes</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Parsed package </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> from lockfile </span><span class="si">%r</span><span class="s2"> has no hashes assigned&quot;</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                    <span class="n">requirements_lock_path</span><span class="p">,</span>
+                <span class="p">)</span>
+
+        <span class="n">sources</span> <span class="o">=</span> <span class="n">sources</span> <span class="ow">or</span> <span class="n">sources_lock</span> <span class="ow">or</span> <span class="p">[]</span>
+
+        <span class="c1"># We know which index is assigned.</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sources</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">sources</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions_lock</span> <span class="ow">or</span> <span class="p">[]:</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">index</span> <span class="o">=</span> <span class="n">sources</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># XXX: do we want a default source?</span>
+        <span class="n">meta</span> <span class="o">=</span> <span class="n">PipfileMeta</span><span class="p">(</span><span class="n">sources</span><span class="o">=</span><span class="p">{</span><span class="n">s</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">})</span>
+        <span class="n">pipfile</span> <span class="o">=</span> <span class="n">Pipfile</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">(</span><span class="n">package_versions</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="n">meta</span><span class="p">)</span>
+        <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">package_versions_lock</span><span class="p">:</span>
+            <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">PipfileLock</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">(</span><span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">packages</span><span class="o">=</span><span class="n">package_versions_lock</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="n">meta</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">runtime_environment</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">pipfile_lock</span><span class="p">,</span> <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">pipfile_lock</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Project.from_package_versions"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.from_package_versions">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_package_versions</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">packages</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">],</span>
+        <span class="n">packages_locked</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">meta</span><span class="p">:</span> <span class="n">PipfileMeta</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">RuntimeEnvironment</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create project from PackageVersion objects.</span>
+
+<span class="sd">        If locked packages are omitted, the lock has to be explicitly performed to generate</span>
+<span class="sd">        in-memory Pipfile.lock representation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">pipfile</span> <span class="o">=</span> <span class="n">Pipfile</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">(</span><span class="n">packages</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="n">meta</span><span class="p">)</span>
+        <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">packages_locked</span><span class="p">:</span>
+            <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">PipfileLock</span><span class="o">.</span><span class="n">from_package_versions</span><span class="p">(</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">packages_locked</span><span class="p">,</span> <span class="n">meta</span><span class="o">=</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">runtime_environment</span><span class="p">:</span>
+            <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">pipfile_lock</span><span class="p">,</span> <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Let default be expanded.</span>
+            <span class="n">instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="p">(</span><span class="n">pipfile</span><span class="p">,</span> <span class="n">pipfile_lock</span><span class="p">)</span>
+
+        <span class="n">instance</span><span class="o">.</span><span class="n">sanitize_source_indexes</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">instance</span></div>
+
+<div class="viewcode-block" id="Project.set_allow_prereleases"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.set_allow_prereleases">[docs]</a>    <span class="k">def</span> <span class="nf">set_allow_prereleases</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">allow_prereleases</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Allow or disallow pre-releases for this project.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">pipenv</span><span class="p">[</span><span class="s2">&quot;allow_prereleases&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">allow_prereleases</span>  <span class="c1"># type: ignore</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">prereleases_allowed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if pre-releases are allowed for this project.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">pipenv</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;allow_prereleases&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">pipenv</span> <span class="k">else</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="Project.set_python_version"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.set_python_version">[docs]</a>    <span class="k">def</span> <span class="nf">set_python_version</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">python_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Set version of Python used in the project.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">python_version</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">requires</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;python_version&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">requires</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">requires</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">requires</span><span class="p">[</span><span class="s2">&quot;python_version&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">python_version</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">python_version</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get Python version used in this project.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">requires</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">requires</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;python_version&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Project.to_dict"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">keep_thoth_section</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Create a dictionary representation of this project.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;requirements&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">keep_thoth_section</span><span class="o">=</span><span class="n">keep_thoth_section</span><span class="p">),</span>
+            <span class="s2">&quot;requirements_locked&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">&quot;runtime_environment&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+        <span class="p">}</span></div>
+
+<div class="viewcode-block" id="Project.get_configuration_check_report"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.get_configuration_check_report">[docs]</a>    <span class="k">def</span> <span class="nf">get_configuration_check_report</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">]]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get a report on project configuration for the given runtime environment.&quot;&quot;&quot;</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">changes_in_config</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># We check Python version if there is used Pipfile, it should match runtime configuration.</span>
+        <span class="n">pipfile_python_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">requires</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;python_version&quot;</span><span class="p">)</span>
+        <span class="n">runtime_python_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span>
+
+        <span class="c1"># Keep the current runtime environment untouched.</span>
+        <span class="n">recommended_runtime_configuration_entry</span> <span class="o">=</span> <span class="n">RuntimeEnvironment</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pipfile_python_version</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">runtime_python_version</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="s2">&quot;Please specify Python version in Pipfile using `pipenv --python &lt;VERSION&gt;` &quot;</span>
+                    <span class="s2">&quot;and in Thoth&#39;s configuration file to have reproducible deployment and &quot;</span>
+                    <span class="s2">&quot;recommendations targeting specific Python version&quot;</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">pipfile_python_version</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">runtime_python_version</span><span class="p">:</span>
+            <span class="n">changes_in_config</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">recommended_runtime_configuration_entry</span><span class="o">.</span><span class="n">python_version</span> <span class="o">=</span> <span class="n">pipfile_python_version</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="s2">&quot;Use Python version in Thoth&#39;s configuration file to have &quot;</span>
+                    <span class="s2">&quot;recommendations matching configuration in Pipfile, configured Python version &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;in Pipfile is </span><span class="si">{</span><span class="n">pipfile_python_version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="c1"># if pipfile_python_version and runtime_python_version:</span>
+        <span class="c1"># This case is not related to adjustments in Thoth&#39;s configuration but rather in Pipfile - that is handled</span>
+        <span class="c1"># in scoring.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="n">recommended_runtime_configuration_entry</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">without_none</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">if</span> <span class="n">changes_in_config</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="Project.get_outdated_package_versions"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.get_outdated_package_versions">[docs]</a>    <span class="k">def</span> <span class="nf">get_outdated_package_versions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get outdated packages in the lock file.</span>
+
+<span class="sd">        This function will check indexes configured and look for version of</span>
+<span class="sd">        each package. If the given package package is not latest, it will add</span>
+<span class="sd">        it to the resulting list with the newer version identifier found on</span>
+<span class="sd">        package index.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">InternalError</span><span class="p">(</span><span class="s2">&quot;Cannot check outdated packages on not-locked application stack&quot;</span><span class="p">)</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">iter_dependencies_locked</span><span class="p">(</span><span class="n">with_devel</span><span class="o">=</span><span class="n">devel</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+                <span class="n">latest</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">get_latest_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span> <span class="o">!=</span> <span class="n">latest</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">package_version</span><span class="p">,</span> <span class="n">latest</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">found</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="k">for</span> <span class="n">index</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="n">latest</span> <span class="o">=</span> <span class="n">index</span><span class="o">.</span><span class="n">get_latest_package_version</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+                        <span class="n">found</span> <span class="o">=</span> <span class="kc">True</span>
+                    <span class="k">except</span> <span class="n">NotFound</span><span class="p">:</span>
+                        <span class="k">continue</span>
+
+                    <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">semantic_version</span> <span class="o">!=</span> <span class="n">latest</span><span class="p">:</span>
+                        <span class="n">result</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">package_version</span><span class="p">,</span> <span class="n">latest</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">found</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="n">NotFound</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Package </span><span class="si">{</span><span class="n">package_version</span><span class="si">!r}</span><span class="s2"> was not found on any package index&quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;configured: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="Project.pipenv_lock"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.pipenv_lock">[docs]</a>    <span class="k">def</span> <span class="nf">pipenv_lock</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Perform pipenv lock on the current state of project.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">workdir</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_file</span><span class="p">()</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running pipenv lock&quot;</span><span class="p">)</span>
+
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span><span class="s2">&quot;pipenv lock&quot;</span><span class="p">,</span> <span class="n">env</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;PIPENV_IGNORE_VIRTUALENVS&quot;</span><span class="p">:</span> <span class="s2">&quot;1&quot;</span><span class="p">})</span>
+            <span class="k">except</span> <span class="n">CommandError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span>
+                    <span class="s2">&quot;Unable to lock application stack (return code: </span><span class="si">%d</span><span class="s2">):</span><span class="se">\n</span><span class="si">%s</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc</span><span class="o">.</span><span class="n">return_code</span><span class="p">,</span> <span class="n">exc</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">exc</span><span class="o">.</span><span class="n">stderr</span>
+                <span class="p">)</span>
+                <span class="k">raise</span> <span class="n">UnableLock</span><span class="p">(</span><span class="s2">&quot;Failed to perform lock&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;pipenv stdout:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;pipenv stderr:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">PipfileLock</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">pipfile</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Project.is_direct_dependency"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.is_direct_dependency">[docs]</a>    <span class="k">def</span> <span class="nf">is_direct_dependency</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check whether the given package is a direct dependency.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">packages</span></div>
+
+<div class="viewcode-block" id="Project.get_locked_package_version"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.get_locked_package_version">[docs]</a>    <span class="k">def</span> <span class="nf">get_locked_package_version</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get locked version of the package.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PipfileLock was not provided and is None.&quot;</span><span class="p">)</span>
+
+        <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="p">:</span>
+            <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">package_version</span></div>
+
+<div class="viewcode-block" id="Project.get_package_version"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.get_package_version">[docs]</a>    <span class="k">def</span> <span class="nf">get_package_version</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get locked version of the package.&quot;&quot;&quot;</span>
+        <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">dev_packages</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="p">:</span>
+            <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">packages</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">package_version</span></div>
+
+<div class="viewcode-block" id="Project.exclude_package"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.exclude_package">[docs]</a>    <span class="k">def</span> <span class="nf">exclude_package</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Exclude the given package from application stack.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">is_locked</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">InternalError</span><span class="p">(</span><span class="s2">&quot;Cannot exclude package not pinned down to specific version: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="p">)</span>
+
+        <span class="n">section</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">dev_packages</span> <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">develop</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">packages</span>
+
+        <span class="n">to_exclude_package</span> <span class="o">=</span> <span class="n">section</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">to_exclude_package</span><span class="p">:</span>
+            <span class="n">package_version</span><span class="o">.</span><span class="n">negate_version</span><span class="p">()</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Excluding package </span><span class="si">{</span><span class="n">to_exclude_package</span><span class="si">}</span><span class="s2"> with package specified </span><span class="si">{</span><span class="n">package_version</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span> <span class="o">!=</span> <span class="n">to_exclude_package</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Excluding package </span><span class="si">{</span><span class="n">to_exclude_package</span><span class="si">}</span><span class="s2"> with </span><span class="si">{</span><span class="n">package_version</span><span class="si">}</span><span class="s2"> but package has &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;different index configuration&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">markers</span> <span class="o">!=</span> <span class="n">to_exclude_package</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Excluding package </span><span class="si">{</span><span class="n">to_exclude_package</span><span class="si">}</span><span class="s2"> with </span><span class="si">{</span><span class="n">package_version</span><span class="si">}</span><span class="s2"> but package has &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;different markers configured&quot;</span>
+                <span class="p">)</span>
+
+            <span class="c1"># We do operations on the package we passed via parameters so the original package is</span>
+            <span class="c1"># not adjusted if referenced elsewhere.</span>
+            <span class="k">if</span> <span class="n">to_exclude_package</span><span class="o">.</span><span class="n">version</span> <span class="o">!=</span> <span class="s2">&quot;*&quot;</span><span class="p">:</span>
+                <span class="n">package_version</span><span class="o">.</span><span class="n">version</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">,</span><span class="si">{</span><span class="n">to_exclude_package</span><span class="o">.</span><span class="n">version</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Package with excluded version </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="p">)</span>
+            <span class="n">section</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Adding a new requirement.</span>
+            <span class="n">package_version</span><span class="o">.</span><span class="n">negate_version</span><span class="p">()</span>
+            <span class="n">section</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">package_version</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Added excluded package to pipfile configuration: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_version</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">pipenv_lock</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Project.iter_dependencies_locked"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.iter_dependencies_locked">[docs]</a>    <span class="k">def</span> <span class="nf">iter_dependencies_locked</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Iterate through locked dependencies of this project.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">InternalError</span><span class="p">(</span><span class="s2">&quot;Unable to chain locked dependencies - no Pipfile.lock provided&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">with_devel</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">chain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">packages</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">dev_packages</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">packages</span></div>
+
+<div class="viewcode-block" id="Project.iter_dependencies"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.iter_dependencies">[docs]</a>    <span class="k">def</span> <span class="nf">iter_dependencies</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">with_devel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Iterate through direct dependencies of this project (not locked dependencies).&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">with_devel</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="n">chain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">packages</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">dev_packages</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">packages</span></div>
+
+    <span class="k">def</span> <span class="nf">_check_sources</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">whitelisted_sources</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check sources configuration in the Pipfile and report back any issues.&quot;&quot;&quot;</span>
+        <span class="n">report</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">whitelisted_sources</span> <span class="ow">and</span> <span class="n">source</span><span class="o">.</span><span class="n">url</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">whitelisted_sources</span><span class="p">:</span>
+                <span class="n">report</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;SOURCE-NOT-WHITELISTED&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Provided index </span><span class="si">{</span><span class="n">source</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> is not stated in the &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;whitelisted package sources listing&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">source</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="ow">not</span> <span class="n">source</span><span class="o">.</span><span class="n">verify_ssl</span><span class="p">:</span>
+                <span class="n">report</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;INSECURE-SOURCE&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Source </span><span class="si">{</span><span class="n">source</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> does not use SSL/TLS verification&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">source</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">report</span>
+
+    <span class="k">def</span> <span class="nf">_index_scan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">digests_fetcher</span><span class="p">:</span> <span class="n">DigestsFetcherBase</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Generate full report for packages given the sources configured.&quot;&quot;&quot;</span>
+        <span class="n">report</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">findings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PipfileLock was not provided and has value None.&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">packages</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">dev_packages</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="n">report</span><span class="p">:</span>
+                <span class="c1"># TODO: can we have the same package in dev packages and packages?</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Package </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> already present in the report&quot;</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">index_report</span> <span class="o">=</span> <span class="n">digests_fetcher</span><span class="o">.</span><span class="n">fetch_digests</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">)</span>
+            <span class="n">findings</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_check_scan</span><span class="p">(</span><span class="n">package_version</span><span class="p">,</span> <span class="n">index_report</span><span class="p">))</span>
+            <span class="n">report</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">index_report</span>
+
+        <span class="k">return</span> <span class="n">findings</span><span class="p">,</span> <span class="n">report</span>
+
+    <span class="k">def</span> <span class="nf">_check_scan</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">,</span> <span class="n">index_report</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Find and report errors found in the index scan.&quot;&quot;&quot;</span>
+        <span class="n">scan_report</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Prepare hashes for inspection.</span>
+        <span class="n">hashes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">pipenv_style_hashes</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">index_report</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">hashes</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">])</span>
+            <span class="n">pipenv_style_hashes</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;sha256:</span><span class="si">{</span><span class="n">item</span><span class="p">[</span><span class="s1">&#39;sha256&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">index_report</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># Are there indexes with different artifacts present? - suggest to specify index explicitly.</span>
+            <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">chain</span><span class="p">(</span><span class="o">*</span><span class="n">hashes</span><span class="p">))</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">(</span><span class="n">hashes</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                <span class="n">sources_reported</span> <span class="o">=</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">index_report</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+                <span class="n">scan_report</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;DIFFERENT-ARTIFACTS-ON-SOURCES&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Configured sources (</span><span class="si">{</span><span class="n">sources_reported</span><span class="si">}</span><span class="s2">) have different artifacts &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;available, specify explicitly source to be used&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;indexes&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">index_report</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+                        <span class="s2">&quot;package_locked&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_pipfile_lock</span><span class="p">(),</span>
+                        <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                        <span class="s2">&quot;sources&quot;</span><span class="p">:</span> <span class="n">index_report</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+
+        <span class="c1"># Source for reports.</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
+
+        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span> <span class="ow">and</span> <span class="n">index_report</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">hashes</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># Is installed from different source - which one?</span>
+            <span class="n">used_package_version_hashes</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;sha256:&quot;</span><span class="p">)</span> <span class="p">:]</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">package_version</span><span class="o">.</span><span class="n">hashes</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+            <span class="n">configured_index_hashes</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">h</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">index_report</span><span class="p">[</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">])</span>
+
+            <span class="c1"># Find other sources from which artifacts can be installed.</span>
+            <span class="n">other_sources</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># type: Dict[str, List[Tuple]]</span>
+            <span class="k">for</span> <span class="n">artifact_hash</span> <span class="ow">in</span> <span class="n">package_version</span><span class="o">.</span><span class="n">hashes</span><span class="p">:</span>
+                <span class="n">artifact_hash</span> <span class="o">=</span> <span class="n">artifact_hash</span><span class="p">[</span>  <span class="c1"># type: ignore</span>
+                    <span class="nb">len</span><span class="p">(</span><span class="s2">&quot;sha256:&quot;</span><span class="p">)</span> <span class="p">:</span>
+                <span class="p">]</span>  <span class="c1"># Remove pipenv-specific hash formatting.  # type: ignore</span>
+
+                <span class="k">for</span> <span class="n">index_url</span><span class="p">,</span> <span class="n">index_info</span> <span class="ow">in</span> <span class="n">index_report</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="k">if</span> <span class="n">index_url</span> <span class="o">==</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">:</span>
+                        <span class="c1"># Skip index that is assigned to the package, we are inspecting from the other sources.</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">artifact_entry</span> <span class="o">=</span> <span class="p">[(</span><span class="n">i</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">),</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">])</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">index_info</span> <span class="k">if</span> <span class="n">i</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">artifact_hash</span><span class="p">]</span>
+
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">artifact_entry</span><span class="p">:</span>
+                        <span class="k">continue</span>
+
+                    <span class="k">if</span> <span class="n">index_url</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">other_sources</span><span class="p">:</span>
+                        <span class="n">other_sources</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+                    <span class="n">other_sources</span><span class="p">[</span><span class="n">index_url</span><span class="p">]</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">artifact_entry</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">used_package_version_hashes</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">configured_index_hashes</span><span class="p">)):</span>
+                <span class="c1"># Source is different from the configured one.</span>
+                <span class="n">scan_report</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;ARTIFACT-DIFFERENT-SOURCE&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Artifacts are installed from different &quot;</span>
+                        <span class="sa">f</span><span class="s1">&#39;sources (</span><span class="si">{</span><span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">other_sources</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s1">) not respecting configuration&#39;</span><span class="p">,</span>
+                        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">source</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                        <span class="s2">&quot;package_locked&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_pipfile_lock</span><span class="p">(),</span>
+                        <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                        <span class="s2">&quot;indexes&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">other_sources</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+                        <span class="s2">&quot;sources&quot;</span><span class="p">:</span> <span class="n">other_sources</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+            <span class="k">elif</span> <span class="n">other_sources</span><span class="p">:</span>
+                <span class="c1"># Warn about possible installation from another source.</span>
+                <span class="n">scan_report</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;ARTIFACT-POSSIBLE-DIFFERENT-SOURCE&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Artifacts can be installed from different sources &quot;</span>
+                        <span class="sa">f</span><span class="s1">&#39;(</span><span class="si">{</span><span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">other_sources</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s1">) not respecting configuration &#39;</span>
+                        <span class="sa">f</span><span class="s2">&quot;that expects </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">source</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                        <span class="s2">&quot;package_locked&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_pipfile_lock</span><span class="p">(),</span>
+                        <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                        <span class="s2">&quot;indexes&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">other_sources</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span>
+                        <span class="s2">&quot;sources&quot;</span><span class="p">:</span> <span class="n">other_sources</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">index_report</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">):</span>
+            <span class="c1"># Configured index does not provide the given package.</span>
+            <span class="n">scan_report</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;MISSING-PACKAGE&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Source index </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> explicitly &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;assigned to package </span><span class="si">{</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="si">!r}</span><span class="s2"> but there was not found &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;any record for the given package&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">source</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                    <span class="s2">&quot;package_locked&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_pipfile_lock</span><span class="p">(),</span>
+                    <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                    <span class="s2">&quot;sources&quot;</span><span class="p">:</span> <span class="n">index_report</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Changed hashes?</span>
+        <span class="k">for</span> <span class="n">digest</span> <span class="ow">in</span> <span class="n">package_version</span><span class="o">.</span><span class="n">hashes</span><span class="p">:</span>
+            <span class="n">digest</span> <span class="o">=</span> <span class="n">digest</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;sha256:&quot;</span><span class="p">)</span> <span class="p">:]</span>  <span class="c1"># type: ignore</span>
+            <span class="k">for</span> <span class="n">index_info</span> <span class="ow">in</span> <span class="n">index_report</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">digest</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">index_info</span><span class="p">):</span>
+                    <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">scan_report</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="s2">&quot;INVALID-ARTIFACT-HASH&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;justification&quot;</span><span class="p">:</span> <span class="s2">&quot;Hash for the given artifact was not found&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;source&quot;</span><span class="p">:</span> <span class="n">source</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                        <span class="s2">&quot;package_locked&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_pipfile_lock</span><span class="p">(),</span>
+                        <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                        <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
+                        <span class="s2">&quot;digest&quot;</span><span class="p">:</span> <span class="n">digest</span><span class="p">,</span>  <span class="c1"># type: ignore</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">scan_report</span>
+
+<div class="viewcode-block" id="Project.check_provenance"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.check_provenance">[docs]</a>    <span class="k">def</span> <span class="nf">check_provenance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">whitelisted_sources</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">digests_fetcher</span><span class="p">:</span> <span class="n">DigestsFetcherBase</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check provenance/origin of packages that are stated in the project.&quot;&quot;&quot;</span>
+        <span class="n">digests_fetcher</span> <span class="o">=</span> <span class="n">digests_fetcher</span> <span class="ow">or</span> <span class="n">PythonDigestsFetcher</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span>
+        <span class="n">findings</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index_scan</span><span class="p">(</span><span class="n">digests_fetcher</span><span class="p">)</span>
+        <span class="n">findings</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_check_sources</span><span class="p">(</span><span class="n">whitelisted_sources</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">findings</span></div>
+
+<div class="viewcode-block" id="Project.sanitize_source_indexes"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.sanitize_source_indexes">[docs]</a>    <span class="k">def</span> <span class="nf">sanitize_source_indexes</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Make sure all the indexes are correctly propagated to Pipfile and Pipfile.lock metadata.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">sanitize_source_indexes</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">sanitize_source_indexes</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="Project.add_source"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.add_source">[docs]</a>    <span class="k">def</span> <span class="nf">add_source</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">verify_ssl</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">warehouse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">warehouse_api_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Source</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add a package source (index) to the project.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">name</span><span class="p">:</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="n">Source</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">url</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">verify_ssl</span><span class="o">=</span><span class="n">verify_ssl</span><span class="p">,</span> <span class="n">warehouse</span><span class="o">=</span><span class="n">warehouse</span><span class="p">,</span> <span class="n">warehouse_api_url</span><span class="o">=</span><span class="n">warehouse_api_url</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Do not provide source index name so that attrs correctly compute default based on URL.</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="n">Source</span><span class="p">(</span><span class="n">url</span><span class="o">=</span><span class="n">url</span><span class="p">,</span> <span class="n">verify_ssl</span><span class="o">=</span><span class="n">verify_ssl</span><span class="p">,</span> <span class="n">warehouse</span><span class="o">=</span><span class="n">warehouse</span><span class="p">,</span> <span class="n">warehouse_api_url</span><span class="o">=</span><span class="n">warehouse_api_url</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">add_source</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">add_source</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">source</span></div>
+
+<div class="viewcode-block" id="Project.add_package"><a class="viewcode-back" href="../../../thoth.python.html#thoth.python.project.Project.add_package">[docs]</a>    <span class="k">def</span> <span class="nf">add_package</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="n">Source</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">develop</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;Add the given package to project.</span>
+
+<span class="sd">        This method will add packages only to Pipfile, locking has to be explicitly done once package is added.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">source</span> <span class="ow">and</span> <span class="n">source</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">sources</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">InternalError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Adding package </span><span class="si">{</span><span class="n">package_name</span><span class="si">}</span><span class="s2"> to project without having source index &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">source</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> registered in the project&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">pkg_vers</span> <span class="o">=</span> <span class="n">PackageVersion</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="n">package_version</span><span class="p">,</span> <span class="n">develop</span><span class="o">=</span><span class="n">develop</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="n">source</span> <span class="k">if</span> <span class="n">source</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">add_package_version</span><span class="p">(</span><span class="n">pkg_vers</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../index.html">Documentation index</a><ul>
+  <li><a href="../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+  
+  </body>
+</html>

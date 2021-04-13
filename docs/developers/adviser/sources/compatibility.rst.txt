@@ -38,11 +38,6 @@ directly use Pipenv on the recommended software stack. See :ref:`integration`
 section for more info on how to integrate with Thoth and benefit from its
 recommendations.
 
-.. note::
-
-  Check `micropipenv <https://github.com/thoth-station/micropipenv>`__. It is
-  a lightweight complement to Pipenv that can be handy for you in some situations.
-
 Compatibility with pip/Pipenv resolver
 ======================================
 
@@ -65,42 +60,23 @@ different software environment is used in comparision to the one provided to
 Thoth's adviser.
 
 Resolution of Thoth's adviser might come up with a software stack that would
-never be produced by pip or Pipenv. The reason is a different resolution
-algorithm used and the aggregated knowledge Thoth uses during the resolution
-process. Thoth's adviser is a drop-in replacement which provides server side
-resolution with additional guidance on installed packages based on observations
-stored in Thoth's knowledge base.
+never be produced by pip or Pipenv. The reason is a known issue - `pip is
+lacking proper resolver <https://github.com/pypa/pip/issues/988>`_. As Pipenv
+uses pip (Pipenv actually bundles pip and virtualenv into one package) this
+issue is inherited and software stacks resolved by pip/Pipenv might be not
+correct (or can even fail). Thoth's adviser is a drop-in replacement which
+provides server side resolution with additional guidance on installed
+packages based on observations stored in Thoth's knowledge base.
 
 .. note::
 
-  It's a good practice to create overlays for different software or hardware
-  environments you want to run. Check `Thamos documentation
-  <https://github.com/thoth-station/thamos>`__ for more details.
+  It's a good practice to create different Thoth configuration files (e.g.
+  different git branches) if you plan to run your application on different
+  software or hardware environments and use Thoth's recommendations.
 
 Environment markers applied on direct dependencies are not evaluated during
-the resolution done on server but are taken into account once packages are
-installed.
-
-Thoth's resolver considers also ``python_requires`` as provided by package
-maintainers, see `PEP-440 <https://www.python.org/dev/peps/pep-0440/>`__ or
-`packaging documentation
-<https://packaging.python.org/guides/distributing-packages-using-setuptools/?highlight=python_requires#python-requires>`__
-for more info and semantics. The Python requirement information is aggregated
-during `Thoth's solver <https://github.com/thoth-station/solver>`__ runs as
-part of data aggregation and considered during the resolution (implemented by
-``SolvedSieve`` pipeline unit).  As the interpreter information is evaluated
-during solver runs for the given package they are specific for the given solver
-(e.g. ubi-8 solver running Python 3.6).
-
-In some cases these Python requirements might give misleading results. For
-example, consider ``python_requires>3.9.1`` for some package. If solver is
-running Python interpreter in version 3.9.0, the given package fails to install
-and thus the recommendation engine never recommends the given package when
-running any Python 3.9. This is considered a corner case as this is not seen
-much in the Python ecosystem.
-
-Resolver also implements experimental features that extend the current feature
-set of Pipenv or pip. See :ref:`experimental_features` for more details.
+resolution done on server but are taken into account once packages are
+installed by Pipenv.
 
 Python package indexes
 ======================
@@ -110,20 +86,20 @@ package (e.g. optimized builds of TensorFlow) and provide it on your own index,
 ``pip`` has no direct configuration option to explicitly specify index that
 should be used when installing the package. There are options like
 ``--extra-index-url`` that can add additional Python package indexes, however
-they are treated as fallbacks or mirrors.
+they are treated as fallbacks or mirrors. You can also supply digests of
+installed artifacts, but...
 
 On the other hand, Pipenv provides a configuration option for `specifying
 custom package indexes
 <https://pipenv.kennethreitz.org/en/latest/advanced/#specifying-package-indexes>`_.
 Thoth respects this configuration and software stacks produced that use
 ``Pipfile.lock`` format always specify from which index the given package came
-from. To prevent installing undesired artifacts, artifacts digests are
-provided. Note Pipenv still does not implement proper package source management
-even though the configuration could suggest so - this is fixed when using Thoth.
+from. To prevent installation undesired artifacts, artifacts digests are
+provided.
 
 An example of a ``Pipfile`` that configures two Python package indexes - `PyPI
 <https://pypi.org/simple>`_ and `AICoE Python package index
-<https://tensorflow.pypi.thoth-station.ninja/>`__:
+<https://tensorflow.pypi.thoth-station.ninja/>`:
 
 .. code-block:: toml
 
@@ -146,13 +122,6 @@ An example of a ``Pipfile`` that configures two Python package indexes - `PyPI
   [pipenv]
   allow_prereleases = true
 
-The configuration above will use two Python package sources for all the
-packages in the application stack. Moreover, it will force to use
-``redhat-aicoe-experiments`` index for installing tensorflow package that will
-*always* come from this index if a software stack is resolved (unlike
-in case of Pipenv).
-
-.. _shared_deps:
 
 A note on shared dependencies in a dependency graph
 ===================================================
@@ -187,8 +156,8 @@ figure bellow:
 To satisfy version range specification, the only valid resolution leads to
 ``wheel==0.33.1`` (not considering pre, post releases or release candidates).
 Note that the implementation does not necessarily need to include such version
-(or versions), especially considering the state space sampling and state space
-restrictions in :class:`beam <thoth.adviser.beam.Beam>`. In such cases, it is
-recommended to pin down versions of such packages (as ``wheel`` in the example)
-explicitly as a hint to resolver.  Otherwise resolution might fail. See logs of
-an adviser run to spot such cases.
+(or versions), especially considering ``limit_latest_versions``, state space
+sampling and state space restrictions in beam. In such cases, it is recommended
+to pin down versions of such packages (as ``wheel`` in the example) explicitly
+as a hint to resolver. Otherwise resolution might fail. See logs of an adviser
+run to spot such cases.

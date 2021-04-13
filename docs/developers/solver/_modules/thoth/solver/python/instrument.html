@@ -1,0 +1,349 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.solver.python.instrument &#8212; Thoth Solver 1.7.2 documentation</title>
+    <link rel="stylesheet" href="/assets/solver/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/solver/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="/assets/solver/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/solver/jquery.js"></script>
+    <script type="text/javascript" src="/assets/solver/underscore.js"></script>
+    <script type="text/javascript" src="/assets/solver/doctools.js"></script>
+    <script type="text/javascript" src="/assets/solver/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Solver 1.7.2 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.solver.python.instrument</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-solver</span>
+<span class="c1"># Copyright(C) 2019, 2020 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;Functions which are executed inside virtual environment.</span>
+
+<span class="sd">These functions are used to gather characteristics about installed packages which are analyzed.</span>
+
+<span class="sd">All the functions are executed in a virtualenv - they should print information to stdout, if any error occurs</span>
+<span class="sd">they should print error messages to stderr and call sys.exit with non-zero value. All necessary functions should</span>
+<span class="sd">be either from standard virtualenv packages or from standard library to remove any dependency inference.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">inspect</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">shlex</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="kn">import</span> <span class="n">run_command</span>
+
+<span class="kn">from</span> <span class="nn">.._typing</span> <span class="kn">import</span> <span class="n">MYPY_CHECK_RUNNING</span>
+
+<span class="k">if</span> <span class="n">MYPY_CHECK_RUNNING</span><span class="p">:</span>  <span class="c1"># pragma: no cover</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">List</span>
+
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_find_distribution_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">):</span>  <span class="c1"># type: (str) -&gt; None</span>
+    <span class="sd">&quot;&quot;&quot;Find the given distribution based on package name and print out distribution&#39;s project name.</span>
+
+<span class="sd">    For example, `backports-weakref&#39; has distribution&#39;s project nmae `backports.weakref&#39;. This is also</span>
+<span class="sd">    applicable to all namespace&#39;d packages - we need to find the actual name. based on distribution discovery.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="kn">import</span> <span class="nn">pkg_resources</span>
+    <span class="kn">from</span> <span class="nn">pkg_resources._vendor.packaging.utils</span> <span class="kn">import</span> <span class="n">canonicalize_name</span>
+
+    <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">distribution</span> <span class="ow">in</span> <span class="n">pkg_resources</span><span class="o">.</span><span class="n">find_distributions</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">canonicalize_name</span><span class="p">(</span><span class="n">distribution</span><span class="o">.</span><span class="n">project_name</span><span class="p">)</span> <span class="o">==</span> <span class="n">canonicalize_name</span><span class="p">(</span><span class="n">package_name</span><span class="p">):</span>
+                <span class="nb">print</span><span class="p">(</span><span class="n">distribution</span><span class="o">.</span><span class="n">project_name</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No matching distribution found for &quot;</span><span class="p">,</span> <span class="n">package_name</span><span class="p">,</span> <span class="n">file</span><span class="o">=</span><span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_importlib_metadata_metadata</span><span class="p">(</span><span class="n">package_name</span><span class="p">):</span>  <span class="c1"># type: (str) -&gt; None</span>
+    <span class="sd">&quot;&quot;&quot;Retrieve all the metadata for the given package.&quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">importlib_metadata</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">importlib.metadata</span> <span class="k">as</span> <span class="nn">importlib_metadata</span>  <span class="c1"># type: ignore</span>
+    <span class="kn">import</span> <span class="nn">json</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">importlib_metadata</span><span class="o">.</span><span class="n">metadata</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>  <span class="c1"># type: ignore</span>
+
+    <span class="c1"># As metadata are encoded as email.message, it&#39;s not possible to implicitly expose information about which keys</span>
+    <span class="c1"># keep multiple values and which are single-value. Let&#39;s explicitly maintain a list for metadata keys that</span>
+    <span class="c1"># are arrays:</span>
+    <span class="c1">#    https://packaging.python.org/specifications/core-metadata</span>
+    <span class="n">keys</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+        <span class="p">(</span>
+            <span class="s2">&quot;Platform&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Supported-Platform&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Classifier&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Provides-Dist&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Requires-Dist&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Requires-External&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Project-URL&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Provides-Extra&quot;</span><span class="p">,</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">keys</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">importlib_metadata</span><span class="o">.</span><span class="n">metadata</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span><span class="o">.</span><span class="n">get_all</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">value</span><span class="p">:</span>
+            <span class="c1"># Override the previous one (single value) with array.</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_importlib_metadata_version</span><span class="p">(</span><span class="n">package_name</span><span class="p">):</span>  <span class="c1"># type: (str) -&gt; None</span>
+    <span class="sd">&quot;&quot;&quot;Retrieve version based on the given package.&quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">importlib_metadata</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">importlib.metadata</span> <span class="k">as</span> <span class="nn">importlib_metadata</span>  <span class="c1"># type: ignore</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="n">importlib_metadata</span><span class="o">.</span><span class="n">version</span><span class="p">(</span><span class="n">package_name</span><span class="p">),</span> <span class="n">end</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_importlib_metadata_requires</span><span class="p">(</span><span class="n">package_name</span><span class="p">):</span>  <span class="c1"># type: (str) -&gt; None</span>
+    <span class="sd">&quot;&quot;&quot;Retrieve requires based on the given package.&quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">importlib_metadata</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">importlib.metadata</span> <span class="k">as</span> <span class="nn">importlib_metadata</span>  <span class="c1"># type: ignore</span>
+    <span class="kn">import</span> <span class="nn">json</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">importlib_metadata</span><span class="o">.</span><span class="n">requires</span><span class="p">(</span><span class="n">package_name</span><span class="p">)))</span>  <span class="c1"># type: ignore</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_importlib_metadata_entry_points</span><span class="p">(</span><span class="n">package_name</span><span class="p">):</span>  <span class="c1"># type: (str) -&gt; None</span>
+    <span class="sd">&quot;&quot;&quot;Retrieve information about entry-points for the given package.&quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">importlib_metadata</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">importlib.metadata</span> <span class="k">as</span> <span class="nn">importlib_metadata</span>  <span class="c1"># type: ignore</span>
+    <span class="kn">import</span> <span class="nn">json</span>
+
+    <span class="n">entry_points</span> <span class="o">=</span> <span class="n">importlib_metadata</span><span class="o">.</span><span class="n">distribution</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span><span class="o">.</span><span class="n">entry_points</span>  <span class="c1"># type: ignore</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">([{</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">ep</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">ep</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;group&quot;</span><span class="p">:</span> <span class="n">ep</span><span class="o">.</span><span class="n">group</span><span class="p">}</span> <span class="k">for</span> <span class="n">ep</span> <span class="ow">in</span> <span class="n">entry_points</span><span class="p">]))</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_importlib_metadata_files</span><span class="p">(</span><span class="n">package_name</span><span class="p">):</span>  <span class="c1"># type: (str) -&gt; None</span>
+    <span class="sd">&quot;&quot;&quot;Retrieve information about files present for the given package.&quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">importlib_metadata</span>
+    <span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">importlib.metadata</span> <span class="k">as</span> <span class="nn">importlib_metadata</span>  <span class="c1"># type: ignore</span>
+    <span class="kn">import</span> <span class="nn">json</span>
+
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+            <span class="p">[</span>
+                <span class="p">{</span><span class="s2">&quot;hash&quot;</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">hash</span><span class="o">.</span><span class="vm">__dict__</span> <span class="k">if</span> <span class="n">f</span><span class="o">.</span><span class="n">hash</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;size&quot;</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">f</span><span class="p">)}</span>
+                <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">importlib_metadata</span><span class="o">.</span><span class="n">files</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+            <span class="p">],</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">_get_import_path</span><span class="p">():</span>  <span class="c1"># type: () -&gt; None</span>
+    <span class="sd">&quot;&quot;&quot;Get import path configured for the given Python interpreter.&quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">json</span>
+    <span class="kn">import</span> <span class="nn">sys</span>
+
+    <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">({</span><span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">},</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="execute_env_function"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.python.instrument.execute_env_function">[docs]</a><span class="k">def</span> <span class="nf">execute_env_function</span><span class="p">(</span>
+    <span class="n">python_bin</span><span class="p">,</span>  <span class="c1"># type: str</span>
+    <span class="n">function</span><span class="p">,</span>  <span class="c1"># type: Union[Callable[[Any], None], Callable[[], None]]</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">env</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># type: Optional[Dict[str, str]]</span>
+    <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+    <span class="n">is_json</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># type: bool</span>
+    <span class="o">**</span><span class="n">function_arguments</span><span class="p">,</span>  <span class="c1"># type: Any</span>
+<span class="p">):</span>  <span class="c1"># type: (...) -&gt; Optional[Union[str, Dict[str, Any], List[str]]]</span>
+    <span class="sd">&quot;&quot;&quot;Execute the given function in Python interpreter.&quot;&quot;&quot;</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">argument</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">function_arguments</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">kwargs</span><span class="p">:</span>
+            <span class="n">kwargs</span> <span class="o">+=</span> <span class="s2">&quot;,&quot;</span>
+
+        <span class="n">kwargs</span> <span class="o">+=</span> <span class="n">argument</span> <span class="o">+</span> <span class="s1">&#39;=&quot;&#39;</span> <span class="o">+</span> <span class="n">value</span> <span class="o">+</span> <span class="s1">&#39;&quot;&#39;</span>
+
+    <span class="n">function_source</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">getsource</span><span class="p">(</span><span class="n">function</span><span class="p">)</span>
+    <span class="n">cmd</span> <span class="o">=</span> <span class="n">python_bin</span> <span class="o">+</span> <span class="s2">&quot; -c &quot;</span> <span class="o">+</span> <span class="p">(</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">function_source</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">function</span><span class="o">.</span><span class="vm">__name__</span> <span class="o">+</span> <span class="s2">&quot;(&quot;</span> <span class="o">+</span> <span class="n">kwargs</span> <span class="o">+</span> <span class="s2">&quot;)&quot;</span><span class="p">))</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Executing the following command in Python interpreter (env: </span><span class="si">%r</span><span class="s2">): </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">env</span><span class="p">,</span> <span class="n">cmd</span><span class="p">)</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span> <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">,</span> <span class="n">is_json</span><span class="o">=</span><span class="n">is_json</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;stderr during command execution: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">raise_on_error</span> <span class="ow">and</span> <span class="n">res</span><span class="o">.</span><span class="n">return_code</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Failed to successfully execute function in Python interpreter: </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">res</span><span class="o">.</span><span class="n">stderr</span><span class="p">))</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;stdout during command execution: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">res</span><span class="o">.</span><span class="n">return_code</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">stdout</span> <span class="o">=</span> <span class="n">res</span><span class="o">.</span><span class="n">stdout</span>  <span class="c1"># type: Union[str, Dict[str, Any]]</span>
+        <span class="k">return</span> <span class="n">stdout</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to successfully execute function in Python interpreter: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">res</span><span class="o">.</span><span class="n">stderr</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="get_package_metadata"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.python.instrument.get_package_metadata">[docs]</a><span class="k">def</span> <span class="nf">get_package_metadata</span><span class="p">(</span><span class="n">python_bin</span><span class="p">,</span> <span class="n">package_name</span><span class="p">):</span>
+    <span class="c1"># type: (str, str) -&gt; Dict[str, Any]</span>
+    <span class="sd">&quot;&quot;&quot;Get metadata information from the installed package.&quot;&quot;&quot;</span>
+    <span class="c1"># A simple trick when running importlib_metadata - importlib_metadata is present as</span>
+    <span class="c1"># a dependency of this package, but it is not installed in the created virtual environment.</span>
+    <span class="c1"># Inject the current path to the created environment. Note however, the path configured in</span>
+    <span class="c1"># the virtual environment needs to take precedence.</span>
+    <span class="n">venv_path</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">f</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">execute_env_function</span><span class="p">(</span><span class="n">python_bin</span><span class="p">,</span> <span class="n">_get_import_path</span><span class="p">,</span> <span class="n">is_json</span><span class="o">=</span><span class="kc">True</span><span class="p">)[</span><span class="s2">&quot;path&quot;</span><span class="p">]</span>  <span class="c1"># type: ignore</span>
+        <span class="k">if</span> <span class="n">f</span> <span class="ow">and</span> <span class="n">f</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span>
+    <span class="p">]</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="n">execute_env_function</span><span class="p">(</span>
+            <span class="n">python_bin</span><span class="p">,</span>
+            <span class="n">_get_importlib_metadata_metadata</span><span class="p">,</span>
+            <span class="n">env</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;PYTHONPATH&quot;</span><span class="p">:</span> <span class="s2">&quot;:&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">venv_path</span> <span class="o">+</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">)},</span>
+            <span class="n">is_json</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="s2">&quot;requires&quot;</span><span class="p">:</span> <span class="n">execute_env_function</span><span class="p">(</span>
+            <span class="n">python_bin</span><span class="p">,</span>
+            <span class="n">_get_importlib_metadata_requires</span><span class="p">,</span>
+            <span class="n">env</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;PYTHONPATH&quot;</span><span class="p">:</span> <span class="s2">&quot;:&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">venv_path</span> <span class="o">+</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">)},</span>
+            <span class="n">is_json</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="s2">&quot;entry_points&quot;</span><span class="p">:</span> <span class="n">execute_env_function</span><span class="p">(</span>
+            <span class="n">python_bin</span><span class="p">,</span>
+            <span class="n">_get_importlib_metadata_entry_points</span><span class="p">,</span>
+            <span class="n">env</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;PYTHONPATH&quot;</span><span class="p">:</span> <span class="s2">&quot;:&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">venv_path</span> <span class="o">+</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">)},</span>
+            <span class="n">is_json</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="s2">&quot;files&quot;</span><span class="p">:</span> <span class="n">execute_env_function</span><span class="p">(</span>
+            <span class="n">python_bin</span><span class="p">,</span>
+            <span class="n">_get_importlib_metadata_files</span><span class="p">,</span>
+            <span class="n">env</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;PYTHONPATH&quot;</span><span class="p">:</span> <span class="s2">&quot;:&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">venv_path</span> <span class="o">+</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">)},</span>
+            <span class="n">is_json</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+        <span class="p">),</span>
+        <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">execute_env_function</span><span class="p">(</span>
+            <span class="n">python_bin</span><span class="p">,</span>
+            <span class="n">_get_importlib_metadata_version</span><span class="p">,</span>
+            <span class="n">env</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;PYTHONPATH&quot;</span><span class="p">:</span> <span class="s2">&quot;:&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">venv_path</span> <span class="o">+</span> <span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="p">)},</span>
+            <span class="n">is_json</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+        <span class="p">),</span>
+    <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="find_distribution_name"><a class="viewcode-back" href="../../../../thoth.solver.python.html#thoth.solver.python.instrument.find_distribution_name">[docs]</a><span class="k">def</span> <span class="nf">find_distribution_name</span><span class="p">(</span><span class="n">python_bin</span><span class="p">,</span> <span class="n">package_name</span><span class="p">):</span>  <span class="c1"># type: (str, str) -&gt; str</span>
+    <span class="sd">&quot;&quot;&quot;Find distribution name based on the package name.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">execute_env_function</span><span class="p">(</span><span class="n">python_bin</span><span class="p">,</span> <span class="n">_find_distribution_name</span><span class="p">,</span> <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation index</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-123174547-1"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+
+        function gtag() {
+            dataLayer.push(arguments);
+        }
+        gtag('js', new Date());
+
+        gtag('config', 'UA-123174547-1');
+    </script>
+
+  </body>
+</html>
