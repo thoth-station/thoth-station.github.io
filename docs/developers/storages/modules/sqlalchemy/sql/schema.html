@@ -4,14 +4,14 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>sqlalchemy.sql.schema &#8212; Thoth Storages 0.25.8 documentation</title>
-    <link rel="stylesheet" href="/assets/nameko.css" type="text/css" />
-    <link rel="stylesheet" href="/assets/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/documentation_options.js"></script>
-    <script type="text/javascript" src="/assets/jquery.js"></script>
-    <script type="text/javascript" src="/assets/underscore.js"></script>
-    <script type="text/javascript" src="/assets/doctools.js"></script>
-    <script type="text/javascript" src="/assets/language_data.js"></script>
+    <title>sqlalchemy.sql.schema &#8212; Thoth Storages 0.40.0 documentation</title>
+    <link rel="stylesheet" href="/assets/storages/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/storages/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/storages/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/storages/jquery.js"></script>
+    <script type="text/javascript" src="/assets/storages/underscore.js"></script>
+    <script type="text/javascript" src="/assets/storages/doctools.js"></script>
+    <script type="text/javascript" src="/assets/storages/language_data.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
 
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Storages 0.25.8 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Storages 0.40.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -51,7 +51,7 @@
             
   <h1>Source code for sqlalchemy.sql.schema</h1><div class="highlight"><pre>
 <span></span><span class="c1"># sql/schema.py</span>
-<span class="c1"># Copyright (C) 2005-2020 the SQLAlchemy authors and contributors</span>
+<span class="c1"># Copyright (C) 2005-2021 the SQLAlchemy authors and contributors</span>
 <span class="c1"># &lt;see AUTHORS file&gt;</span>
 <span class="c1">#</span>
 <span class="c1"># This module is part of SQLAlchemy and is released under</span>
@@ -132,6 +132,9 @@
 <span class="c1"># this should really be in sql/util.py but we&#39;d have to</span>
 <span class="c1"># break an import cycle</span>
 <span class="k">def</span> <span class="nf">_copy_expression</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">source_table</span><span class="p">,</span> <span class="n">target_table</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">source_table</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">target_table</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">expression</span>
+
     <span class="k">def</span> <span class="nf">replace</span><span class="p">(</span><span class="n">col</span><span class="p">):</span>
         <span class="k">if</span> <span class="p">(</span>
             <span class="nb">isinstance</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="n">Column</span><span class="p">)</span>
@@ -927,9 +930,7 @@
         <span class="s2">&quot;:class:`.DDLEvents`.&quot;</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="k">def</span> <span class="nf">append_ddl_listener</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="n">listener</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Append a DDL event listener to this ``Table``.</span>
-
-<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Append a DDL event listener to this ``Table``.&quot;&quot;&quot;</span>
 
         <span class="k">def</span> <span class="nf">adapt_listener</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">connection</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
             <span class="n">listener</span><span class="p">(</span><span class="n">event_name</span><span class="p">,</span> <span class="n">target</span><span class="p">,</span> <span class="n">connection</span><span class="p">)</span>
@@ -1306,11 +1307,57 @@
 <span class="sd">            application, including ORM attribute mapping; the ``name`` field</span>
 <span class="sd">            is used only when rendering SQL.</span>
 
-<span class="sd">        :param index: When ``True``, indicates that the column is indexed.</span>
-<span class="sd">            This is a shortcut for using a :class:`.Index` construct on the</span>
-<span class="sd">            table. To specify indexes with explicit names or indexes that</span>
-<span class="sd">            contain multiple columns, use the :class:`.Index` construct</span>
-<span class="sd">            instead.</span>
+<span class="sd">        :param index: When ``True``, indicates that a :class:`_schema.Index`</span>
+<span class="sd">            construct will be automatically generated for this</span>
+<span class="sd">            :class:`_schema.Column`, which will result in a &quot;CREATE INDEX&quot;</span>
+<span class="sd">            statement being emitted for the :class:`_schema.Table` when the DDL</span>
+<span class="sd">            create operation is invoked.</span>
+
+<span class="sd">            Using this flag is equivalent to making use of the</span>
+<span class="sd">            :class:`_schema.Index` construct explicitly at the level of the</span>
+<span class="sd">            :class:`_schema.Table` construct itself::</span>
+
+<span class="sd">                Table(</span>
+<span class="sd">                    &quot;some_table&quot;,</span>
+<span class="sd">                    metadata,</span>
+<span class="sd">                    Column(&quot;x&quot;, Integer),</span>
+<span class="sd">                    Index(&quot;ix_some_table_x&quot;, &quot;x&quot;)</span>
+<span class="sd">                )</span>
+
+<span class="sd">            To add the :paramref:`_schema.Index.unique` flag to the</span>
+<span class="sd">            :class:`_schema.Index`, set both the</span>
+<span class="sd">            :paramref:`_schema.Column.unique` and</span>
+<span class="sd">            :paramref:`_schema.Column.index` flags to True simultaneously,</span>
+<span class="sd">            which will have the effect of rendering the &quot;CREATE UNIQUE INDEX&quot;</span>
+<span class="sd">            DDL instruction instead of &quot;CREATE INDEX&quot;.</span>
+
+<span class="sd">            The name of the index is generated using the</span>
+<span class="sd">            :ref:`default naming convention &lt;constraint_default_naming_convention&gt;`</span>
+<span class="sd">            which for the :class:`_schema.Index` construct is of the form</span>
+<span class="sd">            ``ix_&lt;tablename&gt;_&lt;columnname&gt;``.</span>
+
+<span class="sd">            As this flag is intended only as a convenience for the common case</span>
+<span class="sd">            of adding a single-column, default configured index to a table</span>
+<span class="sd">            definition, explicit use of the :class:`_schema.Index` construct</span>
+<span class="sd">            should be preferred for most use cases, including composite indexes</span>
+<span class="sd">            that encompass more than one column, indexes with SQL expressions</span>
+<span class="sd">            or ordering, backend-specific index configuration options, and</span>
+<span class="sd">            indexes that use a specific name.</span>
+
+<span class="sd">            .. note:: the :attr:`_schema.Column.index` attribute on</span>
+<span class="sd">               :class:`_schema.Column`</span>
+<span class="sd">               **does not indicate** if this column is indexed or not, only</span>
+<span class="sd">               if this flag was explicitly set here.  To view indexes on</span>
+<span class="sd">               a column, view the :attr:`_schema.Table.indexes` collection</span>
+<span class="sd">               or use :meth:`_reflection.Inspector.get_indexes`.</span>
+
+<span class="sd">            .. seealso::</span>
+
+<span class="sd">                :ref:`schema_indexes`</span>
+
+<span class="sd">                :ref:`constraint_naming_conventions`</span>
+
+<span class="sd">                :paramref:`_schema.Column.unique`</span>
 
 <span class="sd">        :param info: Optional data dictionary which will be populated into the</span>
 <span class="sd">            :attr:`.SchemaItem.info` attribute of this object.</span>
@@ -1400,12 +1447,67 @@
 <span class="sd">             reserved word. This flag is only needed to force quoting of a</span>
 <span class="sd">             reserved word which is not known by the SQLAlchemy dialect.</span>
 
-<span class="sd">        :param unique: When ``True``, indicates that this column contains a</span>
-<span class="sd">             unique constraint, or if ``index`` is ``True`` as well, indicates</span>
-<span class="sd">             that the :class:`.Index` should be created with the unique flag.</span>
-<span class="sd">             To specify multiple columns in the constraint/index or to specify</span>
-<span class="sd">             an explicit name, use the :class:`.UniqueConstraint` or</span>
-<span class="sd">             :class:`.Index` constructs explicitly.</span>
+<span class="sd">        :param unique: When ``True``, and the :paramref:`_schema.Column.index`</span>
+<span class="sd">            parameter is left at its default value of ``False``,</span>
+<span class="sd">            indicates that a :class:`_schema.UniqueConstraint`</span>
+<span class="sd">            construct will be automatically generated for this</span>
+<span class="sd">            :class:`_schema.Column`,</span>
+<span class="sd">            which will result in a &quot;UNIQUE CONSTRAINT&quot; clause referring</span>
+<span class="sd">            to this column being included</span>
+<span class="sd">            in the ``CREATE TABLE`` statement emitted, when the DDL create</span>
+<span class="sd">            operation for the :class:`_schema.Table` object is invoked.</span>
+
+<span class="sd">            When this flag is ``True`` while the</span>
+<span class="sd">            :paramref:`_schema.Column.index` parameter is simultaneously</span>
+<span class="sd">            set to ``True``, the effect instead is that a</span>
+<span class="sd">            :class:`_schema.Index` construct which includes the</span>
+<span class="sd">            :paramref:`_schema.Index.unique` parameter set to ``True``</span>
+<span class="sd">            is generated.  See the documentation for</span>
+<span class="sd">            :paramref:`_schema.Column.index` for additional detail.</span>
+
+<span class="sd">            Using this flag is equivalent to making use of the</span>
+<span class="sd">            :class:`_schema.UniqueConstraint` construct explicitly at the</span>
+<span class="sd">            level of the :class:`_schema.Table` construct itself::</span>
+
+<span class="sd">                Table(</span>
+<span class="sd">                    &quot;some_table&quot;,</span>
+<span class="sd">                    metadata,</span>
+<span class="sd">                    Column(&quot;x&quot;, Integer),</span>
+<span class="sd">                    UniqueConstraint(&quot;x&quot;)</span>
+<span class="sd">                )</span>
+
+<span class="sd">            The :paramref:`_schema.UniqueConstraint.name` parameter</span>
+<span class="sd">            of the unique constraint object is left at its default value</span>
+<span class="sd">            of ``None``; in the absence of a :ref:`naming convention &lt;constraint_naming_conventions&gt;`</span>
+<span class="sd">            for the enclosing :class:`_schema.MetaData`, the UNIQUE CONSTRAINT</span>
+<span class="sd">            construct will be emitted as unnamed, which typically invokes</span>
+<span class="sd">            a database-specific naming convention to take place.</span>
+
+<span class="sd">            As this flag is intended only as a convenience for the common case</span>
+<span class="sd">            of adding a single-column, default configured unique constraint to a table</span>
+<span class="sd">            definition, explicit use of the :class:`_schema.UniqueConstraint` construct</span>
+<span class="sd">            should be preferred for most use cases, including composite constraints</span>
+<span class="sd">            that encompass more than one column, backend-specific index configuration options, and</span>
+<span class="sd">            constraints that use a specific name.</span>
+
+<span class="sd">            .. note:: the :attr:`_schema.Column.unique` attribute on</span>
+<span class="sd">                :class:`_schema.Column`</span>
+<span class="sd">                **does not indicate** if this column has a unique constraint or</span>
+<span class="sd">                not, only if this flag was explicitly set here.  To view</span>
+<span class="sd">                indexes and unique constraints that may involve this column,</span>
+<span class="sd">                view the</span>
+<span class="sd">                :attr:`_schema.Table.indexes` and/or</span>
+<span class="sd">                :attr:`_schema.Table.constraints` collections or use</span>
+<span class="sd">                :meth:`_reflection.Inspector.get_indexes` and/or</span>
+<span class="sd">                :meth:`_reflection.Inspector.get_unique_constraints`</span>
+
+<span class="sd">            .. seealso::</span>
+
+<span class="sd">                :ref:`schema_unique_constraint`</span>
+
+<span class="sd">                :ref:`constraint_naming_conventions`</span>
+
+<span class="sd">                :paramref:`_schema.Column.index`</span>
 
 <span class="sd">        :param system: When ``True``, indicates this is a &quot;system&quot; column,</span>
 <span class="sd">             that is a column which is automatically made available by the</span>
@@ -1424,7 +1526,7 @@
 <span class="sd">                parameter to :class:`_schema.Column`.</span>
 
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>  <span class="c1"># noqa E501</span>
 
         <span class="n">name</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">type_</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;type_&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
@@ -1615,6 +1717,8 @@
 
         <span class="n">table</span><span class="o">.</span><span class="n">_columns</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
 
+        <span class="bp">self</span><span class="o">.</span><span class="n">table</span> <span class="o">=</span> <span class="n">table</span>
+
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">primary_key</span><span class="p">:</span>
             <span class="n">table</span><span class="o">.</span><span class="n">primary_key</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">key</span> <span class="ow">in</span> <span class="n">table</span><span class="o">.</span><span class="n">primary_key</span><span class="p">:</span>
@@ -1623,8 +1727,6 @@
                 <span class="s2">&quot;non-primary-key column on table &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span>
                 <span class="o">%</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">key</span><span class="p">,</span> <span class="n">table</span><span class="o">.</span><span class="n">fullname</span><span class="p">)</span>
             <span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">table</span> <span class="o">=</span> <span class="n">table</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">:</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">index</span><span class="p">,</span> <span class="n">util</span><span class="o">.</span><span class="n">string_types</span><span class="p">):</span>
@@ -2867,8 +2969,7 @@
     <span class="s2">&quot;future release.  Please refer to :class:`.DefaultClause`.&quot;</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">class</span> <span class="nc">PassiveDefault</span><span class="p">(</span><span class="n">DefaultClause</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;A DDL-specified DEFAULT column value.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot;A DDL-specified DEFAULT column value.&quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">arg</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
         <span class="n">DefaultClause</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">arg</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">)</span>
@@ -3126,7 +3227,7 @@
     <span class="k">def</span> <span class="fm">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">columns</span>
 
-    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_table</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
         <span class="c1"># ticket #5276</span>
         <span class="n">constraint_kwargs</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="k">for</span> <span class="n">dialect_name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">dialect_options</span><span class="p">:</span>
@@ -3143,7 +3244,10 @@
             <span class="n">name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
             <span class="n">deferrable</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">deferrable</span><span class="p">,</span>
             <span class="n">initially</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">initially</span><span class="p">,</span>
-            <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span>
+            <span class="o">*</span><span class="p">[</span>
+                <span class="n">_copy_expression</span><span class="p">(</span><span class="n">expr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">target_table</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">expr</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">columns</span>
+            <span class="p">],</span>
             <span class="o">**</span><span class="n">constraint_kwargs</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema_item_copy</span><span class="p">(</span><span class="n">c</span><span class="p">)</span>
@@ -3254,6 +3358,9 @@
 
     <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_table</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">target_table</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># note that target_table is None for the copy process of</span>
+            <span class="c1"># a column-bound CheckConstraint, so this path is not reached</span>
+            <span class="c1"># in that case.</span>
             <span class="n">sqltext</span> <span class="o">=</span> <span class="n">_copy_expression</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sqltext</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="p">,</span> <span class="n">target_table</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">sqltext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sqltext</span>
@@ -3692,7 +3799,6 @@
 <span class="sd">        are already present.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-
         <span class="c1"># set the primary key flag on new columns.</span>
         <span class="c1"># note any existing PK cols on the table also have their</span>
         <span class="c1"># flag still set.</span>
@@ -3707,6 +3813,8 @@
     <span class="k">def</span> <span class="nf">_replace</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col</span><span class="p">):</span>
         <span class="n">PrimaryKeyConstraint</span><span class="o">.</span><span class="n">_autoincrement_column</span><span class="o">.</span><span class="n">_reset</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">columns</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">dispatch</span><span class="o">.</span><span class="n">_sa_event_column_added_to_pk_constraint</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">columns_autoinc_first</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -3750,10 +3858,14 @@
             <span class="k">if</span> <span class="n">col</span><span class="o">.</span><span class="n">autoincrement</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
                 <span class="n">_validate_autoinc</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
                 <span class="k">return</span> <span class="n">col</span>
-            <span class="k">elif</span> <span class="n">col</span><span class="o">.</span><span class="n">autoincrement</span> <span class="ow">in</span> <span class="p">(</span>
-                <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;ignore_fk&quot;</span><span class="p">,</span>
-            <span class="p">)</span> <span class="ow">and</span> <span class="n">_validate_autoinc</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="k">elif</span> <span class="p">(</span>
+                <span class="n">col</span><span class="o">.</span><span class="n">autoincrement</span>
+                <span class="ow">in</span> <span class="p">(</span>
+                    <span class="s2">&quot;auto&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;ignore_fk&quot;</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="ow">and</span> <span class="n">_validate_autoinc</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+            <span class="p">):</span>
                 <span class="k">return</span> <span class="n">col</span>
 
         <span class="k">else</span><span class="p">:</span>
@@ -4571,10 +4683,7 @@
         <span class="s2">&quot;:class:`.DDLEvents`.&quot;</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="k">def</span> <span class="nf">append_ddl_listener</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event_name</span><span class="p">,</span> <span class="n">listener</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;Append a DDL event listener to this ``MetaData``.</span>
-
-
-<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="sd">&quot;&quot;&quot;Append a DDL event listener to this ``MetaData``.&quot;&quot;&quot;</span>
 
         <span class="k">def</span> <span class="nf">adapt_listener</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">connection</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
             <span class="n">tables</span> <span class="o">=</span> <span class="n">kw</span><span class="p">[</span><span class="s2">&quot;tables&quot;</span><span class="p">]</span>
@@ -4833,10 +4942,11 @@
         <span class="k">return</span> <span class="bp">self</span>
 
     <span class="k">def</span> <span class="nf">copy</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_table</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kw</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">target_table</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">sqltext</span> <span class="o">=</span> <span class="n">_copy_expression</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">sqltext</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="p">,</span> <span class="n">target_table</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">sqltext</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sqltext</span>
+        <span class="n">sqltext</span> <span class="o">=</span> <span class="n">_copy_expression</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">sqltext</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">column</span><span class="o">.</span><span class="n">table</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">column</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">target_table</span><span class="p">,</span>
+        <span class="p">)</span>
         <span class="n">g</span> <span class="o">=</span> <span class="n">Computed</span><span class="p">(</span><span class="n">sqltext</span><span class="p">,</span> <span class="n">persisted</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">persisted</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schema_item_copy</span><span class="p">(</span><span class="n">g</span><span class="p">)</span>

@@ -70,10 +70,9 @@
 
 <span class="sd">&quot;&quot;&quot;Helper functions for using confluent kafka producer with thoth.messaging.&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">attr</span> <span class="kn">import</span> <span class="n">asdict</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span>
-<span class="kn">from</span> <span class="nn">json</span> <span class="kn">import</span> <span class="n">dumps</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Union</span>
 <span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">json</span>
 
 <span class="kn">from</span> <span class="nn">.config</span> <span class="kn">import</span> <span class="n">kafka_config_from_env</span>
 <span class="kn">from</span> <span class="nn">.message_base</span> <span class="kn">import</span> <span class="n">MessageBase</span><span class="p">,</span> <span class="n">BaseMessageContents</span>
@@ -90,10 +89,47 @@
     <span class="k">return</span> <span class="n">Producer</span><span class="p">(</span><span class="n">kafka_config_from_env</span><span class="p">())</span></div>
 
 
-<div class="viewcode-block" id="publish_to_topic"><a class="viewcode-back" href="../../../thoth.messaging.html#thoth.messaging.producer.publish_to_topic">[docs]</a><span class="k">def</span> <span class="nf">publish_to_topic</span><span class="p">(</span><span class="n">producer</span><span class="p">:</span> <span class="n">Producer</span><span class="p">,</span> <span class="n">message_type</span><span class="p">:</span> <span class="n">MessageBase</span><span class="p">,</span> <span class="n">message_contents</span><span class="p">:</span> <span class="n">BaseMessageContents</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Publish to topic using message contents class.&quot;&quot;&quot;</span>
-    <span class="n">producer</span><span class="o">.</span><span class="n">produce</span><span class="p">(</span><span class="n">message_type</span><span class="o">.</span><span class="n">topic_name</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">dumps</span><span class="p">(</span><span class="n">asdict</span><span class="p">(</span><span class="n">message_contents</span><span class="p">))</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Sending the following message to topic </span><span class="si">%s</span><span class="s2">.</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">message_type</span><span class="o">.</span><span class="n">topic_name</span><span class="p">,</span> <span class="n">asdict</span><span class="p">(</span><span class="n">message_contents</span><span class="p">))</span></div>
+<div class="viewcode-block" id="publish_to_topic"><a class="viewcode-back" href="../../../thoth.messaging.html#thoth.messaging.producer.publish_to_topic">[docs]</a><span class="k">def</span> <span class="nf">publish_to_topic</span><span class="p">(</span>
+    <span class="n">producer</span><span class="p">:</span> <span class="n">Producer</span><span class="p">,</span>
+    <span class="n">message_type</span><span class="p">:</span> <span class="n">MessageBase</span><span class="p">,</span>
+    <span class="n">message_contents</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">BaseMessageContents</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+    <span class="n">validate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Publish to topic using message contents class.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    producer : Producer</span>
+<span class="sd">        Instance of confluent Kafka producer which handles sending the message to Kafka instance</span>
+<span class="sd">    message_type : MessageBase</span>
+<span class="sd">        Message type which determines the schema of the message as well as the topic name to produce to</span>
+<span class="sd">    message_contents : Union[BaseMessageContents, Dict[str, Any]]</span>
+<span class="sd">        Message to be sent. A dict is parsed on messaging side to `message_type.model`.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    None</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValidationError</span>
+<span class="sd">        When pydantic detects ill formed message</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">validate</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">message_contents</span><span class="p">)</span> <span class="o">==</span> <span class="nb">dict</span><span class="p">:</span>
+            <span class="n">contents</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">message_contents</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">contents</span> <span class="o">=</span> <span class="n">message_contents</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">message_contents</span><span class="p">)</span> <span class="o">==</span> <span class="nb">dict</span><span class="p">:</span>
+            <span class="n">contents</span> <span class="o">=</span> <span class="n">message_type</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">parse_obj</span><span class="p">(</span><span class="n">message_contents</span><span class="p">)</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">message_type</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">validate</span><span class="p">(</span><span class="n">message_contents</span><span class="p">)</span>
+            <span class="n">contents</span> <span class="o">=</span> <span class="n">message_contents</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>  <span class="c1"># type: ignore</span>
+
+    <span class="n">producer</span><span class="o">.</span><span class="n">produce</span><span class="p">(</span><span class="n">message_type</span><span class="o">.</span><span class="n">topic_name</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">contents</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Sending the following message to topic </span><span class="si">%s</span><span class="s2">.</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">message_type</span><span class="o">.</span><span class="n">topic_name</span><span class="p">,</span> <span class="n">contents</span><span class="p">)</span></div>
 </pre></div>
 
           </div>

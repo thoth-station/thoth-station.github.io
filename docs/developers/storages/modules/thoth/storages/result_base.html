@@ -4,14 +4,14 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.result_base &#8212; Thoth Storages 0.25.8 documentation</title>
-    <link rel="stylesheet" href="/assets/nameko.css" type="text/css" />
-    <link rel="stylesheet" href="/assets/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/documentation_options.js"></script>
-    <script type="text/javascript" src="/assets/jquery.js"></script>
-    <script type="text/javascript" src="/assets/underscore.js"></script>
-    <script type="text/javascript" src="/assets/doctools.js"></script>
-    <script type="text/javascript" src="/assets/language_data.js"></script>
+    <title>thoth.storages.result_base &#8212; Thoth Storages 0.40.0 documentation</title>
+    <link rel="stylesheet" href="/assets/storages/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/storages/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/storages/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/storages/jquery.js"></script>
+    <script type="text/javascript" src="/assets/storages/underscore.js"></script>
+    <script type="text/javascript" src="/assets/storages/doctools.js"></script>
+    <script type="text/javascript" src="/assets/storages/language_data.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
 
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Storages 0.25.8 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Storages 0.40.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -71,6 +71,8 @@
 
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">typing</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">date</span>
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">timedelta</span>
 
 <span class="kn">from</span> <span class="nn">.base</span> <span class="kn">import</span> <span class="n">StorageBase</span>
 <span class="kn">from</span> <span class="nn">.ceph</span> <span class="kn">import</span> <span class="n">CephStore</span>
@@ -136,13 +138,46 @@
         <span class="sd">&quot;&quot;&quot;Connect the given storage adapter.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="ResultStorageBase.get_document_listing"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.get_document_listing">[docs]</a>    <span class="k">def</span> <span class="nf">get_document_listing</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Get listing of documents available in Ceph as a generator.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">()</span></div>
+    <span class="k">def</span> <span class="nf">_iter_dates_prefix_addition</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">start_date</span><span class="p">:</span> <span class="n">date</span><span class="p">,</span> <span class="n">end_date</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Create prefix based on dates supplied.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">end_date</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">end_date</span> <span class="o">=</span> <span class="n">date</span><span class="o">.</span><span class="n">today</span><span class="p">()</span> <span class="o">+</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># Today inclusively.</span>
+        <span class="k">elif</span> <span class="n">end_date</span> <span class="o">&lt;=</span> <span class="n">start_date</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;end_date cannot precede or equal to start_date&quot;</span><span class="p">)</span>
 
-<div class="viewcode-block" id="ResultStorageBase.get_document_count"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.get_document_count">[docs]</a>    <span class="k">def</span> <span class="nf">get_document_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="n">walker</span> <span class="o">=</span> <span class="n">start_date</span>
+        <span class="n">step</span> <span class="o">=</span> <span class="n">timedelta</span><span class="p">(</span><span class="n">days</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">while</span> <span class="n">walker</span> <span class="o">&lt;</span> <span class="n">end_date</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">walker</span><span class="o">.</span><span class="n">strftime</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">RESULT_TYPE</span><span class="si">}</span><span class="s2">-%y%m%d&quot;</span><span class="p">)</span>
+            <span class="n">walker</span> <span class="o">+=</span> <span class="n">step</span>
+
+<div class="viewcode-block" id="ResultStorageBase.get_document_listing"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.get_document_listing">[docs]</a>    <span class="k">def</span> <span class="nf">get_document_listing</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">start_date</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">end_date</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get listing of documents available in Ceph as a generator.</span>
+
+<span class="sd">        Additional parameters can filter results. If start_date is supplied</span>
+<span class="sd">        and no end_date is supplied explicitly, the current date is</span>
+<span class="sd">        considered as end_date (inclusively).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">start_date</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">prefix_addition</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iter_dates_prefix_addition</span><span class="p">(</span><span class="n">start_date</span><span class="o">=</span><span class="n">start_date</span><span class="p">,</span> <span class="n">end_date</span><span class="o">=</span><span class="n">end_date</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">(</span><span class="n">prefix_addition</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">document_id</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.request&quot;</span><span class="p">):</span>
+                        <span class="k">yield</span> <span class="n">document_id</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+                <span class="c1"># Filter out stored requests.</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">document_id</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.request&quot;</span><span class="p">):</span>
+                    <span class="k">yield</span> <span class="n">document_id</span></div>
+
+<div class="viewcode-block" id="ResultStorageBase.get_document_count"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.get_document_count">[docs]</a>    <span class="k">def</span> <span class="nf">get_document_count</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">start_date</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">end_date</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get number of documents present.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">()))</span></div>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">(</span><span class="n">start_date</span><span class="o">=</span><span class="n">start_date</span><span class="p">,</span> <span class="n">end_date</span><span class="o">=</span><span class="n">end_date</span><span class="p">))</span></div>
 
 <div class="viewcode-block" id="ResultStorageBase.store_document"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.store_document">[docs]</a>    <span class="k">def</span> <span class="nf">store_document</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Store the given document in Ceph.&quot;&quot;&quot;</span>
@@ -156,6 +191,23 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">store_document</span><span class="p">(</span><span class="n">document</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">document_id</span></div>
 
+<div class="viewcode-block" id="ResultStorageBase.store_request"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.store_request">[docs]</a>    <span class="k">def</span> <span class="nf">store_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">request</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Store the given request.</span>
+
+<span class="sd">        This function stores a request document for user request traceability.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">document_id</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">document_id</span><span class="si">}</span><span class="s2">.request&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">store_document</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">document_id</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">document_id</span></div>
+
+<div class="viewcode-block" id="ResultStorageBase.retrieve_request"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.retrieve_request">[docs]</a>    <span class="k">def</span> <span class="nf">retrieve_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Retrieve document capturing requests.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">document_id</span><span class="si">}</span><span class="s2">.request&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="ResultStorageBase.request_exists"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.request_exists">[docs]</a>    <span class="k">def</span> <span class="nf">request_exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if a request exists for the given document id.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">document_exists</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">document_id</span><span class="si">}</span><span class="s2">.request&quot;</span><span class="p">)</span></div>
+
 <div class="viewcode-block" id="ResultStorageBase.store_file"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.store_file">[docs]</a>    <span class="k">def</span> <span class="nf">store_file</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">file_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">file_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Store the given file in Ceph.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">store_file</span><span class="p">(</span><span class="n">file_path</span><span class="p">,</span> <span class="n">file_id</span><span class="p">)</span>
@@ -165,9 +217,20 @@
         <span class="sd">&quot;&quot;&quot;Retrieve a document from Ceph by its id.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">retrieve_document</span><span class="p">(</span><span class="n">document_id</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="ResultStorageBase.iterate_results"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.iterate_results">[docs]</a>    <span class="k">def</span> <span class="nf">iterate_results</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Generator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Iterate over results available in the Ceph.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">iterate_results</span><span class="p">()</span></div>
+<div class="viewcode-block" id="ResultStorageBase.iterate_results"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.iterate_results">[docs]</a>    <span class="k">def</span> <span class="nf">iterate_results</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">start_date</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">end_date</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Generator</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Iterate over results available in the Ceph.</span>
+
+<span class="sd">        Additional parameters can filter results. If start_date is supplied</span>
+<span class="sd">        and no end_date is supplied explicitly, the current date is</span>
+<span class="sd">        considered as end_date (inclusively).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">start_date</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">prefix_addition</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iter_dates_prefix_addition</span><span class="p">(</span><span class="n">start_date</span><span class="o">=</span><span class="n">start_date</span><span class="p">,</span> <span class="n">end_date</span><span class="o">=</span><span class="n">end_date</span><span class="p">):</span>
+                <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">iterate_results</span><span class="p">(</span><span class="n">prefix_addition</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">yield from</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">iterate_results</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="ResultStorageBase.document_exists"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.result_base.ResultStorageBase.document_exists">[docs]</a>    <span class="k">def</span> <span class="nf">document_exists</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Check if the there is an object with the given key in bucket.&quot;&quot;&quot;</span>
