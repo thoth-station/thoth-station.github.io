@@ -25,15 +25,15 @@ very likely to happen).
 ## Performance recommendation type
 
 The second recommendation type will address recommendations to gain performance
-in  applications (especially AI/ML applications). The resulted software stack
+in applications (especially AI/ML applications). The resulted software stack
 is addressing performance quality as much as possible, other aspects (such as
 security) will be ignored.
 
 ## Security recommendation type
 
 Security-based recommendation types are suitable for applications that should
-not be prone to security issues. This can result in loss of other aspects of
-the software quality, such as performnace.
+not be prone to security issues. This can result in the loss of other aspects of
+the software quality, such as performance.
 
 ## Stable recommendation type
 
