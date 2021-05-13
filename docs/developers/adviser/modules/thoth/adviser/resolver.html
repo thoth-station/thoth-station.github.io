@@ -318,12 +318,6 @@
                 <span class="n">boot</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
             <span class="k">except</span> <span class="n">NotAcceptable</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
                 <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Boot pipeline unit </span><span class="si">{</span><span class="n">boot</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">()</span><span class="si">!r}</span><span class="s2"> failed: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-                    <span class="p">{</span>
-                        <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">msg</span><span class="p">,</span>
-                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span>
-                    <span class="p">}</span>
-                <span class="p">)</span>
                 <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">stack_info</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="p">)</span>
             <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="n">BootError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to run pipeline boot </span><span class="si">{</span><span class="n">boot</span><span class="o">.</span><span class="n">get_unit_name</span><span class="p">()</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
@@ -739,9 +733,13 @@
             <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">unresolved</span><span class="p">:</span>
-            <span class="n">error_msg</span> <span class="o">=</span> <span class="s2">&quot;Resolver failed as it was unable to resolve direct dependencies&quot;</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">error_msg</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span> <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;unresolved&quot;</span><span class="p">)})</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">error_msg</span><span class="p">,</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;unresolved&quot;</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">dep</span> <span class="ow">in</span> <span class="n">unresolved</span><span class="p">:</span>
+                <span class="n">error_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Resolver failed as it was unable to resolve direct dependency </span><span class="si">{</span><span class="n">dep</span><span class="si">!r}</span><span class="s2">&quot;</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span><span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">error_msg</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span> <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;unresolved&quot;</span><span class="p">),</span> <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">dep</span><span class="p">}</span>
+                <span class="p">)</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">error_msg</span><span class="p">,</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;unresolved&quot;</span><span class="p">))</span>
+
             <span class="k">raise</span> <span class="n">UnresolvedDependencies</span><span class="p">(</span>
                 <span class="s2">&quot;Unable to resolve all direct dependencies&quot;</span><span class="p">,</span> <span class="n">unresolved</span><span class="o">=</span><span class="n">unresolved</span><span class="p">,</span> <span class="n">stack_info</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span>
             <span class="p">)</span>
@@ -804,6 +802,17 @@
             <span class="c1"># should occur rarely so it&#39;s more efficient to do it this way instead of creating a swallow copy of</span>
             <span class="c1"># dict during iteration.</span>
             <span class="n">direct_dependencies</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">direct_dependency_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">direct_dependencies</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Cannot satisfy direct dependencies: all direct dependencies were filtered by sieves&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">msg</span><span class="p">,</span>
+                    <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;unresolved&quot;</span><span class="p">),</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+            <span class="k">raise</span> <span class="n">CannotProduceStack</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="n">stack_info</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="p">)</span>
 
         <span class="c1"># Create an initial state which is made out of all the direct dependencies (kept as unresolved) in</span>
         <span class="c1"># resolved versions.</span>
