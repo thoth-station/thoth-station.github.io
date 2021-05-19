@@ -102,6 +102,7 @@
 <span class="kn">from</span> <span class="nn">sqlalchemy.orm</span> <span class="kn">import</span> <span class="n">sessionmaker</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy.orm.session</span> <span class="kn">import</span> <span class="n">Session</span>
 <span class="kn">from</span> <span class="nn">sqlalchemy.dialects.postgresql</span> <span class="kn">import</span> <span class="n">insert</span>
+<span class="kn">from</span> <span class="nn">sqlalchemy.orm.exc</span> <span class="kn">import</span> <span class="n">NoResultFound</span>
 
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Pipfile</span>
@@ -121,7 +122,6 @@
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">ExternalHardwareInformation</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">ExternalPythonRequirements</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">ExternalPythonRequirementsLock</span>
-<span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">ExternalPythonSoftwareStack</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">ExternalSoftwareEnvironment</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">HardwareInformation</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">InspectionRun</span>
@@ -3914,6 +3914,39 @@
                     <span class="p">)</span>
                     <span class="k">return</span> <span class="n">entity</span><span class="p">,</span> <span class="n">existed</span></div>
 
+    <span class="k">def</span> <span class="nf">_delete_python_package_version</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">package_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">index_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">os_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">os_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">python_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Delete the given package-version entry.&quot;&quot;&quot;</span>
+        <span class="c1"># We use join so raw delete() cannot be used.</span>
+        <span class="n">deleted_count</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">pv_id</span> <span class="ow">in</span> <span class="p">(</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+                    <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">,</span>
+                    <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">package_version</span> <span class="o">==</span> <span class="n">package_version</span><span class="p">,</span>
+                    <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">os_name</span> <span class="o">==</span> <span class="n">os_name</span><span class="p">,</span>
+                    <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">os_version</span> <span class="o">==</span> <span class="n">os_version</span><span class="p">,</span>
+                    <span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">python_version</span> <span class="o">==</span> <span class="n">python_version</span><span class="p">,</span>
+                    <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">index_url</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="o">.</span><span class="n">with_entities</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+                <span class="o">.</span><span class="n">all</span><span class="p">()</span>
+            <span class="p">):</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="p">)</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageVersion</span><span class="o">.</span><span class="n">id</span> <span class="o">==</span> <span class="n">pv_id</span><span class="p">)</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+                <span class="n">deleted_count</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">deleted_count</span>
+
     <span class="k">def</span> <span class="nf">_create_python_package_version</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">,</span>
@@ -5084,7 +5117,7 @@
                 <span class="n">python_package_version_id</span><span class="o">=</span><span class="n">python_package_version_id</span><span class="p">,</span>
             <span class="p">)</span></div>
 
-<div class="viewcode-block" id="GraphDatabase.sync_solver_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.sync_solver_result">[docs]</a>    <span class="k">def</span> <span class="nf">sync_solver_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="GraphDatabase.sync_solver_result"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.sync_solver_result">[docs]</a>    <span class="k">def</span> <span class="nf">sync_solver_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">document</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">force</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Sync the given solver result to the graph database.&quot;&quot;&quot;</span>
         <span class="n">solver_document_id</span> <span class="o">=</span> <span class="n">SolverResultsStore</span><span class="o">.</span><span class="n">get_document_id</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
         <span class="n">solver_name</span> <span class="o">=</span> <span class="n">SolverResultsStore</span><span class="o">.</span><span class="n">get_solver_name_from_document_id</span><span class="p">(</span><span class="n">solver_document_id</span><span class="p">)</span>
@@ -5158,17 +5191,45 @@
                         <span class="sa">f</span><span class="s2">&quot;No related columns for </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">importlib_metadata</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">!r}</span><span class="s2"> &quot;</span>
                         <span class="s2">&quot;found in PythonPackageMetadata table, the error is not fatal&quot;</span>
                     <span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">python_package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_python_package_version</span><span class="p">(</span>
+                        <span class="n">session</span><span class="p">,</span>
+                        <span class="n">package_name</span><span class="p">,</span>
+                        <span class="n">package_version</span><span class="p">,</span>
+                        <span class="n">os_name</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">os_name</span><span class="p">,</span>
+                        <span class="n">os_version</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">os_version</span><span class="p">,</span>
+                        <span class="n">python_version</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
+                        <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span>
+                        <span class="n">python_package_metadata_id</span><span class="o">=</span><span class="n">package_metadata</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">except</span> <span class="n">NoResultFound</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">force</span><span class="p">:</span>
+                        <span class="k">raise</span>
 
-                <span class="n">python_package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_python_package_version</span><span class="p">(</span>
-                    <span class="n">session</span><span class="p">,</span>
-                    <span class="n">package_name</span><span class="p">,</span>
-                    <span class="n">package_version</span><span class="p">,</span>
-                    <span class="n">os_name</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">os_name</span><span class="p">,</span>
-                    <span class="n">os_version</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">os_version</span><span class="p">,</span>
-                    <span class="n">python_version</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
-                    <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span>
-                    <span class="n">python_package_metadata_id</span><span class="o">=</span><span class="n">package_metadata</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
-                <span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;Removing old PythonPackageVersion entry based on previous results stored and &quot;</span>
+                        <span class="s2">&quot;force parameter supplied&quot;</span>
+                    <span class="p">)</span>
+                    <span class="c1"># Try to delete the given package-version and continue with the sync.</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_delete_python_package_version</span><span class="p">(</span>
+                        <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+                        <span class="n">package_version</span><span class="o">=</span><span class="n">package_version</span><span class="p">,</span>
+                        <span class="n">os_name</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">os_name</span><span class="p">,</span>
+                        <span class="n">os_version</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">os_version</span><span class="p">,</span>
+                        <span class="n">python_version</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
+                        <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+                    <span class="n">python_package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_python_package_version</span><span class="p">(</span>
+                        <span class="n">session</span><span class="p">,</span>
+                        <span class="n">package_name</span><span class="p">,</span>
+                        <span class="n">package_version</span><span class="p">,</span>
+                        <span class="n">os_name</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">os_name</span><span class="p">,</span>
+                        <span class="n">os_version</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">os_version</span><span class="p">,</span>
+                        <span class="n">python_version</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
+                        <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span>
+                        <span class="n">python_package_metadata_id</span><span class="o">=</span><span class="n">package_metadata</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                    <span class="p">)</span>
 
                 <span class="k">for</span> <span class="n">sha256</span> <span class="ow">in</span> <span class="n">python_package_info</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]:</span>
                     <span class="n">artifact</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">PythonArtifact</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
