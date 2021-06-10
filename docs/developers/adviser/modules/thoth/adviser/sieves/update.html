@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.sieves.solved &#8212; Thoth Adviser 0.33.0 documentation</title>
+    <title>thoth.adviser.sieves.update &#8212; Thoth Adviser 0.33.0 documentation</title>
     <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="/assets/adviser/documentation_options.js"></script>
@@ -49,10 +49,10 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <h1>Source code for thoth.adviser.sieves.solved</h1><div class="highlight"><pre>
+  <h1>Source code for thoth.adviser.sieves.update</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
 <span class="c1"># thoth-adviser</span>
-<span class="c1"># Copyright(C) 2019, 2020 Fridolin Pokorny</span>
+<span class="c1"># Copyright(C) 2021 Fridolin Pokorny</span>
 <span class="c1">#</span>
 <span class="c1"># This program is free software: you can redistribute it and / or modify</span>
 <span class="c1"># it under the terms of the GNU General Public License as published by</span>
@@ -67,21 +67,29 @@
 <span class="c1"># You should have received a copy of the GNU General Public License</span>
 <span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
 
-<span class="sd">&quot;&quot;&quot;A sieve for filtering out build time/installation errors of Python packages.&quot;&quot;&quot;</span>
+<span class="sd">&quot;&quot;&quot;A sieve for filtering out Python packages that are not part of a new release.</span>
 
+<span class="sd">This pipeline unit is registered only if adviser was requested to run to check a new</span>
+<span class="sd">package release. The pipeline unit filters out all the packages except for the one that</span>
+<span class="sd">should be included in the stack (the newly released) to check whether there is a stack</span>
+<span class="sd">with the released package that is better than the one used with an older release.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.enums</span> <span class="kn">import</span> <span class="n">RecommendationType</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
-<span class="kn">from</span> <span class="nn">thoth.storages.exceptions</span> <span class="kn">import</span> <span class="n">NotFoundError</span>
-<span class="kn">from</span> <span class="nn">voluptuous</span> <span class="kn">import</span> <span class="n">Any</span> <span class="k">as</span> <span class="n">SchemaAny</span>
 <span class="kn">from</span> <span class="nn">voluptuous</span> <span class="kn">import</span> <span class="n">Required</span>
 <span class="kn">from</span> <span class="nn">voluptuous</span> <span class="kn">import</span> <span class="n">Schema</span>
 
@@ -93,67 +101,67 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="SolvedSieve"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.solved.SolvedSieve">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">SolvedSieve</span><span class="p">(</span><span class="n">Sieve</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Filter out build time/installation errors of Python packages.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="PackageUpdateSieve"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.update.PackageUpdateSieve">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">PackageUpdateSieve</span><span class="p">(</span><span class="n">Sieve</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A sieve for filtering out Python packages that are not part of a new release.&quot;&quot;&quot;</span>
 
-    <span class="n">CONFIGURATION_DEFAULT</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;without_error&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}</span>
+    <span class="n">CONFIGURATION_DEFAULT</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;index_url&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
     <span class="n">CONFIGURATION_SCHEMA</span><span class="p">:</span> <span class="n">Schema</span> <span class="o">=</span> <span class="n">Schema</span><span class="p">(</span>
-        <span class="p">{</span><span class="n">Required</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">):</span> <span class="n">SchemaAny</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span> <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;without_error&quot;</span><span class="p">):</span> <span class="nb">bool</span><span class="p">}</span>
+        <span class="p">{</span><span class="n">Required</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">):</span> <span class="nb">str</span><span class="p">,</span> <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;package_version&quot;</span><span class="p">):</span> <span class="nb">str</span><span class="p">,</span> <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;index_url&quot;</span><span class="p">):</span> <span class="nb">str</span><span class="p">}</span>
     <span class="p">)</span>
-    <span class="n">_JUSTIFICATION_LINK</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;buildtime_error&quot;</span><span class="p">)</span>
+    <span class="n">_JUSTIFICATION_LINK</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;update&quot;</span><span class="p">)</span>
+    <span class="n">_PACKAGE_UPDATE</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_DEPLOYMENT_PACKAGE_UPDATE&quot;</span><span class="p">)</span>
 
     <span class="n">_messages_logged</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">set</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">_package_update</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 
-<div class="viewcode-block" id="SolvedSieve.should_include"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.solved.SolvedSieve.should_include">[docs]</a>    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="PackageUpdateSieve.should_include"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.update.PackageUpdateSieve.should_include">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">should_include</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Include solved pipeline sieve for adviser or Dependency Monkey on pipeline creation.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_included</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
-            <span class="k">yield</span> <span class="p">{}</span>
+        <span class="sd">&quot;&quot;&quot;Include pipeline sieve.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_PACKAGE_UPDATE</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_included</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+            <span class="n">package_update_dict</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_PACKAGE_UPDATE</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="o">!=</span> <span class="n">RecommendationType</span><span class="o">.</span><span class="n">LATEST</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                    <span class="s2">&quot;Registering </span><span class="si">%s</span><span class="s2"> sieve pipeline unit when not recommending latest, this error is not critical ...&quot;</span><span class="p">,</span>
+                    <span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                <span class="p">)</span>
+
+            <span class="k">yield</span> <span class="n">package_update_dict</span>
             <span class="k">return</span> <span class="kc">None</span>
 
         <span class="k">yield from</span> <span class="p">()</span>
         <span class="k">return</span> <span class="kc">None</span></div>
 
-<div class="viewcode-block" id="SolvedSieve.pre_run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.solved.SolvedSieve.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="PackageUpdateSieve.pre_run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.update.PackageUpdateSieve.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Initialize this pipeline unit before each run.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_messages_logged</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_package_update</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">configuration</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">configuration</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">],</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">configuration</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">pre_run</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="SolvedSieve.run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.solved.SolvedSieve.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_versions</span><span class="p">:</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Filter out packages based on build time/installation issues..&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="PackageUpdateSieve.run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.update.PackageUpdateSieve.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_versions</span><span class="p">:</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Filter out packages that are old releases.&quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">package_version</span> <span class="ow">in</span> <span class="n">package_versions</span><span class="p">:</span>
             <span class="n">package_tuple</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">()</span>
 
-            <span class="k">try</span><span class="p">:</span>
-                <span class="n">has_error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">has_python_solver_error</span><span class="p">(</span>
-                    <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                    <span class="n">package_version</span><span class="o">.</span><span class="n">locked_version</span><span class="p">,</span>
-                    <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
-                    <span class="n">os_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-                    <span class="n">os_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">,</span>
-                    <span class="n">python_version</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
-                <span class="p">)</span>
-            <span class="k">except</span> <span class="n">NotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="s2">&quot;Removing package </span><span class="si">%r</span><span class="s2"> as it was not solved: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
-                    <span class="n">package_tuple</span><span class="p">,</span>
-                    <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">),</span>
-                <span class="p">)</span>
-                <span class="k">continue</span>
-
-            <span class="k">if</span> <span class="n">has_error</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">configuration</span><span class="p">[</span><span class="s2">&quot;without_error&quot;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">package_tuple</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_package_update</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">package_tuple</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_messages_logged</span><span class="p">:</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">_messages_logged</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">)</span>
-                    <span class="n">message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Removing package </span><span class="si">{</span><span class="n">package_tuple</span><span class="si">}</span><span class="s2"> due to build time error in the software environment&quot;</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Removing package </span><span class="si">{</span><span class="n">package_tuple</span><span class="si">}</span><span class="s2"> as advising on a new release&quot;</span>
                     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK</span><span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                         <span class="p">{</span>
                             <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
                             <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span>
                             <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK</span><span class="p">,</span>
+                            <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
                         <span class="p">}</span>
                     <span class="p">)</span>
+
                 <span class="k">continue</span>
 
             <span class="k">yield</span> <span class="n">package_version</span></div></div>
