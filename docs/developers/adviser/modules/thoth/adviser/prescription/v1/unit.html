@@ -393,6 +393,173 @@
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching base image used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
+        <span class="n">shared_objects</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;shared_objects&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">shared_objects</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Check on image symbols is present but no base image provided&quot;</span><span class="p">,</span>
+                    <span class="n">unit_name</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">base_image</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">get_base_image</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">base_image</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Failed to parse base image </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">symbols_present</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
+                <span class="n">builder_context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_thoth_s2i_analyzed_image_symbols_all</span><span class="p">(</span>
+                    <span class="n">base_image</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                    <span class="n">base_image</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                    <span class="n">is_external</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">symbols_present</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;%s: No symbols found for runtime environment %r&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span>
+                    <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shared_objects</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;not&quot;</span> <span class="ow">in</span> <span class="n">shared_objects</span><span class="p">:</span>
+                <span class="c1"># Negate operation.</span>
+                <span class="k">if</span> <span class="n">symbols_present</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">shared_objects</span><span class="p">[</span><span class="s2">&quot;not&quot;</span><span class="p">])):</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching shared objects present in the base image&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shared_objects</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">shared_objects</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">symbols_present</span><span class="p">):</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching shared objects present in the base image&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Unknown shared objects definition - please report this error to administrator&quot;</span><span class="p">,</span> <span class="n">unit_name</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">rpm_packages</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rpm_packages&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rpm_packages</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Check on RPM packages present but no base image provided&quot;</span><span class="p">,</span>
+                    <span class="n">unit_name</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">base_image</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">get_base_image</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">base_image</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Failed to parse base image </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">analysis_document_id</span> <span class="o">=</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_last_analysis_document_id</span><span class="p">(</span>
+                <span class="n">base_image</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">base_image</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="n">is_external</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_document_id</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: No analysis for base container image </span><span class="si">%r</span><span class="s2"> found&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">rpm_packages_present</span> <span class="o">=</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_rpm_package_version_all</span><span class="p">(</span><span class="n">analysis_document_id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">rpm_packages_present</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: No RPM packages found for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_rpm_packages</span><span class="p">(</span><span class="n">unit_name</span><span class="p">,</span> <span class="n">rpm_packages_present</span><span class="p">,</span> <span class="n">rpm_packages</span><span class="p">):</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching RPM packages present in the base image </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_check_rpm_packages</span><span class="p">(</span>
+        <span class="n">unit_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">rpm_packages_present</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span>
+        <span class="n">rpm_packages_required</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if required RPM packages are present.&quot;&quot;&quot;</span>
+        <span class="c1"># Convert RPM packages present to mapping to save some cycles and have O(1) look up.</span>
+        <span class="n">rpm_packages_pres</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rpm_packages_present</span><span class="p">}</span>
+        <span class="n">rpm_packages_req</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rpm_packages_required</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">if</span> <span class="s2">&quot;not&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rpm_packages_required</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%r</span><span class="s2">: Unable to parse description of RPM packages required&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">should_be_present</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">rpm_packages_req</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rpm_packages_required</span><span class="p">[</span><span class="s2">&quot;not&quot;</span><span class="p">]]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">should_be_present</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">rpm_packages_req</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rpm_packages_required</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">rpm_package_req</span> <span class="ow">in</span> <span class="n">rpm_packages_req</span><span class="p">:</span>
+            <span class="n">rpm_name</span> <span class="o">=</span> <span class="n">rpm_package_req</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span>
+            <span class="n">rpm_present</span> <span class="o">=</span> <span class="n">rpm_packages_pres</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">rpm_name</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">should_be_present</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">rpm_present</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not including unit as RPM </span><span class="si">%r</span><span class="s2"> is not present in the runtime environment&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">rpm_name</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+
+                <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">rpm_package_req</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">value_present</span> <span class="o">=</span> <span class="n">rpm_present</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">value_present</span> <span class="o">!=</span> <span class="n">value</span><span class="p">:</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not including unit as RPM </span><span class="si">%r</span><span class="s2"> has not matching </span><span class="si">%r</span><span class="s2"> - expected </span><span class="si">%r</span><span class="s2"> got </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">unit_name</span><span class="p">,</span>
+                            <span class="n">rpm_name</span><span class="p">,</span>
+                            <span class="n">key</span><span class="p">,</span>
+                            <span class="n">value</span><span class="p">,</span>
+                            <span class="n">value_present</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">rpm_present</span><span class="p">:</span>
+                    <span class="c1"># If just one is not present, we know the unit is included.</span>
+                    <span class="k">return</span> <span class="kc">True</span>
+
+                <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">rpm_package_req</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">value_present</span> <span class="o">=</span> <span class="n">rpm_present</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">value_present</span> <span class="o">!=</span> <span class="n">value</span><span class="p">:</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not including unit as RPM </span><span class="si">%s</span><span class="s2"> has matching </span><span class="si">%r</span><span class="s2"> - expected </span><span class="si">%r</span><span class="s2"> got </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">unit_name</span><span class="p">,</span>
+                            <span class="n">rpm_name</span><span class="p">,</span>
+                            <span class="n">key</span><span class="p">,</span>
+                            <span class="n">value</span><span class="p">,</span>
+                            <span class="n">value_present</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">should_be_present</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not including unit as all RPM are present in the runtime environment&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="c1"># Path to should be present.</span>
         <span class="k">return</span> <span class="kc">True</span>
 
     <span class="nd">@classmethod</span>

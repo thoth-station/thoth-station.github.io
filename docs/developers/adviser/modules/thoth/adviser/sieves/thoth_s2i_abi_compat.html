@@ -52,7 +52,7 @@
   <h1>Source code for thoth.adviser.sieves.thoth_s2i_abi_compat</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
 <span class="c1"># thoth-adviser</span>
-<span class="c1"># Copyright(C) 2019-2021 Kevin Postlehtwait</span>
+<span class="c1"># Copyright(C) 2019-2021 Kevin Postlehtwait, Fridolin Pokorny</span>
 <span class="c1">#</span>
 <span class="c1"># This program is free software: you can redistribute it and / or modify</span>
 <span class="c1"># it under the terms of the GNU General Public License as published by</span>
@@ -115,8 +115,8 @@
 <div class="viewcode-block" id="ThothS2IAbiCompatibilitySieve.pre_run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.thoth_s2i_abi_compat.ThothS2IAbiCompatibilitySieve.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Initialize image_symbols.&quot;&quot;&quot;</span>
         <span class="n">base_image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">base_image</span>
-        <span class="n">parts</span> <span class="o">=</span> <span class="n">base_image</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">parsed_base_image</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_base_image</span><span class="p">(</span><span class="n">base_image</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">parsed_base_image</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">error_msg</span> <span class="o">=</span> <span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;Cannot determine Thoth s2i version information from </span><span class="si">{</span><span class="n">base_image</span><span class="si">}</span><span class="s2">, &quot;</span>
                 <span class="s2">&quot;recommendations specific for ABI used will not be taken into account&quot;</span>
@@ -129,16 +129,11 @@
                     <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_LINK_BAD_IMAGE</span><span class="p">,</span>
                 <span class="p">}</span>
             <span class="p">)</span>
-
             <span class="bp">self</span><span class="o">.</span><span class="n">image_symbols</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">pre_run</span><span class="p">()</span>
             <span class="k">return</span>
 
-        <span class="n">thoth_s2i_image_name</span><span class="p">,</span> <span class="n">thoth_s2i_image_version</span> <span class="o">=</span> <span class="n">parts</span>
-        <span class="k">if</span> <span class="n">thoth_s2i_image_version</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;v&quot;</span><span class="p">):</span>
-            <span class="c1"># Not nice as we always prefix with &quot;v&quot; but do not store it with &quot;v&quot; in the database</span>
-            <span class="c1"># (based on env var exported and detected in Thoth&#39;s s2i).</span>
-            <span class="n">thoth_s2i_image_version</span> <span class="o">=</span> <span class="n">thoth_s2i_image_version</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
-
+        <span class="n">thoth_s2i_image_name</span><span class="p">,</span> <span class="n">thoth_s2i_image_version</span> <span class="o">=</span> <span class="n">parsed_base_image</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">image_symbols</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_thoth_s2i_analyzed_image_symbols_all</span><span class="p">(</span>
                 <span class="n">thoth_s2i_image_name</span><span class="o">=</span><span class="n">thoth_s2i_image_name</span><span class="p">,</span>

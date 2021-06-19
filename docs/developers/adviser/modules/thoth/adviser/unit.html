@@ -77,6 +77,7 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
 <span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
 
@@ -87,6 +88,7 @@
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
 
 <span class="kn">from</span> <span class="nn">.context</span> <span class="kn">import</span> <span class="n">Context</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">ParseBaseImageError</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">PipelineUnitConfigurationSchemaError</span>
 <span class="kn">from</span> <span class="nn">.dm_report</span> <span class="kn">import</span> <span class="n">DependencyMonkeyReport</span>
 
@@ -265,6 +267,27 @@
             <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span></div>
+
+<div class="viewcode-block" id="Unit.get_base_image"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.unit.Unit.get_base_image">[docs]</a>    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">get_base_image</span><span class="p">(</span><span class="n">base_image</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Return information about base image used.&quot;&quot;&quot;</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="n">base_image</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">raise_on_error</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ParseBaseImageError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Cannot determine Thoth s2i version information from </span><span class="si">{</span><span class="n">base_image</span><span class="si">}</span><span class="s2">, &quot;</span>
+                    <span class="s2">&quot;recommendations specific for ABI used will not be taken into account&quot;</span>
+                <span class="p">)</span>
+
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">thoth_s2i_image_name</span><span class="p">,</span> <span class="n">thoth_s2i_image_version</span> <span class="o">=</span> <span class="n">parts</span>
+        <span class="k">if</span> <span class="n">thoth_s2i_image_version</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;v&quot;</span><span class="p">):</span>
+            <span class="c1"># Not nice as we always prefix with &quot;v&quot; but do not store it with &quot;v&quot; in the database</span>
+            <span class="c1"># (based on env var exported and detected in Thoth&#39;s s2i).</span>
+            <span class="n">thoth_s2i_image_version</span> <span class="o">=</span> <span class="n">thoth_s2i_image_version</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+
+        <span class="k">return</span> <span class="n">thoth_s2i_image_name</span><span class="p">,</span> <span class="n">thoth_s2i_image_version</span></div>
 
 <div class="viewcode-block" id="Unit.pre_run"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.unit.Unit.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D401</span>
         <span class="sd">&quot;&quot;&quot;Called before running any pipeline unit with context already assigned.</span>
