@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.48.0 documentation</title>
+    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.49.0 documentation</title>
     <link rel="stylesheet" href="/assets/storages/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/storages/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="/assets/storages/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Storages 0.48.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Storages 0.49.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -78,6 +78,7 @@
 <span class="kn">import</span> <span class="nn">weakref</span>
 <span class="kn">import</span> <span class="nn">ssdeep</span>
 
+<span class="kn">from</span> <span class="nn">decimal</span> <span class="kn">import</span> <span class="n">Decimal</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
@@ -6044,10 +6045,206 @@
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">True</span></div>
 
-<div class="viewcode-block" id="GraphDatabase.get_bloat_data"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_bloat_data">[docs]</a>    <span class="k">def</span> <span class="nf">get_bloat_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get bloat data.&quot;&quot;&quot;</span>
-        <span class="c1"># Reference: https://raw.githubusercontent.com/pgexperts/pgx_scripts/master/bloat/table_bloat_check.sql</span>
+<div class="viewcode-block" id="GraphDatabase.get_index_bloat_data"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_index_bloat_data">[docs]</a>    <span class="k">def</span> <span class="nf">get_index_bloat_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get index bloat data.</span>
 
+<span class="sd">        documenation: https://raw.githubusercontent.com/pgexperts/pgx_scripts/master/bloat/index_bloat_check.sql</span>
+<span class="sd">        It returns data for each index/table present in the database.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from thoth.storages import GraphDatabase</span>
+<span class="sd">        &gt;&gt;&gt; graph = GraphDatabase()</span>
+<span class="sd">        &gt;&gt;&gt; graph.get_index_bloat_data()</span>
+<span class="sd">        [</span>
+<span class="sd">            {</span>
+<span class="sd">                &#39;database_name&#39;: &#39;postgres&#39;,</span>
+<span class="sd">                &#39;schema_name&#39;: &#39;public&#39;,</span>
+<span class="sd">                &#39;table_name&#39;: &#39;depends_on&#39;,</span>
+<span class="sd">                &#39;index_name&#39;: &#39;depends_on_entity_id_idx&#39;,</span>
+<span class="sd">                &#39;bloat_pct&#39;: 11.0,</span>
+<span class="sd">                &#39;bloat_mb&#39;: 623.0,</span>
+<span class="sd">                &#39;index_mb&#39;: 5821.516,</span>
+<span class="sd">                &#39;table_mb&#39;: 14053.625,</span>
+<span class="sd">                &#39;index_scans&#39;: 2</span>
+<span class="sd">            },</span>
+<span class="sd">            {</span>
+<span class="sd">                &#39;database_name&#39;: &#39;postgres&#39;,</span>
+<span class="sd">                &#39;schema_name&#39;: &#39;public&#39;,</span>
+<span class="sd">                &#39;table_name&#39;: &#39;python_package_version&#39;,</span>
+<span class="sd">                &#39;index_name&#39;: &#39;python_package_version_package_name_package_version_python__key&#39;,</span>
+<span class="sd">                &#39;bloat_pct&#39;: 43.0,</span>
+<span class="sd">                &#39;bloat_mb&#39;: 35.0,</span>
+<span class="sd">                &#39;index_mb&#39;: 35.0,</span>
+<span class="sd">                &#39;table_mb&#39;: 111.344,</span>
+<span class="sd">                &#39;index_scans&#39;: 0</span>
+<span class="sd">            }, ...</span>
+<span class="sd">        ]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># btree index stats query estimates bloat for btree indexes</span>
+        <span class="n">btree_index_atts</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT nspname,</span>
+<span class="s2">            indexclass.relname as index_name,</span>
+<span class="s2">            indexclass.reltuples,</span>
+<span class="s2">            indexclass.relpages,</span>
+<span class="s2">            indrelid, indexrelid,</span>
+<span class="s2">            indexclass.relam,</span>
+<span class="s2">            tableclass.relname as tablename,</span>
+<span class="s2">            regexp_split_to_table(indkey::text, &#39; &#39;)::smallint AS attnum,</span>
+<span class="s2">            indexrelid as index_oid</span>
+<span class="s2">        FROM pg_index</span>
+<span class="s2">        JOIN pg_class AS indexclass ON pg_index.indexrelid = indexclass.oid</span>
+<span class="s2">        JOIN pg_class AS tableclass ON pg_index.indrelid = tableclass.oid</span>
+<span class="s2">        JOIN pg_namespace ON pg_namespace.oid = indexclass.relnamespace</span>
+<span class="s2">        JOIN pg_am ON indexclass.relam = pg_am.oid</span>
+<span class="s2">        WHERE pg_am.amname = &#39;btree&#39; and indexclass.relpages &gt; 0</span>
+<span class="s2">            AND nspname NOT IN (&#39;pg_catalog&#39;,&#39;information_schema&#39;)&quot;&quot;&quot;</span>
+
+        <span class="n">index_item_sizes</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT</span>
+<span class="s2">            ind_atts.nspname, ind_atts.index_name,</span>
+<span class="s2">            ind_atts.reltuples, ind_atts.relpages, ind_atts.relam,</span>
+<span class="s2">            indrelid AS table_oid, index_oid,</span>
+<span class="s2">            current_setting(&#39;block_size&#39;)::numeric AS bs,</span>
+<span class="s2">            8 AS maxalign,</span>
+<span class="s2">            24 AS pagehdr,</span>
+<span class="s2">            CASE WHEN max(coalesce(pg_stats.null_frac,0)) = 0</span>
+<span class="s2">                THEN 2</span>
+<span class="s2">                ELSE 6</span>
+<span class="s2">            END AS index_tuple_hdr,</span>
+<span class="s2">            sum( (1-coalesce(pg_stats.null_frac, 0)) * coalesce(pg_stats.avg_width, 1024) ) AS nulldatawidth</span>
+<span class="s2">            FROM pg_attribute</span>
+<span class="s2">            JOIN btree_index_atts AS ind_atts ON pg_attribute.attrelid = ind_atts.indexrelid AND pg_attribute.attnum = ind_atts.attnum</span>
+<span class="s2">            JOIN pg_stats ON pg_stats.schemaname = ind_atts.nspname</span>
+<span class="s2">                -- stats for regular index columns</span>
+<span class="s2">                AND ( (pg_stats.tablename = ind_atts.tablename AND pg_stats.attname = pg_catalog.pg_get_indexdef(pg_attribute.attrelid, pg_attribute.attnum, TRUE))</span>
+<span class="s2">                -- stats for functional indexes</span>
+<span class="s2">                OR   (pg_stats.tablename = ind_atts.index_name AND pg_stats.attname = pg_attribute.attname))</span>
+<span class="s2">            WHERE pg_attribute.attnum &gt; 0</span>
+<span class="s2">            GROUP BY 1, 2, 3, 4, 5, 6, 7, 8, 9&quot;&quot;&quot;</span>
+
+        <span class="n">index_aligned_est</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT maxalign, bs, nspname, index_name, reltuples,</span>
+<span class="s2">            relpages, relam, table_oid, index_oid,</span>
+<span class="s2">            coalesce (</span>
+<span class="s2">                ceil (</span>
+<span class="s2">                    reltuples * ( 6</span>
+<span class="s2">                        + maxalign</span>
+<span class="s2">                        - CASE</span>
+<span class="s2">                            WHEN index_tuple_hdr%maxalign = 0 THEN maxalign</span>
+<span class="s2">                            ELSE index_tuple_hdr%maxalign</span>
+<span class="s2">                        END</span>
+<span class="s2">                        + nulldatawidth</span>
+<span class="s2">                        + maxalign</span>
+<span class="s2">                        - CASE /* Add padding to the data to align on MAXALIGN */</span>
+<span class="s2">                            WHEN nulldatawidth::integer%maxalign = 0 THEN maxalign</span>
+<span class="s2">                            ELSE nulldatawidth::integer%maxalign</span>
+<span class="s2">                        END</span>
+<span class="s2">                    )::numeric</span>
+<span class="s2">                / ( bs - pagehdr::NUMERIC )</span>
+<span class="s2">                +1 )</span>
+<span class="s2">            , 0 )</span>
+<span class="s2">        as expected</span>
+<span class="s2">        FROM index_item_sizes&quot;&quot;&quot;</span>
+
+        <span class="n">raw_bloat</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT current_database() as dbname, nspname, pg_class.relname AS table_name, index_name,</span>
+<span class="s2">            bs*(index_aligned_est.relpages)::bigint AS totalbytes, expected,</span>
+<span class="s2">            CASE</span>
+<span class="s2">                WHEN index_aligned_est.relpages &lt;= expected</span>
+<span class="s2">                    THEN 0</span>
+<span class="s2">                    ELSE bs*(index_aligned_est.relpages-expected)::bigint</span>
+<span class="s2">                END AS wastedbytes,</span>
+<span class="s2">            CASE</span>
+<span class="s2">                WHEN index_aligned_est.relpages &lt;= expected</span>
+<span class="s2">                    THEN 0</span>
+<span class="s2">                    ELSE bs*(index_aligned_est.relpages-expected)::bigint * 100 / (bs*(index_aligned_est.relpages)::bigint)</span>
+<span class="s2">                END AS realbloat,</span>
+<span class="s2">            pg_relation_size(index_aligned_est.table_oid) as table_bytes,</span>
+<span class="s2">            stat.idx_scan as index_scans</span>
+<span class="s2">            FROM index_aligned_est</span>
+<span class="s2">            JOIN pg_class ON pg_class.oid=index_aligned_est.table_oid</span>
+<span class="s2">            JOIN pg_stat_user_indexes AS stat ON index_aligned_est.index_oid = stat.indexrelid&quot;&quot;&quot;</span>
+
+        <span class="n">format_bloat</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;SELECT dbname as database_name, nspname as schema_name, table_name, index_name,</span>
+<span class="s2">            round(realbloat) as bloat_pct, round(wastedbytes/(1024^2)::NUMERIC) as bloat_mb,</span>
+<span class="s2">            round(totalbytes/(1024^2)::NUMERIC,3) as index_mb,</span>
+<span class="s2">            round(table_bytes/(1024^2)::NUMERIC,3) as table_mb,</span>
+<span class="s2">            index_scans</span>
+<span class="s2">            FROM raw_bloat&quot;&quot;&quot;</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
+            <span class="n">tables</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;WITH btree_index_atts AS (</span><span class="si">{</span><span class="n">btree_index_atts</span><span class="si">}</span><span class="s2">),</span><span class="se">\</span>
+<span class="s2">                index_item_sizes AS (</span><span class="si">{</span><span class="n">index_item_sizes</span><span class="si">}</span><span class="s2">),</span><span class="se">\</span>
+<span class="s2">                index_aligned_est AS (</span><span class="si">{</span><span class="n">index_aligned_est</span><span class="si">}</span><span class="s2">),</span><span class="se">\</span>
+<span class="s2">                raw_bloat AS (</span><span class="si">{</span><span class="n">raw_bloat</span><span class="si">}</span><span class="s2">),</span><span class="se">\</span>
+<span class="s2">                format_bloat AS (</span><span class="si">{</span><span class="n">format_bloat</span><span class="si">}</span><span class="s2">)</span><span class="se">\</span>
+<span class="s2">                SELECT *</span><span class="se">\</span>
+<span class="s2">                FROM format_bloat</span><span class="se">\</span>
+<span class="s2">                ORDER BY bloat_mb DESC; &quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_bloat_data_results</span><span class="p">(</span><span class="n">tables</span><span class="o">=</span><span class="n">tables</span><span class="p">)</span></div>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_process_bloat_data_results</span><span class="p">(</span><span class="n">tables</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+        <span class="n">processed_bloat_data</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">tables</span><span class="p">:</span>
+            <span class="n">bloat_data</span> <span class="o">=</span> <span class="p">{}</span>
+
+            <span class="k">if</span> <span class="s2">&quot;pct_bloat&quot;</span> <span class="ow">in</span> <span class="n">table</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;mb_bloat&quot;</span> <span class="ow">in</span> <span class="n">table</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">table</span><span class="p">[</span><span class="s2">&quot;pct_bloat&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+                <span class="k">if</span> <span class="n">table</span><span class="p">[</span><span class="s2">&quot;mb_bloat&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+
+            <span class="k">for</span> <span class="n">column</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">table</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Decimal</span><span class="p">):</span>
+                    <span class="n">bloat_data</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">bloat_data</span><span class="p">[</span><span class="n">column</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
+
+            <span class="n">processed_bloat_data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bloat_data</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">processed_bloat_data</span>
+
+<div class="viewcode-block" id="GraphDatabase.get_bloat_data"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_bloat_data">[docs]</a>    <span class="k">def</span> <span class="nf">get_bloat_data</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+        <span class="sd">&quot;&quot;&quot;Get table bloat data.</span>
+
+<span class="sd">        documenation: https://raw.githubusercontent.com/pgexperts/pgx_scripts/master/bloat/table_bloat_check.sql</span>
+<span class="sd">        It returns data for each table present in the database.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from thoth.storages import GraphDatabase</span>
+<span class="sd">        &gt;&gt;&gt; graph = GraphDatabase()</span>
+<span class="sd">        &gt;&gt;&gt; graph.get_bloat_data()</span>
+<span class="sd">        [</span>
+<span class="sd">            {</span>
+<span class="sd">                &#39;databasename&#39;: &#39;postgres&#39;,</span>
+<span class="sd">                &#39;schemaname&#39;: &#39;public&#39;,</span>
+<span class="sd">                &#39;tablename&#39;: &#39;advised&#39;,</span>
+<span class="sd">                &#39;can_estimate&#39;: True,</span>
+<span class="sd">                &#39;table_bytes&#39;: 49152.0,</span>
+<span class="sd">                &#39;table_mb&#39;: 0.047,</span>
+<span class="sd">                &#39;expected_bytes&#39;: 49152.0,</span>
+<span class="sd">                &#39;expected_mb&#39;: 0.047,</span>
+<span class="sd">                &#39;pct_bloat&#39;: 0.0,</span>
+<span class="sd">                &#39;mb_bloat&#39;: 0.0,</span>
+<span class="sd">                &#39;est_rows&#39;: 1158.0</span>
+<span class="sd">            },</span>
+<span class="sd">            {</span>
+<span class="sd">                &#39;databasename&#39;: &#39;postgres&#39;,</span>
+<span class="sd">                &#39;schemaname&#39;: &#39;public&#39;,</span>
+<span class="sd">                &#39;tablename&#39;: &#39;adviser_run&#39;,</span>
+<span class="sd">                &#39;can_estimate&#39;: True,</span>
+<span class="sd">                &#39;table_bytes&#39;: 720896.0,</span>
+<span class="sd">                &#39;table_mb&#39;: 0.688,</span>
+<span class="sd">                &#39;expected_bytes&#39;: 712704.0,</span>
+<span class="sd">                &#39;expected_mb&#39;: 0.68,</span>
+<span class="sd">                &#39;pct_bloat&#39;: 1.0,</span>
+<span class="sd">                &#39;mb_bloat&#39;: 0.01,</span>
+<span class="sd">                &#39;est_rows&#39;: 3600.0</span>
+<span class="sd">            }, ...</span>
+<span class="sd">        ]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="c1"># define some constants for sizes of things</span>
         <span class="c1"># for reference down the query and easy maintenance</span>
         <span class="n">constants</span> <span class="o">=</span> <span class="s2">&quot;SELECT current_setting(&#39;block_size&#39;)::numeric AS bs, 23 AS hdr, 8 AS ma&quot;</span>
@@ -6162,7 +6359,7 @@
 <span class="s2">        FROM table_estimates_plus&quot;&quot;&quot;</span>
 
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
-            <span class="n">resultproxy</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
+            <span class="n">tables</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span>
                 <span class="sa">f</span><span class="s2">&quot;WITH constants AS (</span><span class="si">{</span><span class="n">constants</span><span class="si">}</span><span class="s2">),</span><span class="se">\</span>
 <span class="s2">                no_stats AS (</span><span class="si">{</span><span class="n">no_stats</span><span class="si">}</span><span class="s2">),</span><span class="se">\</span>
 <span class="s2">                null_headers AS (</span><span class="si">{</span><span class="n">null_headers</span><span class="si">}</span><span class="s2">),</span><span class="se">\</span>
@@ -6173,11 +6370,7 @@
                 <span class="o">+</span> <span class="n">bloat_data</span>
             <span class="p">)</span>
 
-            <span class="n">result</span> <span class="o">=</span> <span class="p">[{</span><span class="n">column</span><span class="p">:</span> <span class="n">value</span> <span class="k">for</span> <span class="n">column</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">rowproxy</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span> <span class="k">for</span> <span class="n">rowproxy</span> <span class="ow">in</span> <span class="n">resultproxy</span><span class="p">]</span>
-
-        <span class="n">bloat_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">table</span> <span class="k">for</span> <span class="n">table</span> <span class="ow">in</span> <span class="n">result</span> <span class="k">if</span> <span class="n">table</span><span class="p">[</span><span class="s2">&quot;pct_bloat&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">table</span><span class="p">[</span><span class="s2">&quot;mb_bloat&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
-
-        <span class="k">return</span> <span class="n">bloat_data</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_process_bloat_data_results</span><span class="p">(</span><span class="n">tables</span><span class="o">=</span><span class="n">tables</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.delete_solved"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.delete_solved">[docs]</a>    <span class="k">def</span> <span class="nf">delete_solved</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">os_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">os_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">python_version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Delete corresponding solver data.&quot;&quot;&quot;</span>
