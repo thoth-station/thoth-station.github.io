@@ -641,88 +641,109 @@
     <span class="n">labels</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]:</span>
     <span class="sd">&quot;&quot;&quot;Run advise in current directory, requires no arguments.&quot;&quot;&quot;</span>
-    <span class="n">requirements_format</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">requirements_format</span>
-    <span class="k">if</span> <span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="s2">&quot;Using Pipenv files to manage dependencies located in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
-        <span class="p">)</span>
-        <span class="n">pipfile_lock_exists</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">pipfile_lock_exists</span><span class="p">:</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                <span class="s2">&quot;Submitting Pipfile.lock as a base for user&#39;s stack scoring - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
-                <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;user_stack&quot;</span><span class="p">),</span>
-            <span class="p">)</span>
-
-        <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_files</span><span class="p">(</span>
-            <span class="n">pipfile_path</span><span class="o">=</span><span class="s2">&quot;Pipfile&quot;</span><span class="p">,</span>
-            <span class="n">pipfile_lock_path</span><span class="o">=</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">,</span>
-            <span class="n">without_pipfile_lock</span><span class="o">=</span><span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">),</span>
-        <span class="p">)</span>
-
-        <span class="k">if</span> <span class="p">(</span>
-            <span class="n">pipfile_lock_exists</span>
-            <span class="ow">and</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span>
-            <span class="o">!=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span>
-        <span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                <span class="s2">&quot;Pipfile hash stated in Pipfile.lock </span><span class="si">%r</span><span class="s2"> does not correspond to Pipfile hash </span><span class="si">%r</span><span class="s2"> - was Pipfile &quot;</span>
-                <span class="s2">&quot;adjusted? This error is not critical.&quot;</span><span class="p">,</span>
-                <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
-                <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
-            <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">requirements_format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;pip&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-tools&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-compile&quot;</span><span class="p">):</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="s2">&quot;Using requirements.txt file to manage dependencies located in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-            <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span>
-        <span class="p">)</span>
-        <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_pip_compile_files</span><span class="p">(</span><span class="n">allow_without_lock</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">runtime_environment_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_environment</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Unknown configuration option for requirements format: </span><span class="si">{</span><span class="n">requirements_format</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="s2">&quot;Both runtime_environment and runtime_environment_name were set.&quot;</span>
         <span class="p">)</span>
 
-    <span class="n">constraints_str</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;constraints.txt&quot;</span><span class="p">):</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using constraints.txt file located in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
-        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;constraints.txt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">constraints_file</span><span class="p">:</span>
-            <span class="n">constraints_str</span> <span class="o">=</span> <span class="n">constraints_file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">runtime_environment</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_environment_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">runtime_environment</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">()</span>
 
-        <span class="c1"># Try to load constraints before the request to verify their correctness without sending request to the backend.</span>
-        <span class="n">Constraints</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">constraints_str</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">runtime_environment</span><span class="p">:</span>
+        <span class="n">runtime_environment_name</span> <span class="o">=</span> <span class="n">runtime_environment</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
 
-    <span class="n">pipfile</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span>
-    <span class="n">pipfile_lock_str</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+    <span class="c1"># get_overlays_directory() returns the current working directory if overlays_dir is not configured so this change</span>
+    <span class="c1"># should not result in a behavioral change</span>
+    <span class="n">overlay_dir</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">get_overlays_directory</span><span class="p">(</span>
+        <span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment_name</span>
+    <span class="p">)</span>
 
-    <span class="k">return</span> <span class="n">advise</span><span class="p">(</span>
-        <span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span>
-        <span class="n">pipfile_lock</span><span class="o">=</span><span class="n">pipfile_lock_str</span><span class="p">,</span>
-        <span class="n">constraints</span><span class="o">=</span><span class="n">constraints_str</span><span class="p">,</span>
-        <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span><span class="p">,</span>
-        <span class="n">src_path</span><span class="o">=</span><span class="n">src_path</span><span class="p">,</span>
-        <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
-        <span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment_name</span><span class="p">,</span>
-        <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span>
-        <span class="n">no_static_analysis</span><span class="o">=</span><span class="n">no_static_analysis</span><span class="p">,</span>
-        <span class="n">no_user_stack</span><span class="o">=</span><span class="n">no_user_stack</span><span class="p">,</span>
-        <span class="n">nowait</span><span class="o">=</span><span class="n">nowait</span><span class="p">,</span>
-        <span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span>
-        <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span>
-        <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
-        <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
-        <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
-        <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
-        <span class="n">source_type</span><span class="o">=</span><span class="n">source_type</span><span class="p">,</span>
-        <span class="n">github_event_type</span><span class="o">=</span><span class="n">github_event_type</span><span class="p">,</span>
-        <span class="n">github_check_run_id</span><span class="o">=</span><span class="n">github_check_run_id</span><span class="p">,</span>
-        <span class="n">github_installation_id</span><span class="o">=</span><span class="n">github_installation_id</span><span class="p">,</span>
-        <span class="n">github_base_repo_url</span><span class="o">=</span><span class="n">github_base_repo_url</span><span class="p">,</span>
-        <span class="n">justification</span><span class="o">=</span><span class="n">justification</span><span class="p">,</span>
-        <span class="n">stack_info</span><span class="o">=</span><span class="n">stack_info</span><span class="p">,</span>
-        <span class="n">kebechet_metadata</span><span class="o">=</span><span class="n">kebechet_metadata</span><span class="p">,</span>
-        <span class="n">verify_tls</span><span class="o">=</span><span class="n">verify_tls</span><span class="p">,</span>
-        <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span>
-    <span class="p">)</span></div>
+    <span class="k">with</span> <span class="n">cwd</span><span class="p">(</span><span class="n">overlay_dir</span><span class="p">):</span>
+        <span class="n">requirements_format</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">requirements_format</span>
+        <span class="k">if</span> <span class="n">requirements_format</span> <span class="o">==</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Using Pipenv files to manage dependencies located in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">()</span>
+            <span class="p">)</span>
+            <span class="n">pipfile_lock_exists</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">pipfile_lock_exists</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="s2">&quot;Submitting Pipfile.lock as a base for user&#39;s stack scoring - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;user_stack&quot;</span><span class="p">),</span>
+                <span class="p">)</span>
+
+            <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_files</span><span class="p">(</span>
+                <span class="n">pipfile_path</span><span class="o">=</span><span class="s2">&quot;Pipfile&quot;</span><span class="p">,</span>
+                <span class="n">pipfile_lock_path</span><span class="o">=</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">,</span>
+                <span class="n">without_pipfile_lock</span><span class="o">=</span><span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">),</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="n">pipfile_lock_exists</span>
+                <span class="ow">and</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span>
+                <span class="o">!=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">]</span>
+            <span class="p">):</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s2">&quot;Pipfile hash stated in Pipfile.lock </span><span class="si">%r</span><span class="s2"> does not correspond to Pipfile hash </span><span class="si">%r</span><span class="s2"> - was Pipfile &quot;</span>
+                    <span class="s2">&quot;adjusted? This error is not critical.&quot;</span><span class="p">,</span>
+                    <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
+                    <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()[</span><span class="s2">&quot;sha256&quot;</span><span class="p">][:</span><span class="mi">6</span><span class="p">],</span>
+                <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">requirements_format</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;pip&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-tools&quot;</span><span class="p">,</span> <span class="s2">&quot;pip-compile&quot;</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Using requirements.txt file to manage dependencies located in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">(),</span>
+            <span class="p">)</span>
+            <span class="n">project</span> <span class="o">=</span> <span class="n">Project</span><span class="o">.</span><span class="n">from_pip_compile_files</span><span class="p">(</span><span class="n">allow_without_lock</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Unknown configuration option for requirements format: </span><span class="si">{</span><span class="n">requirements_format</span><span class="si">!r}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">constraints_str</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="s2">&quot;constraints.txt&quot;</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Using constraints.txt file located in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getcwd</span><span class="p">())</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;constraints.txt&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">constraints_file</span><span class="p">:</span>
+                <span class="n">constraints_str</span> <span class="o">=</span> <span class="n">constraints_file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+            <span class="c1"># Try to load constraints before the request to verify their correctness without sending request to the</span>
+            <span class="c1"># backend.</span>
+            <span class="n">Constraints</span><span class="o">.</span><span class="n">from_string</span><span class="p">(</span><span class="n">constraints_str</span><span class="p">)</span>
+
+        <span class="n">pipfile</span> <span class="o">=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span>
+        <span class="n">pipfile_lock_str</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">advise</span><span class="p">(</span>
+            <span class="n">pipfile</span><span class="o">=</span><span class="n">pipfile</span><span class="p">,</span>
+            <span class="n">pipfile_lock</span><span class="o">=</span><span class="n">pipfile_lock_str</span><span class="p">,</span>
+            <span class="n">constraints</span><span class="o">=</span><span class="n">constraints_str</span><span class="p">,</span>
+            <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span><span class="p">,</span>
+            <span class="n">src_path</span><span class="o">=</span><span class="n">src_path</span><span class="p">,</span>
+            <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
+            <span class="n">runtime_environment_name</span><span class="o">=</span><span class="n">runtime_environment_name</span><span class="p">,</span>
+            <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span>
+            <span class="n">no_static_analysis</span><span class="o">=</span><span class="n">no_static_analysis</span><span class="p">,</span>
+            <span class="n">no_user_stack</span><span class="o">=</span><span class="n">no_user_stack</span><span class="p">,</span>
+            <span class="n">nowait</span><span class="o">=</span><span class="n">nowait</span><span class="p">,</span>
+            <span class="n">force</span><span class="o">=</span><span class="n">force</span><span class="p">,</span>
+            <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">,</span>
+            <span class="n">count</span><span class="o">=</span><span class="n">count</span><span class="p">,</span>
+            <span class="n">debug</span><span class="o">=</span><span class="n">debug</span><span class="p">,</span>
+            <span class="n">origin</span><span class="o">=</span><span class="n">origin</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+            <span class="n">source_type</span><span class="o">=</span><span class="n">source_type</span><span class="p">,</span>
+            <span class="n">github_event_type</span><span class="o">=</span><span class="n">github_event_type</span><span class="p">,</span>
+            <span class="n">github_check_run_id</span><span class="o">=</span><span class="n">github_check_run_id</span><span class="p">,</span>
+            <span class="n">github_installation_id</span><span class="o">=</span><span class="n">github_installation_id</span><span class="p">,</span>
+            <span class="n">github_base_repo_url</span><span class="o">=</span><span class="n">github_base_repo_url</span><span class="p">,</span>
+            <span class="n">justification</span><span class="o">=</span><span class="n">justification</span><span class="p">,</span>
+            <span class="n">stack_info</span><span class="o">=</span><span class="n">stack_info</span><span class="p">,</span>
+            <span class="n">kebechet_metadata</span><span class="o">=</span><span class="n">kebechet_metadata</span><span class="p">,</span>
+            <span class="n">verify_tls</span><span class="o">=</span><span class="n">verify_tls</span><span class="p">,</span>
+            <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">,</span>
+        <span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="provenance_check"><a class="viewcode-back" href="../../thamos.html#thamos.lib.provenance_check">[docs]</a><span class="nd">@with_api_client</span>
