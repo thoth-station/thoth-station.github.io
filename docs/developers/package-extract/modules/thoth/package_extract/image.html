@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.package_extract.image &#8212; Thoth Package Extract 1.1.2 documentation</title>
+    <title>thoth.package_extract.image &#8212; Thoth Package Extract 1.2.0 documentation</title>
     <link rel="stylesheet" href="/assets/package-extract/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/package-extract/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/package-extract/documentation_options.js"></script>
@@ -32,7 +32,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Package Extract 1.1.2 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Package Extract 1.2.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -72,6 +72,7 @@
 <span class="kn">import</span> <span class="nn">hashlib</span>
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
 <span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
@@ -80,6 +81,7 @@
 
 <span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="kn">import</span> <span class="n">run_command</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">cwd</span>
+<span class="kn">from</span> <span class="nn">pip._internal.operations.freeze</span> <span class="kn">import</span> <span class="n">freeze</span>
 
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">InvalidImageError</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NotSupported</span>
@@ -677,6 +679,33 @@
     <span class="k">return</span> <span class="n">output</span>
 
 
+<span class="k">def</span> <span class="nf">_get_python_packages</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+    <span class="sd">&quot;&quot;&quot;Get installed Python packages in the container image.&quot;&quot;&quot;</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Detecting installed Python packages&quot;</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">location</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">walk</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">location</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">&quot;site-packages&quot;</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;Excluding </span><span class="si">%r</span><span class="s2"> from checking Python modules installed: not a site-packages directory&quot;</span><span class="p">,</span>
+                <span class="n">location</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">continue</span>
+
+        <span class="k">for</span> <span class="n">dist</span> <span class="ow">in</span> <span class="n">freeze</span><span class="p">(</span><span class="n">paths</span><span class="o">=</span><span class="p">[</span><span class="n">location</span><span class="p">]):</span>
+            <span class="n">package_name</span><span class="p">,</span> <span class="n">package_version</span> <span class="o">=</span> <span class="n">dist</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;==&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_name</span><span class="p">,</span>
+                    <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">package_version</span><span class="p">,</span>
+                    <span class="s2">&quot;location&quot;</span><span class="p">:</span> <span class="n">location</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="p">:]</span>
+                    <span class="k">if</span> <span class="n">location</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="n">location</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">result</span>
+
+
 <div class="viewcode-block" id="run_analyzers"><a class="viewcode-back" href="../../../thoth.package_extract.html#thoth.package_extract.image.run_analyzers">[docs]</a><span class="k">def</span> <span class="nf">run_analyzers</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Run analyzers on the given path (directory) and extract found packages.&quot;&quot;&quot;</span>
     <span class="n">path</span> <span class="o">=</span> <span class="n">quote</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
@@ -698,6 +727,7 @@
         <span class="s2">&quot;system-symbols&quot;</span><span class="p">:</span> <span class="n">_get_system_symbols</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
         <span class="s2">&quot;python-interpreters&quot;</span><span class="p">:</span> <span class="n">_get_python_interpreters</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
         <span class="s2">&quot;cuda-version&quot;</span><span class="p">:</span> <span class="n">_get_cuda_version</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+        <span class="s2">&quot;python-packages&quot;</span><span class="p">:</span> <span class="n">_get_python_packages</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
     <span class="p">}</span></div>
 </pre></div>
 
