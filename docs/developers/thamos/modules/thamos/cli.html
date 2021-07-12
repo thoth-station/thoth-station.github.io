@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.cli &#8212; Thamos 1.18.4 documentation</title>
+    <title>thamos.cli &#8212; Thamos 1.19.0 documentation</title>
     <link rel="stylesheet" href="/assets/thamos/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/thamos/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="/assets/thamos/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.18.4 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.19.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -100,14 +100,17 @@
 <span class="kn">from</span> <span class="nn">thamos.exceptions</span> <span class="kn">import</span> <span class="n">NoRuntimeEnvironmentError</span>
 <span class="kn">from</span> <span class="nn">thamos.config</span> <span class="kn">import</span> <span class="n">config</span> <span class="k">as</span> <span class="n">configuration</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">advise_here</span> <span class="k">as</span> <span class="n">thoth_advise_here</span>
-<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">provenance_check</span> <span class="k">as</span> <span class="n">thoth_provenance_check</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">collect_support_information_dict</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_log</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_status</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">install</span> <span class="k">as</span> <span class="n">thamos_install</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">list_hardware_environments</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">list_python_package_indexes</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">list_thoth_s2i</span>
-<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_log</span>
-<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">install</span> <span class="k">as</span> <span class="n">thamos_install</span>
-<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_status</span>
-<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">write_configuration</span><span class="p">,</span> <span class="n">write_files</span><span class="p">,</span> <span class="n">load_files</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">load_files</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">provenance_check</span> <span class="k">as</span> <span class="n">thoth_provenance_check</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">write_configuration</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">write_files</span>
 <span class="kn">from</span> <span class="nn">thamos.utils</span> <span class="kn">import</span> <span class="n">workdir</span>
 <span class="kn">from</span> <span class="nn">thamos</span> <span class="kn">import</span> <span class="n">__version__</span> <span class="k">as</span> <span class="n">thamos_version</span>
 
@@ -1416,6 +1419,26 @@
         <span class="s2">&quot;Changes done might require triggering new advise to resolve dependencies&quot;</span>
     <span class="p">)</span>
     <span class="n">configuration</span><span class="o">.</span><span class="n">save_project</span><span class="p">(</span><span class="n">project</span><span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;support&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--output&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-o&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;FILE&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify output file&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;-&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="k">def</span> <span class="nf">support</span><span class="p">(</span><span class="n">output</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Collect information from the current environment to report an issue.&quot;&quot;&quot;</span>
+    <span class="n">info</span> <span class="o">=</span> <span class="n">collect_support_information_dict</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">output</span> <span class="o">==</span> <span class="s2">&quot;-&quot;</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">info</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">output_file</span><span class="p">:</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">info</span><span class="p">,</span> <span class="n">output_file</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 
 
 <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span> <span class="ow">and</span> <span class="n">cli</span><span class="p">()</span>

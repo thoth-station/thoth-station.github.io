@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.lib &#8212; Thamos 1.18.4 documentation</title>
+    <title>thamos.lib &#8212; Thamos 1.19.0 documentation</title>
     <link rel="stylesheet" href="/assets/thamos/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/thamos/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="/assets/thamos/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.18.4 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.19.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -72,10 +72,11 @@
 
 <span class="sd">&quot;&quot;&quot;Core parts of library for interacting with Thoth.&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">typing</span>
+<span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">platform</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">import</span> <span class="nn">typing</span>
 <span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">sleep</span>
 <span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">monotonic</span>
 <span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
@@ -99,6 +100,7 @@
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">cwd</span>
 
+<span class="kn">import</span> <span class="nn">thamos.discover</span>
 <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">__version__</span> <span class="k">as</span> <span class="n">thamos_version</span>
 <span class="kn">from</span> <span class="nn">.swagger_client.rest</span> <span class="kn">import</span> <span class="n">ApiException</span>
 <span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">ApiClient</span>
@@ -1331,6 +1333,56 @@
     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Writing adjusted Thoth&#39;s configuration file&quot;</span><span class="p">)</span>
     <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;.thoth.yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">thoth_yaml_file</span><span class="p">:</span>
         <span class="n">yaml</span><span class="o">.</span><span class="n">safe_dump</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="n">thoth_yaml_file</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="collect_support_information_dict"><a class="viewcode-back" href="../../thamos.html#thamos.lib.collect_support_information_dict">[docs]</a><span class="k">def</span> <span class="nf">collect_support_information_dict</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Collect environment information suitable to report bugs or issues in a dictionary form.&quot;&quot;&quot;</span>
+    <span class="n">discovery</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">obj</span> <span class="ow">in</span> <span class="n">thamos</span><span class="o">.</span><span class="n">discover</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">callable</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="ow">and</span> <span class="n">name</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;discover_&quot;</span><span class="p">):</span>
+            <span class="n">discovery</span><span class="p">[</span><span class="n">name</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="s2">&quot;discover_&quot;</span><span class="p">)</span> <span class="p">:]]</span> <span class="o">=</span> <span class="n">obj</span><span class="p">()</span>
+
+    <span class="n">thoth_config_content</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">thoth_config_content</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">content</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to obtain content of Thoth&#39;s configuration file&quot;</span><span class="p">)</span>
+
+    <span class="n">thoth_version</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">thoth_version</span> <span class="o">=</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">get_thoth_version</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to obtain Thoth version information&quot;</span><span class="p">)</span>
+
+    <span class="n">pip_freeze</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">pip_freeze</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span><span class="s2">&quot;pip freeze&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to obtain packages present in the environment&quot;</span><span class="p">)</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;environment&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">((</span><span class="s2">&quot;THAMOS_&quot;</span><span class="p">,</span> <span class="s2">&quot;THOTH_&quot;</span><span class="p">))</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;is_s2i&quot;</span><span class="p">:</span> <span class="n">_is_s2i</span><span class="p">(),</span>
+        <span class="s2">&quot;last_analysis_id&quot;</span><span class="p">:</span> <span class="n">_get_last_analysis_id</span><span class="p">(),</span>
+        <span class="s2">&quot;thoth_config&quot;</span><span class="p">:</span> <span class="n">thoth_config_content</span><span class="p">,</span>
+        <span class="s2">&quot;thoth_version&quot;</span><span class="p">:</span> <span class="n">thoth_version</span><span class="p">,</span>
+        <span class="s2">&quot;thamos_version&quot;</span><span class="p">:</span> <span class="n">thamos_version</span><span class="p">,</span>
+        <span class="s2">&quot;os_name&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="s2">&quot;platform_machine&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">machine</span><span class="p">(),</span>
+        <span class="s2">&quot;platform_python_implementation&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_implementation</span><span class="p">(),</span>
+        <span class="s2">&quot;platform_release&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">release</span><span class="p">(),</span>
+        <span class="s2">&quot;platform_system&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">(),</span>
+        <span class="s2">&quot;platform_version&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">version</span><span class="p">(),</span>
+        <span class="s2">&quot;python_full_version&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_version</span><span class="p">(),</span>
+        <span class="s2">&quot;python_version&quot;</span><span class="p">:</span> <span class="n">platform</span><span class="o">.</span><span class="n">python_version</span><span class="p">()[:</span><span class="mi">3</span><span class="p">],</span>
+        <span class="s2">&quot;sys_platform&quot;</span><span class="p">:</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span><span class="p">,</span>
+        <span class="s2">&quot;pip_freeze&quot;</span><span class="p">:</span> <span class="n">pip_freeze</span><span class="p">,</span>
+        <span class="s2">&quot;discovery&quot;</span><span class="p">:</span> <span class="n">discovery</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">result</span></div>
 </pre></div>
 
           </div>
