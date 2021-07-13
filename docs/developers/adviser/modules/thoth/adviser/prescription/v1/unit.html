@@ -70,6 +70,7 @@
 <span class="sd">&quot;&quot;&quot;A base class for prescription based pipeline units.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">abc</span>
+<span class="kn">import</span> <span class="nn">re</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
@@ -393,23 +394,18 @@
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching base image used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
+        <span class="c1"># All the following require base image information.</span>
+        <span class="n">base_image</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">:</span>
+            <span class="n">base_image</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">get_base_image</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
         <span class="n">shared_objects</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;shared_objects&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">shared_objects</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">base_image</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Check on image symbols is present but no base image provided&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Check on shared objects present but no base image provided&quot;</span><span class="p">,</span>
                     <span class="n">unit_name</span><span class="p">,</span>
                 <span class="p">)</span>
-                <span class="k">return</span> <span class="kc">False</span>
-
-            <span class="n">base_image</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">get_base_image</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">base_image</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Failed to parse base image </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                        <span class="n">unit_name</span><span class="p">,</span>
-                        <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span>
-                    <span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
 
             <span class="n">symbols_present</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span>
@@ -447,21 +443,11 @@
 
         <span class="n">rpm_packages</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rpm_packages&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">rpm_packages</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">base_image</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
                     <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Check on RPM packages present but no base image provided&quot;</span><span class="p">,</span>
                     <span class="n">unit_name</span><span class="p">,</span>
                 <span class="p">)</span>
-                <span class="k">return</span> <span class="kc">False</span>
-
-            <span class="n">base_image</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">get_base_image</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">base_image</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Failed to parse base image </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                        <span class="n">unit_name</span><span class="p">,</span>
-                        <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span>
-                    <span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
 
             <span class="n">analysis_document_id</span> <span class="o">=</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_last_analysis_document_id</span><span class="p">(</span>
@@ -489,13 +475,146 @@
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
 
+        <span class="n">python_packages</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;python_packages&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">python_packages</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">base_image</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Check on Python packages present but no base image provided&quot;</span><span class="p">,</span>
+                    <span class="n">unit_name</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">analysis_document_id</span> <span class="o">=</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_last_analysis_document_id</span><span class="p">(</span>
+                <span class="n">base_image</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">base_image</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="n">is_external</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_document_id</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">iteration</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: No analysis for base container image </span><span class="si">%r</span><span class="s2"> found&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">python_packages_present</span> <span class="o">=</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_python_package_version_all</span><span class="p">(</span><span class="n">analysis_document_id</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">python_packages_present</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: No Python packages found for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_python_packages</span><span class="p">(</span><span class="n">unit_name</span><span class="p">,</span> <span class="n">python_packages_present</span><span class="p">,</span> <span class="n">python_packages</span><span class="p">):</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching Python packages present in the base image </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_check_python_packages</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">unit_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">python_packages_present</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span>
+        <span class="n">python_packages_required</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if required Python packages are present in the environment.&quot;&quot;&quot;</span>
+        <span class="c1"># Convert to dict to have O(1) access time.</span>
+        <span class="n">py_packages_present_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">python_package_present</span> <span class="ow">in</span> <span class="n">python_packages_present</span><span class="p">:</span>
+            <span class="n">package</span> <span class="o">=</span> <span class="n">py_packages_present_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">python_package_present</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">package</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">py_packages_present_dict</span><span class="p">[</span><span class="n">python_package_present</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span><span class="n">python_package_present</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">package</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">python_package_present</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">python_packages_required</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">if</span> <span class="s2">&quot;not&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">python_packages_required</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Unable to parse description of Python packages required&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="k">for</span> <span class="n">not_required_python_package</span> <span class="ow">in</span> <span class="n">python_packages_required</span><span class="p">[</span><span class="s2">&quot;not&quot;</span><span class="p">]:</span>
+                <span class="k">for</span> <span class="n">py_package_present</span> <span class="ow">in</span> <span class="n">py_packages_present_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">not_required_python_package</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span> <span class="ow">or</span> <span class="p">[]:</span>
+                    <span class="n">location</span> <span class="o">=</span> <span class="n">not_required_python_package</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;location&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">location</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">re</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">location</span><span class="p">,</span> <span class="n">py_package_present</span><span class="p">[</span><span class="s2">&quot;location&quot;</span><span class="p">]):</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Python package </span><span class="si">%r</span><span class="s2"> in </span><span class="si">%r</span><span class="s2"> is located in different location </span><span class="si">%r</span><span class="s2"> as expected&quot;</span><span class="p">,</span>
+                            <span class="n">unit_name</span><span class="p">,</span>
+                            <span class="n">not_required_python_package</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                            <span class="n">py_package_present</span><span class="p">[</span><span class="s2">&quot;location&quot;</span><span class="p">],</span>
+                            <span class="n">location</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">version</span> <span class="o">=</span> <span class="n">not_required_python_package</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">version</span> <span class="ow">and</span> <span class="n">py_package_present</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">SpecifierSet</span><span class="p">(</span><span class="n">version</span><span class="p">):</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Python package &#39;</span><span class="si">%s</span><span class="s2">==</span><span class="si">%s</span><span class="s2">&#39; (in </span><span class="si">%r</span><span class="s2">) matches version </span><span class="si">%r</span><span class="s2"> but should not&quot;</span><span class="p">,</span>
+                            <span class="n">unit_name</span><span class="p">,</span>
+                            <span class="n">not_required_python_package</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                            <span class="n">py_package_present</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">],</span>
+                            <span class="n">py_package_present</span><span class="p">[</span><span class="s2">&quot;location&quot;</span><span class="p">],</span>
+                            <span class="n">version</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: presence of Python package </span><span class="si">%r</span><span class="s2"> causes not including the pipeline unit&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">py_package_present</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">required_python_package</span> <span class="ow">in</span> <span class="n">python_packages_required</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">py_package_present</span> <span class="ow">in</span> <span class="n">py_packages_present_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">required_python_package</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span> <span class="ow">or</span> <span class="p">[]:</span>
+                    <span class="n">version</span> <span class="o">=</span> <span class="n">required_python_package</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">version</span> <span class="ow">and</span> <span class="n">py_package_present</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">SpecifierSet</span><span class="p">(</span><span class="n">version</span><span class="p">):</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Python package &#39;</span><span class="si">%s</span><span class="s2">==</span><span class="si">%s</span><span class="s2">&#39; (in </span><span class="si">%r</span><span class="s2">) does not match required version </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">unit_name</span><span class="p">,</span>
+                            <span class="n">required_python_package</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                            <span class="n">py_package_present</span><span class="p">[</span><span class="s2">&quot;package_version&quot;</span><span class="p">],</span>
+                            <span class="n">py_package_present</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;location&quot;</span><span class="p">,</span> <span class="s2">&quot;any&quot;</span><span class="p">),</span>
+                            <span class="n">version</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">location</span> <span class="o">=</span> <span class="n">required_python_package</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;location&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">location</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">re</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="n">location</span><span class="p">,</span> <span class="n">py_package_present</span><span class="p">[</span><span class="s2">&quot;location&quot;</span><span class="p">]):</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Python package </span><span class="si">%r</span><span class="s2"> is located at </span><span class="si">%r</span><span class="s2"> but expected to be in </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">unit_name</span><span class="p">,</span>
+                            <span class="n">required_python_package</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                            <span class="n">py_package_present</span><span class="p">[</span><span class="s2">&quot;location&quot;</span><span class="p">],</span>
+                            <span class="n">location</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="k">continue</span>
+
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Python package </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> (located in </span><span class="si">%r</span><span class="s2">) is found in the runtime environment&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">required_python_package</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                        <span class="n">required_python_package</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">,</span> <span class="s2">&quot;any&quot;</span><span class="p">),</span>
+                        <span class="n">py_package_present</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;location&quot;</span><span class="p">,</span> <span class="s2">&quot;any&quot;</span><span class="p">),</span>
+                    <span class="p">)</span>
+                    <span class="k">break</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not including as Python package </span><span class="si">%r</span><span class="s2"> (in version </span><span class="si">%r</span><span class="s2">) is not present in the environment&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">required_python_package</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                        <span class="n">required_python_package</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">,</span> <span class="s2">&quot;any&quot;</span><span class="p">),</span>
+                    <span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: all Python package presence checks passed&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">True</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">_check_rpm_packages</span><span class="p">(</span>
         <span class="n">unit_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
         <span class="n">rpm_packages_present</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span>
-        <span class="n">rpm_packages_required</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]],</span>
+        <span class="n">rpm_packages_required</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]],</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Check if required RPM packages are present.&quot;&quot;&quot;</span>
         <span class="c1"># Convert RPM packages present to mapping to save some cycles and have O(1) look up.</span>
@@ -503,7 +622,7 @@
         <span class="n">rpm_packages_req</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">rpm_packages_required</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
             <span class="k">if</span> <span class="s2">&quot;not&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rpm_packages_required</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%r</span><span class="s2">: Unable to parse description of RPM packages required&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Unable to parse description of RPM packages required&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
 
             <span class="n">should_be_present</span> <span class="o">=</span> <span class="kc">False</span>
@@ -560,6 +679,7 @@
             <span class="k">return</span> <span class="kc">False</span>
 
         <span class="c1"># Path to should be present.</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: all RPM package presence checks passed&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">True</span>
 
     <span class="nd">@classmethod</span>
