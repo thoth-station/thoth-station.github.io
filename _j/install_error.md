@@ -1,5 +1,5 @@
 ---
-title: Removing a package due to build time error in the software environment
+title: Removing a package due to installation time error in the software environment
 ---
 
 The given package was removed from the resolution process as it produces errors
