@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.product &#8212; Thoth Adviser 0.35.0 documentation</title>
+    <title>thoth.adviser.product &#8212; Thoth Adviser 0.36.0 documentation</title>
     <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/adviser/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Adviser 0.35.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Adviser 0.36.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -82,6 +82,7 @@
 <span class="kn">import</span> <span class="nn">attr</span>
 
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">RuntimeEnvironment</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">Project</span>
 <span class="kn">from</span> <span class="nn">thoth.storages.exceptions</span> <span class="kn">import</span> <span class="n">NotFoundError</span>
@@ -99,6 +100,11 @@
     <span class="sd">&quot;&quot;&quot;A representation of an advised stack.&quot;&quot;&quot;</span>
 
     <span class="n">_LOG_HASHES</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">_NO_OBSERVATION_JUSTIFICATION</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;no_observations&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;No issues spotted for this stack based on Thoth&#39;s database&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
+    <span class="p">}</span>
 
     <span class="n">project</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Project</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">score</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -193,10 +199,14 @@
             <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to parse adviser metadata&quot;</span><span class="p">)</span>
 
+        <span class="n">justification</span> <span class="o">=</span> <span class="n">justification_metadata</span> <span class="o">+</span> <span class="n">state</span><span class="o">.</span><span class="n">justification</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">justification</span><span class="p">:</span>
+            <span class="n">justification</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_NO_OBSERVATION_JUSTIFICATION</span><span class="p">)</span>
+
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
             <span class="n">project</span><span class="o">=</span><span class="n">advised_project</span><span class="p">,</span>
             <span class="n">score</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">score</span><span class="p">,</span>
-            <span class="n">justification</span><span class="o">=</span><span class="n">justification_metadata</span> <span class="o">+</span> <span class="n">state</span><span class="o">.</span><span class="n">justification</span><span class="p">,</span>
+            <span class="n">justification</span><span class="o">=</span><span class="n">justification</span><span class="p">,</span>
             <span class="n">advised_runtime_environment</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">advised_runtime_environment</span><span class="p">,</span>
             <span class="n">advised_manifest_changes</span><span class="o">=</span><span class="n">state</span><span class="o">.</span><span class="n">advised_manifest_changes</span><span class="p">,</span>
         <span class="p">)</span></div>
