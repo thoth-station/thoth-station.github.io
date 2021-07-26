@@ -2,7 +2,7 @@
 title: No CUDA specific trove classifier matching CUDA version used
 ---
 
-Package maintainer did not state CUDA version used as a compatible version.
+The CUDA version used is not listed as a compatible version for this package by the package maintainer.
 
 ## Issue description
 
