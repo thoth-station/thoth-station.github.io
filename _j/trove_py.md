@@ -2,7 +2,7 @@
 title: No Python specific trove classifier matching Python version used
 ---
 
-Package maintainer did not state Python version used as a compatible version.
+Python package version used is not listed in the list of compatible versions by the package maintainer.
 
 ## Issue description
 
