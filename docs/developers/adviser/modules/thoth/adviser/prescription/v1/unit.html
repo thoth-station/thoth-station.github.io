@@ -187,6 +187,44 @@
         <span class="bp">cls</span><span class="o">.</span><span class="n">_PRESCRIPTION</span> <span class="o">=</span> <span class="n">prescription</span></div>
 
     <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">_check_symbols</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">library_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">symbols_expected</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">symbols_used</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if symbols expected are available given the symbols used.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">symbol_expected</span> <span class="ow">in</span> <span class="n">symbols_expected</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">symbol_used</span> <span class="ow">in</span> <span class="n">symbols_used</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">symbol_expected</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.*&quot;</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">symbol_used</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">symbol_expected</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">]):</span>  <span class="c1"># Discard ending &quot;.*&quot;</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                            <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Library symbol </span><span class="si">%r</span><span class="s2"> matching unit requirement on symbol </span><span class="si">%r</span><span class="s2"> for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="n">unit_name</span><span class="p">,</span>
+                            <span class="n">symbol_used</span><span class="p">,</span>
+                            <span class="n">symbol_expected</span><span class="p">,</span>
+                            <span class="n">library_name</span><span class="p">,</span>
+                        <span class="p">)</span>
+                        <span class="k">break</span>
+                <span class="k">elif</span> <span class="n">symbol_used</span> <span class="o">==</span> <span class="n">symbol_expected</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Library symbol </span><span class="si">%r</span><span class="s2"> matching unit requirement on symbol </span><span class="si">%r</span><span class="s2"> for </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">symbol_used</span><span class="p">,</span>
+                        <span class="n">symbol_expected</span><span class="p">,</span>
+                        <span class="n">library_name</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">break</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as library symbol requested </span><span class="si">%r</span><span class="s2"> for </span><span class="si">%r</span><span class="s2"> is not used&quot;</span><span class="p">,</span>
+                    <span class="n">unit_name</span><span class="p">,</span>
+                    <span class="n">symbol_expected</span><span class="p">,</span>
+                    <span class="n">library_name</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: All library symbols required for </span><span class="si">%r</span><span class="s2"> unit are used&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">library_name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">_should_include_base</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Determine if this unit should be included.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_PRESCRIPTION</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -262,13 +300,14 @@
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as no library usage supplied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
 
-            <span class="k">for</span> <span class="n">library</span><span class="p">,</span> <span class="n">symbols</span> <span class="ow">in</span> <span class="n">library_usage_expected</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                <span class="k">if</span> <span class="n">library</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">library_usage</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as library </span><span class="si">%r</span><span class="s2"> is not used&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">library</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">library_name</span><span class="p">,</span> <span class="n">symbols_expected</span> <span class="ow">in</span> <span class="n">library_usage_expected</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">symbols_used</span> <span class="o">=</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">library_usage</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">library_name</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">symbols_used</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as library </span><span class="si">%s</span><span class="s2"> is not used&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">library_name</span><span class="p">)</span>
                     <span class="k">return</span> <span class="kc">False</span>
 
-                <span class="k">if</span> <span class="ow">not</span> <span class="nb">set</span><span class="p">(</span><span class="n">symbols</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">builder_context</span><span class="o">.</span><span class="n">library_usage</span><span class="p">[</span><span class="n">library</span><span class="p">]):</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as not all required symbols for </span><span class="si">%r</span><span class="s2"> used&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">library</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_symbols</span><span class="p">(</span><span class="n">unit_name</span><span class="p">,</span> <span class="n">library_name</span><span class="p">,</span> <span class="n">symbols_expected</span><span class="p">,</span> <span class="n">symbols_used</span><span class="p">):</span>
                     <span class="k">return</span> <span class="kc">False</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: All library symbols required present in the library usage supplied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
@@ -399,11 +438,11 @@
         <span class="k">if</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">:</span>
             <span class="n">base_image</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">get_base_image</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-        <span class="n">shared_objects</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;shared_objects&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">shared_objects</span><span class="p">:</span>
+        <span class="n">abi</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;abi&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">abi</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">base_image</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Check on shared objects present but no base image provided&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Check on ABI present but no base image provided&quot;</span><span class="p">,</span>
                     <span class="n">unit_name</span><span class="p">,</span>
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
@@ -422,23 +461,21 @@
                     <span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
 
-            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shared_objects</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;not&quot;</span> <span class="ow">in</span> <span class="n">shared_objects</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">abi</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;not&quot;</span> <span class="ow">in</span> <span class="n">abi</span><span class="p">:</span>
                 <span class="c1"># Negate operation.</span>
-                <span class="k">if</span> <span class="n">symbols_present</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">shared_objects</span><span class="p">[</span><span class="s2">&quot;not&quot;</span><span class="p">])):</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching shared objects present in the base image&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">symbols_present</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">abi</span><span class="p">[</span><span class="s2">&quot;not&quot;</span><span class="p">])):</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching ABI present in the base image&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
                     <span class="k">return</span> <span class="kc">False</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="k">return</span> <span class="kc">True</span>
-            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">shared_objects</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-                <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">shared_objects</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">symbols_present</span><span class="p">):</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">abi</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">set</span><span class="p">(</span><span class="n">abi</span><span class="p">)</span><span class="o">.</span><span class="n">issubset</span><span class="p">(</span><span class="n">symbols_present</span><span class="p">):</span>
                     <span class="k">return</span> <span class="kc">True</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching shared objects present in the base image&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching ABI present in the base image&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
                     <span class="k">return</span> <span class="kc">False</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Unknown shared objects definition - please report this error to administrator&quot;</span><span class="p">,</span> <span class="n">unit_name</span>
-                <span class="p">)</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Unknown ABI definition - please report this error to administrator&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
 
         <span class="n">rpm_packages</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rpm_packages&quot;</span><span class="p">)</span>

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.cli &#8212; Thamos 1.19.0 documentation</title>
+    <title>thamos.cli &#8212; Thamos 1.20.0 documentation</title>
     <link rel="stylesheet" href="/assets/thamos/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/thamos/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="/assets/thamos/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.19.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.20.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -110,6 +110,7 @@
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">load_files</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">provenance_check</span> <span class="k">as</span> <span class="n">thoth_provenance_check</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">write_configuration</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">print_dependency_graph</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">write_files</span>
 <span class="kn">from</span> <span class="nn">thamos.utils</span> <span class="kn">import</span> <span class="n">workdir</span>
 <span class="kn">from</span> <span class="nn">thamos</span> <span class="kn">import</span> <span class="n">__version__</span> <span class="k">as</span> <span class="n">thamos_version</span>
@@ -931,6 +932,37 @@
         <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown output format </span><span class="si">{</span><span class="n">output_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;graph&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;analysis_id&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;ANALYSIS_ID&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--fold/--unfold&quot;</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_GRAPH_FOLD&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">bool</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Collapse repeating sub-graphs in the output.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@handle_cli_exception</span>
+<span class="k">def</span> <span class="nf">graph</span><span class="p">(</span>
+    <span class="n">analysis_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">fold</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D412</span>
+    <span class="sd">&quot;&quot;&quot;Show dependency graph of resolved dependencies.</span>
+
+<span class="sd">    If ANALYSIS_ID is not provided, the last request is used by default.</span>
+
+<span class="sd">    Examples:</span>
+
+<span class="sd">      thamos graph</span>
+
+<span class="sd">      thamos graph &quot;adviser-940101080006-110c392feb7cf6da&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="n">workdir</span><span class="p">():</span>
+        <span class="n">printed</span> <span class="o">=</span> <span class="n">print_dependency_graph</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">,</span> <span class="n">fold</span><span class="o">=</span><span class="n">fold</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">printed</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
 
 
 <span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;list&quot;</span><span class="p">)</span>

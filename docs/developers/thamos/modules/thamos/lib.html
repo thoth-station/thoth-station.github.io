@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.lib &#8212; Thamos 1.19.0 documentation</title>
+    <title>thamos.lib &#8212; Thamos 1.20.0 documentation</title>
     <link rel="stylesheet" href="/assets/thamos/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/thamos/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="/assets/thamos/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.19.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.20.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -77,6 +77,7 @@
 <span class="kn">import</span> <span class="nn">platform</span>
 <span class="kn">import</span> <span class="nn">sys</span>
 <span class="kn">import</span> <span class="nn">typing</span>
+<span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
 <span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">sleep</span>
 <span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">monotonic</span>
 <span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">contextmanager</span>
@@ -1037,7 +1038,7 @@
 
 
 <div class="viewcode-block" id="get_status"><a class="viewcode-back" href="../../thamos.html#thamos.lib.get_status">[docs]</a><span class="nd">@with_api_client</span>
-<span class="k">def</span> <span class="nf">get_status</span><span class="p">(</span><span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">get_status</span><span class="p">(</span><span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Get status of an analysis - the analysis type and endpoint are automatically derived from analysis id.</span>
 
 <span class="sd">    If analysis_id is not provided, its get from the last thamos call which stores it in a temporary file.</span>
@@ -1065,8 +1066,13 @@
 
 
 <div class="viewcode-block" id="get_analysis_results"><a class="viewcode-back" href="../../thamos.html#thamos.lib.get_analysis_results">[docs]</a><span class="nd">@with_api_client</span>
-<span class="k">def</span> <span class="nf">get_analysis_results</span><span class="p">(</span><span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">get_analysis_results</span><span class="p">(</span>
+    <span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Get the analysis result from a given id.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_id</span><span class="p">:</span>
+        <span class="n">analysis_id</span> <span class="o">=</span> <span class="n">_get_last_analysis_id</span><span class="p">()</span>
+
     <span class="k">if</span> <span class="n">analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;package-extract-&quot;</span><span class="p">):</span>
         <span class="n">api_instance</span> <span class="o">=</span> <span class="n">ImageAnalysisApi</span><span class="p">(</span>
             <span class="n">api_client</span>
@@ -1383,6 +1389,120 @@
         <span class="s2">&quot;discovery&quot;</span><span class="p">:</span> <span class="n">discovery</span><span class="p">,</span>
     <span class="p">}</span>
     <span class="k">return</span> <span class="n">result</span></div>
+
+
+<span class="k">def</span> <span class="nf">_get_package_entry_str</span><span class="p">(</span>
+    <span class="n">pipfile_lock</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">]],</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Get information about the given package so that they are printed to users.&quot;&quot;&quot;</span>
+    <span class="n">package_entry</span> <span class="o">=</span> <span class="n">pipfile_lock</span><span class="p">[</span><span class="s2">&quot;default&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="n">package_name</span><span class="p">,</span> <span class="n">pipfile_lock</span><span class="p">[</span><span class="s2">&quot;develop&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_name</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">package_entry</span><span class="p">:</span>
+        <span class="c1"># Any error spotted?</span>
+        <span class="k">return</span> <span class="s2">&quot;UNKNOWN==UNKNOWN from UNKNOWN&quot;</span>
+
+    <span class="n">index_url</span> <span class="o">=</span> <span class="s2">&quot;UNKNOWN&quot;</span>
+    <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="n">pipfile_lock</span><span class="p">[</span><span class="s2">&quot;_meta&quot;</span><span class="p">][</span><span class="s2">&quot;sources&quot;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">package_entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;index&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">source</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]:</span>
+            <span class="n">index_url</span> <span class="o">=</span> <span class="n">source</span><span class="p">[</span><span class="s2">&quot;url&quot;</span><span class="p">]</span>
+            <span class="k">break</span>
+
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">package_name</span><span class="si">}{</span><span class="n">package_entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;version&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2"> from </span><span class="si">{</span><span class="n">index_url</span><span class="si">}</span><span class="s2">&quot;</span>
+
+
+<span class="k">def</span> <span class="nf">_traverse_edges</span><span class="p">(</span>
+    <span class="n">pipfile_lock</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span>
+    <span class="n">nodes</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">edges</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]],</span>
+    <span class="n">seen_nodes</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Set</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">starting_node</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">indent</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">fold</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Traverse edges of the dependency graph and show its structure to terminal.&quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">edge</span> <span class="ow">in</span> <span class="n">edges</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">edge</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="n">starting_node</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="s2">&quot; &quot;</span> <span class="o">*</span> <span class="n">indent</span>
+                <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot;↳ </span><span class="si">{</span><span class="n">_get_package_entry_str</span><span class="p">(</span><span class="n">pipfile_lock</span><span class="p">,</span> <span class="n">nodes</span><span class="p">[</span><span class="n">edge</span><span class="p">[</span><span class="mi">1</span><span class="p">]])</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">edge</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen_nodes</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">fold</span><span class="p">:</span>
+                    <span class="n">seen_nodes</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">edge</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+                <span class="n">_traverse_edges</span><span class="p">(</span>
+                    <span class="n">pipfile_lock</span><span class="p">,</span>
+                    <span class="n">nodes</span><span class="p">,</span>
+                    <span class="n">edges</span><span class="p">,</span>
+                    <span class="n">seen_nodes</span><span class="o">=</span><span class="n">seen_nodes</span> <span class="o">|</span> <span class="p">{</span><span class="n">edge</span><span class="p">[</span><span class="mi">1</span><span class="p">]},</span>
+                    <span class="n">starting_node</span><span class="o">=</span><span class="n">edge</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                    <span class="n">indent</span><span class="o">=</span><span class="n">indent</span> <span class="o">+</span> <span class="mi">2</span><span class="p">,</span>
+                    <span class="n">fold</span><span class="o">=</span><span class="n">fold</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Note cyclic dependency.</span>
+                <span class="nb">print</span><span class="p">(</span><span class="s2">&quot; &quot;</span> <span class="o">*</span> <span class="p">(</span><span class="n">indent</span> <span class="o">+</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;↳ …&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="print_dependency_graph_from_adviser_document"><a class="viewcode-back" href="../../thamos.html#thamos.lib.print_dependency_graph_from_adviser_document">[docs]</a><span class="k">def</span> <span class="nf">print_dependency_graph_from_adviser_document</span><span class="p">(</span>
+    <span class="n">adviser_document</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">fold</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Print dependency graph to stdout from the given document.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">adviser_document</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">]:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="s2">&quot;No dependency graph to show, was the adviser request successful?&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">adviser_document</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dependency_graph&quot;</span><span class="p">):</span>
+        <span class="c1"># XXX: we can remove this check over time.</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="s2">&quot;No dependency graph to show, was the result computed with recent adviser?&quot;</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">nodes</span> <span class="o">=</span> <span class="n">adviser_document</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;dependency_graph&quot;</span><span class="p">][</span><span class="s2">&quot;nodes&quot;</span><span class="p">]</span>
+    <span class="n">edges</span> <span class="o">=</span> <span class="n">adviser_document</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;dependency_graph&quot;</span><span class="p">][</span><span class="s2">&quot;edges&quot;</span><span class="p">]</span>
+
+    <span class="n">nodes_idx</span> <span class="o">=</span> <span class="p">{</span><span class="n">n</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">nodes</span><span class="p">)}</span>
+    <span class="c1"># Keep a list of flags stating the given package is a root dependency.</span>
+    <span class="n">pipfile</span> <span class="o">=</span> <span class="n">adviser_document</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;project&quot;</span><span class="p">][</span><span class="s2">&quot;requirements&quot;</span><span class="p">]</span>
+    <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">adviser_document</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;project&quot;</span><span class="p">][</span>
+        <span class="s2">&quot;requirements_locked&quot;</span>
+    <span class="p">]</span>
+    <span class="k">for</span> <span class="n">direct_dependency</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span>
+        <span class="n">pipfile</span><span class="p">[</span><span class="s2">&quot;packages&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">(),</span> <span class="n">pipfile</span><span class="p">[</span><span class="s2">&quot;dev-packages&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="p">):</span>
+        <span class="n">direct_dependency_idx</span> <span class="o">=</span> <span class="n">nodes_idx</span><span class="p">[</span><span class="n">direct_dependency</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;→ </span><span class="si">{</span><span class="n">_get_package_entry_str</span><span class="p">(</span><span class="n">pipfile_lock</span><span class="p">,</span> <span class="n">direct_dependency</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">_traverse_edges</span><span class="p">(</span>
+            <span class="n">pipfile_lock</span><span class="p">,</span>
+            <span class="n">nodes</span><span class="p">,</span>
+            <span class="n">edges</span><span class="p">,</span>
+            <span class="n">seen_nodes</span><span class="o">=</span><span class="p">{</span><span class="n">direct_dependency_idx</span><span class="p">},</span>
+            <span class="n">starting_node</span><span class="o">=</span><span class="n">direct_dependency_idx</span><span class="p">,</span>
+            <span class="n">fold</span><span class="o">=</span><span class="n">fold</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="print_dependency_graph"><a class="viewcode-back" href="../../thamos.html#thamos.lib.print_dependency_graph">[docs]</a><span class="k">def</span> <span class="nf">print_dependency_graph</span><span class="p">(</span>
+    <span class="n">analysis_id</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">fold</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Print dependency graph to stdout produced by the given adviser.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_id</span><span class="p">:</span>
+        <span class="n">adviser_document</span><span class="p">,</span> <span class="n">error</span> <span class="o">=</span> <span class="n">get_analysis_results</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">adviser_document</span><span class="p">,</span> <span class="n">error</span> <span class="o">=</span> <span class="n">get_analysis_results</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">error</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Cannot print dependency graph as advise was not successful&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">return</span> <span class="n">print_dependency_graph_from_adviser_document</span><span class="p">(</span><span class="n">adviser_document</span><span class="p">,</span> <span class="n">fold</span><span class="o">=</span><span class="n">fold</span><span class="p">)</span></div>
 </pre></div>
 
           </div>
