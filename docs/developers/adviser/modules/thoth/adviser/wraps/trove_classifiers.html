@@ -1,0 +1,314 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>thoth.adviser.wraps.trove_classifiers &#8212; Thoth Adviser 0.37.0 documentation</title>
+    <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
+    <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="/assets/adviser/documentation_options.js"></script>
+    <script type="text/javascript" src="/assets/adviser/jquery.js"></script>
+    <script type="text/javascript" src="/assets/adviser/underscore.js"></script>
+    <script type="text/javascript" src="/assets/adviser/doctools.js"></script>
+    <script type="text/javascript" src="/assets/adviser/language_data.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+
+   
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
+  <link href='https://fonts.googleapis.com/css?family=Lato:400,700,400italic,700italic|Lora:400' rel='stylesheet' type='text/css'>
+  <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css">
+
+<script type="text/javascript">
+  var _gaq = _gaq || [];
+  _gaq.push(['_setAccount', 'UA-123174547-2']);
+  _gaq.push(['_trackPageview']);
+</script>
+
+  </head><body>
+  
+  
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../../../../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../../../../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Adviser 0.37.0 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for thoth.adviser.wraps.trove_classifiers</h1><div class="highlight"><pre>
+<span></span><span class="ch">#!/usr/bin/env python3</span>
+<span class="c1"># thoth-adviser</span>
+<span class="c1"># Copyright(C) 2021 Fridolin Pokorny</span>
+<span class="c1">#</span>
+<span class="c1"># This program is free software: you can redistribute it and / or modify</span>
+<span class="c1"># it under the terms of the GNU General Public License as published by</span>
+<span class="c1"># the Free Software Foundation, either version 3 of the License, or</span>
+<span class="c1"># (at your option) any later version.</span>
+<span class="c1">#</span>
+<span class="c1"># This program is distributed in the hope that it will be useful,</span>
+<span class="c1"># but WITHOUT ANY WARRANTY without even the implied warranty of</span>
+<span class="c1"># MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<span class="c1"># GNU General Public License for more details.</span>
+<span class="c1">#</span>
+<span class="c1"># You should have received a copy of the GNU General Public License</span>
+<span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+
+<span class="sd">&quot;&quot;&quot;A wrap that provides information derived from Python trove classifiers.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">from</span> <span class="nn">..state</span> <span class="kn">import</span> <span class="n">State</span>
+<span class="kn">from</span> <span class="nn">..wrap</span> <span class="kn">import</span> <span class="n">Wrap</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.enums</span> <span class="kn">import</span> <span class="n">RecommendationType</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">..pipeline_builder</span> <span class="kn">import</span> <span class="n">PipelineBuilderContext</span>
+
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">_DevelopmentStatusEnum</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Development status trove classifier representation.&quot;&quot;&quot;</span>
+
+    <span class="n">PLANNING</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">PRE_ALPHA</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">ALPHA</span> <span class="o">=</span> <span class="mi">3</span>
+    <span class="n">BETA</span> <span class="o">=</span> <span class="mi">4</span>
+    <span class="n">STABLE</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="n">MATURE</span> <span class="o">=</span> <span class="mi">6</span>
+    <span class="n">INACTIVE</span> <span class="o">=</span> <span class="mi">7</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_str</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">trove_classifier</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="s2">&quot;_DevelopmentStatusEnum&quot;</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get development status enum from a string representation.&quot;&quot;&quot;</span>
+        <span class="n">trove_classifier</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">trove_classifier</span> <span class="o">==</span> <span class="s2">&quot;Development Status:: 1 - Planning&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">PLANNING</span>
+
+        <span class="k">if</span> <span class="n">trove_classifier</span> <span class="o">==</span> <span class="s2">&quot;Development Status:: 2 - Pre - Alpha&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">PRE_ALPHA</span>
+
+        <span class="k">if</span> <span class="n">trove_classifier</span> <span class="o">==</span> <span class="s2">&quot;Development Status:: 3 - Alpha&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">ALPHA</span>
+
+        <span class="k">if</span> <span class="n">trove_classifier</span> <span class="o">==</span> <span class="s2">&quot;Development Status:: 4 - Beta&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">BETA</span>
+
+        <span class="k">if</span> <span class="n">trove_classifier</span> <span class="o">==</span> <span class="s2">&quot;Development Status:: 5 - Production / Stable&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">STABLE</span>
+
+        <span class="k">if</span> <span class="n">trove_classifier</span> <span class="o">==</span> <span class="s2">&quot;Development Status:: 6 - Mature&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">MATURE</span>
+
+        <span class="k">if</span> <span class="n">trove_classifier</span> <span class="o">==</span> <span class="s2">&quot;Development Status:: 7 - Inactive&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">INACTIVE</span>
+
+        <span class="k">return</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="TroveClassifiersWrap"><a class="viewcode-back" href="../../../../thoth.adviser.wraps.html#thoth.adviser.wraps.trove_classifiers.TroveClassifiersWrap">[docs]</a><span class="k">class</span> <span class="nc">TroveClassifiersWrap</span><span class="p">(</span><span class="n">Wrap</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;A wrap that provides information derived from Python trove classifiers.&quot;&quot;&quot;</span>
+
+    <span class="n">_ENVIRONMENT_GPU_CUDA_PREFIX</span> <span class="o">=</span> <span class="s2">&quot;Environment :: GPU :: NVIDIA CUDA :: &quot;</span>
+    <span class="n">_PROGRAMMING_LANGUAGE_PYTHON_PREFIX</span> <span class="o">=</span> <span class="s2">&quot;Programming Language :: Python :: &quot;</span>
+    <span class="n">_DEVELOPMENT_STATUS_PREFIX</span> <span class="o">=</span> <span class="s2">&quot;Development Status:: &quot;</span>
+
+    <span class="n">_JUSTIFICATION_LINK_PYTHON_VERSION</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;trove_py&quot;</span><span class="p">)</span>
+    <span class="n">_JUSTIFICATION_LINK_USING_UNSTABLE</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;trove_unstable&quot;</span><span class="p">)</span>
+    <span class="n">_JUSTIFICATION_LINK_USING_INACTIVE</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;trove_inactive&quot;</span><span class="p">)</span>
+    <span class="n">_JUSTIFICATION_LINK_CUDA_VERSION</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;trove_cuda&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="TroveClassifiersWrap.should_include"><a class="viewcode-back" href="../../../../thoth.adviser.wraps.html#thoth.adviser.wraps.trove_classifiers.TroveClassifiersWrap.should_include">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">should_include</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Include this wrap in adviser, once.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_adviser_pipeline</span><span class="p">()</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_included</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
+            <span class="k">yield</span> <span class="p">{}</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">yield from</span> <span class="p">()</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+    <span class="k">def</span> <span class="nf">_environment_gpu_cuda_version</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">,</span> <span class="n">trove_classifiers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add justifications relevant relevant information for GPU CUDA.&quot;&quot;&quot;</span>
+        <span class="n">cuda_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">cuda_version</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">cuda_version</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">cuda_version_trove_classifiers</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">trove_classifier</span> <span class="ow">in</span> <span class="n">trove_classifiers</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">trove_classifier</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_ENVIRONMENT_GPU_CUDA_PREFIX</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+            <span class="n">cuda_version_trove_classifier</span> <span class="o">=</span> <span class="n">trove_classifier</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_ENVIRONMENT_GPU_CUDA_PREFIX</span><span class="p">)</span> <span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="n">cuda_version_trove_classifier_parts</span> <span class="o">=</span> <span class="n">cuda_version_trove_classifier</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cuda_version_trove_classifier_parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Unknown CUDA trove classifier: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">cuda_version_trove_classifier</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">cuda_version_trove_classifiers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">cuda_version_trove_classifier</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cuda_version_trove_classifiers</span> <span class="ow">and</span> <span class="n">cuda_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">cuda_version_trove_classifiers</span><span class="p">:</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">justification</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK_CUDA_VERSION</span><span class="p">,</span>
+                    <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;No CUDA specific trove classifier matching CUDA version used </span><span class="si">{</span><span class="n">cuda_version</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_name</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_development_status</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">,</span> <span class="n">trove_classifiers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add justifications relevant for development status.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">trove_classifier</span> <span class="ow">in</span> <span class="n">trove_classifiers</span><span class="p">:</span>
+            <span class="n">development_status</span> <span class="o">=</span> <span class="n">_DevelopmentStatusEnum</span><span class="o">.</span><span class="n">from_str</span><span class="p">(</span><span class="n">trove_classifier</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">development_status</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">recommendation_type</span><span class="p">:</span> <span class="n">RecommendationType</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">recommendation_type</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">recommendation_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="n">RecommendationType</span><span class="o">.</span><span class="n">TESTING</span><span class="p">,</span> <span class="n">RecommendationType</span><span class="o">.</span><span class="n">LATEST</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">development_status</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">development_status</span><span class="o">.</span><span class="n">value</span> <span class="o">&lt;</span> <span class="n">_DevelopmentStatusEnum</span><span class="o">.</span><span class="n">STABLE</span><span class="o">.</span><span class="n">value</span><span class="p">:</span>
+                    <span class="n">state</span><span class="o">.</span><span class="n">justification</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                        <span class="p">{</span>
+                            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                            <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK_USING_UNSTABLE</span><span class="p">,</span>
+                            <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Development status stated in trove classifiers is &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">development_status</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;_&#39;</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> which might &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;be not suitable to be used with recommendation type </span><span class="si">{</span><span class="n">recommendation_type</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">,</span>
+                            <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_name</span><span class="p">,</span>
+                        <span class="p">}</span>
+                    <span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">development_status</span> <span class="o">==</span> <span class="n">_DevelopmentStatusEnum</span><span class="o">.</span><span class="n">INACTIVE</span><span class="p">:</span>
+                <span class="n">state</span><span class="o">.</span><span class="n">justification</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK_USING_INACTIVE</span><span class="p">,</span>
+                        <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Inactive development status of </span><span class="si">{</span><span class="n">package_name</span><span class="si">!r}</span><span class="s2"> stated in trove classifiers&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_name</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_programming_language_python</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">,</span> <span class="n">trove_classifiers</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add justification relevant for Python programming language.&quot;&quot;&quot;</span>
+        <span class="n">python_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">python_version</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">py_trove_classifiers</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">trove_classifier</span> <span class="ow">in</span> <span class="n">trove_classifiers</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">trove_classifier</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_PROGRAMMING_LANGUAGE_PYTHON_PREFIX</span><span class="p">):</span>
+                <span class="k">continue</span>
+
+            <span class="n">trove_python_version</span> <span class="o">=</span> <span class="n">trove_classifier</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_PROGRAMMING_LANGUAGE_PYTHON_PREFIX</span><span class="p">)</span> <span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="n">trove_python_version_parts</span> <span class="o">=</span> <span class="n">trove_python_version</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">trove_python_version_parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">py_trove_classifiers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">trove_python_version</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">py_trove_classifiers</span> <span class="ow">and</span> <span class="n">python_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">py_trove_classifiers</span><span class="p">:</span>
+            <span class="n">state</span><span class="o">.</span><span class="n">justification</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK_PYTHON_VERSION</span><span class="p">,</span>
+                    <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;No Python specific trove classifier matching Python version used </span><span class="si">{</span><span class="n">python_version</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_name</span><span class="p">,</span>
+                <span class="p">}</span>
+            <span class="p">)</span>
+
+<div class="viewcode-block" id="TroveClassifiersWrap.run"><a class="viewcode-back" href="../../../../thoth.adviser.wraps.html#thoth.adviser.wraps.trove_classifiers.TroveClassifiersWrap.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Add information derived from Python trove classifiers.&quot;&quot;&quot;</span>
+        <span class="n">runtime_environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span>
+        <span class="n">operating_system</span> <span class="o">=</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span>
+        <span class="n">os_name</span> <span class="o">=</span> <span class="n">operating_system</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">os_version</span> <span class="o">=</span> <span class="n">operating_system</span><span class="o">.</span><span class="n">version</span>
+        <span class="n">python_version</span> <span class="o">=</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span>
+
+        <span class="k">for</span> <span class="n">package_version_tuple</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">package_name</span> <span class="o">=</span> <span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="n">trove_classifiers</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">i</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_python_package_version_trove_classifiers_all</span><span class="p">(</span>
+                    <span class="n">package_name</span><span class="o">=</span><span class="n">package_name</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">=</span><span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                    <span class="n">index_url</span><span class="o">=</span><span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span>
+                    <span class="n">os_name</span><span class="o">=</span><span class="n">os_name</span><span class="p">,</span>
+                    <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
+                    <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">]</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">trove_classifiers</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_environment_gpu_cuda_version</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">trove_classifiers</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_development_status</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">trove_classifiers</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_programming_language_python</span><span class="p">(</span><span class="n">package_name</span><span class="p">,</span> <span class="n">state</span><span class="p">,</span> <span class="n">trove_classifiers</span><span class="p">)</span></div></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><h3>Related Topics</h3>
+<ul>
+  <li><a href="../../../../index.html">Documentation index</a><ul>
+  <li><a href="../../../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+
+  
+<script type="text/javascript">
+  (function() {
+    var ga = document.createElement('script');
+    ga.src = ('https:' == document.location.protocol ?
+              'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+    ga.setAttribute('async', 'true');
+    document.documentElement.firstChild.appendChild(ga);
+  })();
+</script>
+
+  </body>
+</html>
