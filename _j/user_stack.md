@@ -28,6 +28,12 @@ thamos advise
 
 **WARNING:** Resolver does not check if the supplied stack is valid.
 
+Resolver does not check if the supplied stack is valid and if all the
+dependencies stated respect the dependency graph. This creates restrictions to
+use other features, such as ``thamos graph`` which relies on the dependency
+graph structure computed on the backend. As user's stack was not resolved on
+the backend, its structure cannot be shown.
+
 ## Affected packages:
 
 This informative message is not related to any specific package.
