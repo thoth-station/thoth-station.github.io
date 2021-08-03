@@ -70,16 +70,12 @@
 <span class="sd">&quot;&quot;&quot;A class for adviser&#39;s report - output of an adviser run.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">os</span>
-<span class="kn">import</span> <span class="nn">heapq</span>
 <span class="kn">import</span> <span class="nn">json</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">operator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 
@@ -94,18 +90,12 @@
 <span class="k">class</span> <span class="nc">Report</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;A report stating output of an adviser run.&quot;&quot;&quot;</span>
 
-    <span class="n">count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">products</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Product</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">pipeline</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">PipelineConfig</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">resolver_iterations</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
     <span class="n">accepted_final_states_count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
     <span class="n">discarded_final_states_count</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
     <span class="n">_stack_info</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-    <span class="n">_heapq</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
-        <span class="nb">type</span><span class="o">=</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">Product</span><span class="p">]],</span>
-        <span class="n">default</span><span class="o">=</span><span class="n">attr</span><span class="o">.</span><span class="n">Factory</span><span class="p">(</span><span class="nb">list</span><span class="p">),</span>
-        <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-    <span class="p">)</span>
-    <span class="n">_heapq_counter</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">stack_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]:</span>
@@ -115,27 +105,6 @@
 <div class="viewcode-block" id="Report.set_stack_info"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.report.Report.set_stack_info">[docs]</a>    <span class="k">def</span> <span class="nf">set_stack_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stack_info</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Set stack information.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack_info</span> <span class="o">=</span> <span class="n">stack_info</span></div>
-
-<div class="viewcode-block" id="Report.will_add_product_from_state"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.report.Report.will_add_product_from_state">[docs]</a>    <span class="k">def</span> <span class="nf">will_add_product_from_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">score</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Check if a product with the given score would be added.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_heapq</span><span class="p">:</span>
-            <span class="c1"># Empty heap, always add without any check on count.</span>
-            <span class="k">return</span> <span class="kc">True</span>
-
-        <span class="n">key</span> <span class="o">=</span> <span class="n">score</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_heapq_counter</span>
-        <span class="k">return</span> <span class="n">key</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_heapq</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span></div>
-
-<div class="viewcode-block" id="Report.add_product"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.report.Report.add_product">[docs]</a>    <span class="k">def</span> <span class="nf">add_product</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">product</span><span class="p">:</span> <span class="n">Product</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Add adviser pipeline product to report.&quot;&quot;&quot;</span>
-        <span class="n">item</span> <span class="o">=</span> <span class="p">((</span><span class="n">product</span><span class="o">.</span><span class="n">score</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_heapq_counter</span><span class="p">),</span> <span class="n">product</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_heapq_counter</span> <span class="o">-=</span> <span class="mi">1</span>
-
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_heapq</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="p">:</span>
-            <span class="n">popped</span> <span class="o">=</span> <span class="n">heapq</span><span class="o">.</span><span class="n">heappushpop</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_heapq</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
-            <span class="k">return</span> <span class="n">popped</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">item</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">heapq</span><span class="o">.</span><span class="n">heappush</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_heapq</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
-            <span class="k">return</span> <span class="kc">True</span></div>
 
 <div class="viewcode-block" id="Report.to_dict"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.report.Report.to_dict">[docs]</a>    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Convert pipeline report to a dict representation.&quot;&quot;&quot;</span>
@@ -149,24 +118,12 @@
 
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;pipeline&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span> <span class="k">if</span> <span class="n">verbose</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
-            <span class="s2">&quot;products&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">product</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span> <span class="k">for</span> <span class="n">product</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">iter_products</span><span class="p">()],</span>
+            <span class="s2">&quot;products&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">product</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span> <span class="k">for</span> <span class="n">product</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">products</span><span class="p">],</span>
             <span class="s2">&quot;stack_info&quot;</span><span class="p">:</span> <span class="n">stack_info</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stack_info</span> <span class="ow">or</span> <span class="p">[]),</span>
             <span class="s2">&quot;resolver_iterations&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">resolver_iterations</span><span class="p">,</span>
             <span class="s2">&quot;accepted_final_states_count&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">accepted_final_states_count</span><span class="p">,</span>
             <span class="s2">&quot;discarded_final_states_count&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">discarded_final_states_count</span><span class="p">,</span>
-        <span class="p">}</span></div>
-
-<div class="viewcode-block" id="Report.product_count"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.report.Report.product_count">[docs]</a>    <span class="k">def</span> <span class="nf">product_count</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-        <span class="sd">&quot;&quot;&quot;Get number of products stored in the report.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_heapq</span><span class="p">)</span></div>
-
-<div class="viewcode-block" id="Report.iter_products"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.report.Report.iter_products">[docs]</a>    <span class="k">def</span> <span class="nf">iter_products</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Product</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Iterate over products stored in this report, respect their scores.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_heapq</span><span class="p">)</span></div>
-
-<div class="viewcode-block" id="Report.iter_products_sorted"><a class="viewcode-back" href="../../../thoth.adviser.html#thoth.adviser.report.Report.iter_products_sorted">[docs]</a>    <span class="k">def</span> <span class="nf">iter_products_sorted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">reverse</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Product</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
-        <span class="sd">&quot;&quot;&quot;Iterate over products stored in this report, respect their scores.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="p">(</span><span class="n">item</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_heapq</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">reverse</span><span class="o">=</span><span class="n">reverse</span><span class="p">))</span></div></div>
+        <span class="p">}</span></div></div>
 </pre></div>
 
           </div>
