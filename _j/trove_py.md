@@ -40,5 +40,7 @@ available](http://thoth-station.ninja/recommendation-types).
 ## Related
 
  * [Python trove classifier][1]
+ * [YouTube video demonstrating use][2]
 
 [1]: https://pypi.org/classifiers/
+[2]: https://www.youtube.com/watch?v=R_oYDppz0S4
