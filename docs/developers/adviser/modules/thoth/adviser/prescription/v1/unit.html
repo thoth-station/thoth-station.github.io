@@ -76,10 +76,12 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
 <span class="kn">from</span> <span class="nn">packaging.specifiers</span> <span class="kn">import</span> <span class="n">SpecifierSet</span>
+<span class="kn">from</span> <span class="nn">packaging.version</span> <span class="kn">import</span> <span class="n">Version</span>
 <span class="kn">from</span> <span class="nn">voluptuous</span> <span class="kn">import</span> <span class="n">Schema</span>
 <span class="kn">from</span> <span class="nn">voluptuous</span> <span class="kn">import</span> <span class="n">Required</span>
 
@@ -90,9 +92,11 @@
 <span class="kn">from</span> <span class="nn">thoth.adviser.state</span> <span class="kn">import</span> <span class="n">State</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
 
+<span class="kn">from</span> <span class="nn">.unit_cache</span> <span class="kn">import</span> <span class="n">should_include_cache</span>
 <span class="kn">from</span> <span class="nn">...unit</span> <span class="kn">import</span> <span class="n">Unit</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
     <span class="kn">from</span> <span class="nn">...pipeline_builder</span> <span class="kn">import</span> <span class="n">PipelineBuilderContext</span>
 
 
@@ -116,11 +120,12 @@
         <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_list</span><span class="p">[</span><span class="s2">&quot;not&quot;</span><span class="p">]</span><span class="o">.</span><span class="fm">__contains__</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="UnitPrescription"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.unit.UnitPrescription">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="viewcode-block" id="UnitPrescription"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.UnitPrescription">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">UnitPrescription</span><span class="p">(</span><span class="n">Unit</span><span class="p">,</span> <span class="n">metaclass</span><span class="o">=</span><span class="n">abc</span><span class="o">.</span><span class="n">ABCMeta</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;A base class for implementing pipeline units based on prescription supplied.&quot;&quot;&quot;</span>
 
     <span class="c1"># Each prescription unit defines these specifically.</span>
+    <span class="n">SHOULD_INCLUDE_CACHE</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">CONFIGURATION_SCHEMA</span><span class="p">:</span> <span class="n">Schema</span> <span class="o">=</span> <span class="n">Schema</span><span class="p">(</span>
         <span class="p">{</span>
             <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">):</span> <span class="nb">str</span><span class="p">,</span>
@@ -165,7 +170,7 @@
             <span class="s2">&quot;run&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_PRESCRIPTION</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;run&quot;</span><span class="p">,</span> <span class="p">{}),</span>
         <span class="p">}</span>
 
-<div class="viewcode-block" id="UnitPrescription.get_unit_name"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.unit.UnitPrescription.get_unit_name">[docs]</a>    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="UnitPrescription.get_unit_name"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.UnitPrescription.get_unit_name">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">get_unit_name</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Get the name of the current prescription unit.</span>
 
@@ -181,7 +186,7 @@
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_PRESCRIPTION</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">name</span></div>
 
-<div class="viewcode-block" id="UnitPrescription.set_prescription"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.unit.UnitPrescription.set_prescription">[docs]</a>    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="UnitPrescription.set_prescription"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.UnitPrescription.set_prescription">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">set_prescription</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">prescription</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Set prescription to the unit.&quot;&quot;&quot;</span>
         <span class="bp">cls</span><span class="o">.</span><span class="n">_PRESCRIPTION</span> <span class="o">=</span> <span class="n">prescription</span></div>
@@ -224,6 +229,20 @@
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: All library symbols required for </span><span class="si">%r</span><span class="s2"> unit are used&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">library_name</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">True</span>
 
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span> <span class="nf">_check_version</span><span class="p">(</span><span class="n">version_present</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">version_spec_declared</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check that version present matches version specification.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">version_present</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">version_spec_declared</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">version_spec_declared</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">True</span>
+
+            <span class="k">return</span> <span class="n">Version</span><span class="p">(</span><span class="n">version_present</span><span class="p">)</span> <span class="ow">in</span> <span class="n">SpecifierSet</span><span class="p">(</span><span class="n">version_spec_declared</span><span class="p">)</span>
+
     <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">_should_include_base</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Determine if this unit should be included.&quot;&quot;&quot;</span>
@@ -237,6 +256,57 @@
         <span class="k">if</span> <span class="n">times</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_included</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">False</span>
 
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_should_include_base_cached</span><span class="p">(</span><span class="n">unit_name</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">,</span> <span class="n">should_include_dict</span><span class="p">):</span>
+            <span class="c1"># Using pre-cached results based on parts that do not change or first time run.</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="c1"># Dependencies.</span>
+        <span class="n">dependencies</span> <span class="o">=</span> <span class="n">should_include_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dependencies&quot;</span><span class="p">,</span> <span class="p">{})</span>
+        <span class="k">for</span> <span class="n">boot_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;boots&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">boot_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_boot_names</span><span class="p">():</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on boot </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">boot_name</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">pseudonym_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;pseudonyms&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">pseudonym_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_pseudonym_names</span><span class="p">():</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on pseudonym </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">pseudonym_name</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">sieve_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sieves&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">sieve_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_sieve_names</span><span class="p">():</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on sieve </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">sieve_name</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">step_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;steps&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">step_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_step_names</span><span class="p">():</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on step </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">step_name</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">stride_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;strides&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">stride_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_stride_names</span><span class="p">():</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on stride </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">stride_name</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">for</span> <span class="n">wrap_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;wraps&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="k">if</span> <span class="n">wrap_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_wrap_names</span><span class="p">():</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on stride </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">wrap_name</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+        <span class="n">SHOULD_INCLUDE_FUNC_TYPE</span> <span class="o">=</span> <span class="n">Callable</span><span class="p">[</span>
+            <span class="p">[</span><span class="n">Type</span><span class="p">[</span><span class="s2">&quot;UnitPrescription&quot;</span><span class="p">],</span> <span class="nb">str</span><span class="p">,</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="nb">bool</span>
+        <span class="p">]</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="nd">@should_include_cache</span>
+    <span class="k">def</span> <span class="nf">_should_include_base_cached</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">,</span> <span class="n">should_include_dict</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Determine if this unit should be included.&quot;&quot;&quot;</span>
         <span class="n">adviser_pipeline</span> <span class="o">=</span> <span class="n">should_include_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;adviser_pipeline&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">adviser_pipeline</span> <span class="ow">and</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">is_adviser_pipeline</span><span class="p">():</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering for adviser pipeline&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
@@ -312,40 +382,6 @@
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: All library symbols required present in the library usage supplied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">)</span>
 
-        <span class="c1"># Dependencies.</span>
-        <span class="n">dependencies</span> <span class="o">=</span> <span class="n">should_include_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;dependencies&quot;</span><span class="p">,</span> <span class="p">{})</span>
-        <span class="k">for</span> <span class="n">boot_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;boots&quot;</span><span class="p">,</span> <span class="p">[]):</span>
-            <span class="k">if</span> <span class="n">boot_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_boot_names</span><span class="p">():</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on boot </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">boot_name</span><span class="p">)</span>
-                <span class="k">return</span> <span class="kc">False</span>
-
-        <span class="k">for</span> <span class="n">pseudonym_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;pseudonyms&quot;</span><span class="p">,</span> <span class="p">[]):</span>
-            <span class="k">if</span> <span class="n">pseudonym_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_pseudonym_names</span><span class="p">():</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on pseudonym </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">pseudonym_name</span>
-                <span class="p">)</span>
-                <span class="k">return</span> <span class="kc">False</span>
-
-        <span class="k">for</span> <span class="n">sieve_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sieves&quot;</span><span class="p">,</span> <span class="p">[]):</span>
-            <span class="k">if</span> <span class="n">sieve_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_sieve_names</span><span class="p">():</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on sieve </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">sieve_name</span><span class="p">)</span>
-                <span class="k">return</span> <span class="kc">False</span>
-
-        <span class="k">for</span> <span class="n">step_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;steps&quot;</span><span class="p">,</span> <span class="p">[]):</span>
-            <span class="k">if</span> <span class="n">step_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_step_names</span><span class="p">():</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on step </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">step_name</span><span class="p">)</span>
-                <span class="k">return</span> <span class="kc">False</span>
-
-        <span class="k">for</span> <span class="n">stride_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;strides&quot;</span><span class="p">,</span> <span class="p">[]):</span>
-            <span class="k">if</span> <span class="n">stride_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_stride_names</span><span class="p">():</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on stride </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">stride_name</span><span class="p">)</span>
-                <span class="k">return</span> <span class="kc">False</span>
-
-        <span class="k">for</span> <span class="n">wrap_name</span> <span class="ow">in</span> <span class="n">dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;wraps&quot;</span><span class="p">,</span> <span class="p">[]):</span>
-            <span class="k">if</span> <span class="n">wrap_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">get_included_wrap_names</span><span class="p">():</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not registering as dependency on stride </span><span class="si">%r</span><span class="s2"> is not satisfied&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">wrap_name</span><span class="p">)</span>
-                <span class="k">return</span> <span class="kc">False</span>
-
         <span class="n">runtime_environment_dict</span> <span class="o">=</span> <span class="n">should_include_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;runtime_environments&quot;</span><span class="p">,</span> <span class="p">{})</span>
 
         <span class="c1"># Operating system.</span>
@@ -393,14 +429,24 @@
         <span class="c1"># Software present.</span>
         <span class="n">runtime_used</span> <span class="o">=</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span>
 
-        <span class="n">python_versions</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;python_versions&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">python_versions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">python_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ValueList</span><span class="p">(</span><span class="n">python_versions</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching Python version used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">python_version</span><span class="p">)</span>
+        <span class="n">python_version_spec</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;python_version&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_version</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span> <span class="n">python_version_spec</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching Python version used (using </span><span class="si">%r</span><span class="s2">; expected </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">unit_name</span><span class="p">,</span>
+                <span class="n">runtime_used</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
+                <span class="n">python_version_spec</span><span class="p">,</span>
+            <span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
-        <span class="n">cuda_versions</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cuda_versions&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">cuda_versions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">cuda_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ValueList</span><span class="p">(</span><span class="n">cuda_versions</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching CUDA version used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">cuda_version</span><span class="p">)</span>
+        <span class="n">cuda_version_spec</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cuda_version&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_version</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">cuda_version</span><span class="p">,</span> <span class="n">cuda_version_spec</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching CUDA version used (using </span><span class="si">%r</span><span class="s2">; expected </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">unit_name</span><span class="p">,</span>
+                <span class="n">runtime_used</span><span class="o">.</span><span class="n">cuda_version</span><span class="p">,</span>
+                <span class="n">cuda_version_spec</span><span class="p">,</span>
+            <span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
         <span class="n">platforms</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;platforms&quot;</span><span class="p">)</span>
@@ -408,24 +454,44 @@
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching platform used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">platform</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
-        <span class="n">openblas_versions</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;openblas_versions&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">openblas_versions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">openblas_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ValueList</span><span class="p">(</span><span class="n">openblas_versions</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching openblas version used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">openblas_version</span><span class="p">)</span>
+        <span class="n">openblas_version_spec</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;openblas_version&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_version</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">openblas_version</span><span class="p">,</span> <span class="n">openblas_version_spec</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching openblas version used (using </span><span class="si">%r</span><span class="s2">; expected </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">unit_name</span><span class="p">,</span>
+                <span class="n">runtime_used</span><span class="o">.</span><span class="n">openblas_version</span><span class="p">,</span>
+                <span class="n">openblas_version_spec</span><span class="p">,</span>
+            <span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
-        <span class="n">openmpi_versions</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;openmpi_versions&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">openmpi_versions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">openmpi_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ValueList</span><span class="p">(</span><span class="n">openmpi_versions</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching openmpi version used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">openmpi_version</span><span class="p">)</span>
+        <span class="n">openmpi_version_spec</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;openmpi_version&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_version</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">openmpi_version</span><span class="p">,</span> <span class="n">openmpi_version_spec</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching openmpi version used (using </span><span class="si">%r</span><span class="s2">; expected </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">unit_name</span><span class="p">,</span>
+                <span class="n">runtime_used</span><span class="o">.</span><span class="n">openmpi_version</span><span class="p">,</span>
+                <span class="n">openmpi_version_spec</span><span class="p">,</span>
+            <span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
-        <span class="n">cudnn_versions</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cudnn_versions&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">cudnn_versions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">cudnn_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ValueList</span><span class="p">(</span><span class="n">cudnn_versions</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching cudnn version used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">cudnn_version</span><span class="p">)</span>
+        <span class="n">cudnn_version_spec</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cudnn_version&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_version</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">cudnn_version</span><span class="p">,</span> <span class="n">cudnn_version_spec</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching cudnn version used (using </span><span class="si">%r</span><span class="s2">; expected </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">unit_name</span><span class="p">,</span>
+                <span class="n">runtime_used</span><span class="o">.</span><span class="n">cudnn_version</span><span class="p">,</span>
+                <span class="n">cudnn_version_spec</span><span class="p">,</span>
+            <span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
-        <span class="n">mkl_versions</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;mkl_versions&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">mkl_versions</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">mkl_version</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ValueList</span><span class="p">(</span><span class="n">mkl_versions</span><span class="p">):</span>
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching mkl version used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">mkl_version</span><span class="p">)</span>
+        <span class="n">mkl_version_spec</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;mkl_version&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_check_version</span><span class="p">(</span><span class="n">runtime_used</span><span class="o">.</span><span class="n">mkl_version</span><span class="p">,</span> <span class="n">mkl_version_spec</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching mkl version used (using </span><span class="si">%r</span><span class="s2">; expected </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span>
+                <span class="n">unit_name</span><span class="p">,</span>
+                <span class="n">runtime_used</span><span class="o">.</span><span class="n">mkl_version</span><span class="p">,</span>
+                <span class="n">mkl_version_spec</span><span class="p">,</span>
+            <span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
         <span class="n">base_images</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;base_images&quot;</span><span class="p">)</span>
@@ -747,7 +813,7 @@
         <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prescription</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">name</span>
 
-<div class="viewcode-block" id="UnitPrescription.pre_run"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.unit.UnitPrescription.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="UnitPrescription.pre_run"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.UnitPrescription.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Prepare this pipeline unit before running it.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_justification_link</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stack_info&quot;</span><span class="p">,</span> <span class="p">[]))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_stack_info_run</span> <span class="o">=</span> <span class="kc">False</span>
