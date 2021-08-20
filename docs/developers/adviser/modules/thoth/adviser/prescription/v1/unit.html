@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.prescription.v1.unit &#8212; Thoth Adviser 0.39.0 documentation</title>
+    <title>thoth.adviser.prescription.v1.unit &#8212; Thoth Adviser 0.40.0 documentation</title>
     <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../../../" src="/assets/adviser/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../../../index.html">Thoth Adviser 0.39.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../../../index.html">Thoth Adviser 0.40.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -77,6 +77,7 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
@@ -91,6 +92,7 @@
 <span class="kn">from</span> <span class="nn">thoth.adviser.exceptions</span> <span class="kn">import</span> <span class="n">EagerStopPipeline</span>
 <span class="kn">from</span> <span class="nn">thoth.adviser.state</span> <span class="kn">import</span> <span class="n">State</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
 
 <span class="kn">from</span> <span class="nn">.unit_cache</span> <span class="kn">import</span> <span class="n">should_include_cache</span>
 <span class="kn">from</span> <span class="nn">...unit</span> <span class="kn">import</span> <span class="n">Unit</span>
@@ -872,34 +874,90 @@
         <span class="k">if</span> <span class="n">stack_info</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">stack_info</span><span class="p">)</span>
 
+    <span class="k">def</span> <span class="nf">_check_package_tuple_from_prescription</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">dependency_tuple</span><span class="p">:</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">dependency</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if the given package version tuple matches with what was written in prescription.&quot;&quot;&quot;</span>
+        <span class="n">develop</span> <span class="o">=</span> <span class="n">dependency</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;develop&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">develop</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get_package_version</span><span class="p">(</span><span class="n">dependency_tuple</span><span class="p">,</span> <span class="n">graceful</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">develop</span> <span class="o">!=</span> <span class="n">develop</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index_url_check</span><span class="p">(</span><span class="n">dependency</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;index_url&quot;</span><span class="p">),</span> <span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="n">version</span> <span class="o">=</span> <span class="n">dependency</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">specifier</span> <span class="o">=</span> <span class="n">SpecifierSet</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">dependency_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">specifier</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">return</span> <span class="kc">True</span>
+
     <span class="k">def</span> <span class="nf">_run_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Check state match.&quot;&quot;&quot;</span>
         <span class="n">state_prescription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">match_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;state&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">state_prescription</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">resolved_dependency</span> <span class="ow">in</span> <span class="n">state_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resolved_dependencies&quot;</span><span class="p">,</span> <span class="p">[]):</span>
-                <span class="n">resolved</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">resolved_dependency</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">resolved</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">state_prescription</span><span class="p">:</span>
+            <span class="c1"># Nothing to check.</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="k">for</span> <span class="n">resolved_dependency</span> <span class="ow">in</span> <span class="n">state_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resolved_dependencies&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">resolved</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">resolved_dependency</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">resolved</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_package_tuple_from_prescription</span><span class="p">(</span><span class="n">resolved</span><span class="p">,</span> <span class="n">resolved_dependency</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">def</span> <span class="nf">_run_state_with_initiator</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check state match respecting also initiator of the give package.&quot;&quot;&quot;</span>
+        <span class="n">state_prescription</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">match_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;state&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">state_prescription</span><span class="p">:</span>
+            <span class="c1"># Nothing to check.</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+        <span class="n">package_version_from</span> <span class="o">=</span> <span class="n">state_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_version_from&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
+        <span class="c1"># XXX: we explicitly do not consider runtime environment as we expect to have it only one here.</span>
+        <span class="n">dependents</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">dependents</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">(),</span> <span class="nb">set</span><span class="p">())</span>
+        <span class="p">}</span>
+
+        <span class="k">for</span> <span class="n">resolved_dependency</span> <span class="ow">in</span> <span class="n">package_version_from</span><span class="p">:</span>
+            <span class="n">resolved</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">resolved_dependency</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">resolved</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_package_tuple_from_prescription</span><span class="p">(</span><span class="n">resolved</span><span class="p">,</span> <span class="n">resolved_dependency</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="n">resolved</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">dependents</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;Package </span><span class="si">%r</span><span class="s2"> stated in package_version_from not a did not introduce package </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">resolved</span><span class="p">,</span>
+                    <span class="n">package_version</span><span class="o">.</span><span class="n">to_tuple</span><span class="p">(),</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="n">dependents</span><span class="o">.</span><span class="n">discard</span><span class="p">(</span><span class="n">resolved</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">dependents</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">state_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_version_from_allow_other&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">dependent</span> <span class="ow">in</span> <span class="n">dependents</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">dependent</span> <span class="o">==</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">dependent</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
                     <span class="k">return</span> <span class="kc">False</span>
 
-                <span class="n">develop</span> <span class="o">=</span> <span class="n">resolved_dependency</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;develop&quot;</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">develop</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">get_package_version</span><span class="p">(</span><span class="n">resolved</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="ow">not</span> <span class="n">package_version</span><span class="p">:</span>
-                        <span class="c1"># This is a programming error as the give dependency has to be registered in the context.</span>
-                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;No matching package version for </span><span class="si">%r</span><span class="s2"> registered in the context&quot;</span><span class="p">,</span> <span class="n">resolved</span><span class="p">)</span>
-                        <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">for</span> <span class="n">resolved_dependency</span> <span class="ow">in</span> <span class="n">state_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;resolved_dependencies&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">resolved</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">resolved_dependency</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">])</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">resolved</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
 
-                    <span class="k">if</span> <span class="n">package_version</span><span class="o">.</span><span class="n">develop</span> <span class="o">!=</span> <span class="n">develop</span><span class="p">:</span>
-                        <span class="k">return</span> <span class="kc">False</span>
-
-                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index_url_check</span><span class="p">(</span><span class="n">resolved_dependency</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;index_url&quot;</span><span class="p">),</span> <span class="n">resolved</span><span class="p">[</span><span class="mi">2</span><span class="p">]):</span>
-                    <span class="k">return</span> <span class="kc">False</span>
-
-                <span class="n">version</span> <span class="o">=</span> <span class="n">resolved_dependency</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)</span>
-                <span class="k">if</span> <span class="n">version</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">specifier</span> <span class="o">=</span> <span class="n">SpecifierSet</span><span class="p">(</span><span class="n">version</span><span class="p">)</span>  <span class="c1"># XXX: this could be optimized out</span>
-                    <span class="k">if</span> <span class="n">resolved</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">specifier</span><span class="p">:</span>
-                        <span class="k">return</span> <span class="kc">False</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_package_tuple_from_prescription</span><span class="p">(</span><span class="n">resolved</span><span class="p">,</span> <span class="n">resolved_dependency</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">False</span>
 
         <span class="k">return</span> <span class="kc">True</span>
 

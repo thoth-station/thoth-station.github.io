@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
-    <title>Declarative prescriptions for resolver &#8212; Thoth Adviser 0.39.0 documentation</title>
+    <title>Declarative prescriptions for resolver &#8212; Thoth Adviser 0.40.0 documentation</title>
     <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="./" src="/assets/adviser/documentation_options.js"></script>
@@ -48,7 +48,7 @@
         <li class="right" >
           <a href="wraps.html" title="Wrap pipeline unit type"
              accesskey="P">previous</a> |</li>
-        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.39.0 documentation</a> &#187;</li> 
+        <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.40.0 documentation</a> &#187;</li> 
       </ul>
     </div>  
 
@@ -1182,15 +1182,27 @@ should or should not be a development dependency</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">state</span></code> - internal resolver’s state with resolved dependencies</p></li>
 </ul>
 <p>A state that needs to be met to trigger the given step pipeline. The state
-states resolved dependencies where each entry in the resolved dependency
-listing is described as:</p>
+can state:</p>
 <ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">resolved_dependencies</span></code> where each entry in the resolved dependency</p></li>
+</ul>
+<p>listing is described as:</p>
+<blockquote>
+<div><ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - optional package name that has to be stated in the resolved
 dependency listing</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">version</span></code> - optional package version in a form of version specifier that
 has to be stated in the resolved dependency listing</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">index_url</span></code> - optional package index from which the given package is
 consumed, can be negated using <code class="docutils literal notranslate"><span class="pre">not</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">develop</span></code> - optional boolean stating whether the package is or is not in
+the development dependency listing</p></li>
+</ul>
+</div></blockquote>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">package_version_from</span></code> where each entry describes packages that introduced
+the matched package. Entries are identical to entries in the
+<code class="docutils literal notranslate"><span class="pre">resolved_dependencies</span></code> listing.</p></li>
 </ul>
 <p>To run the given step, all the packages in the resolved dependency listing
 need to be present in the resolved software stack. Also both <code class="docutils literal notranslate"><span class="pre">state</span></code> and
@@ -1347,6 +1359,48 @@ Score has to be from interval -1.0 to +1.0 inclusively.</p>
 <p>If the given pipeline unit is registered and matched, it will cause the whole
 resolution to halt and report back any results computed.</p>
 </section>
+</section>
+<section id="skippackage-step">
+<h2>SkipPackage step<a class="headerlink" href="#skippackage-step" title="Permalink to this headline">¶</a></h2>
+<p>This pipeline unit skips including the given package in the resolved stack considering
+also state of the resolver. The pipeline unit considers what packages introduced the
+package that is supposed to be removed and optionally other packages that are present
+in the resolved state.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><em>Example:</em></p>
+<p>A pipeline unit that removes SciPy package from the stack if SciPy was introduced
+by the given TensorFlow version.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">SkipPackageStepUnit</span>
+<span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">step.SkipPackage</span>
+<span class="nt">should_include</span><span class="p">:</span>
+  <span class="nt">adviser_pipeline</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">match</span><span class="p">:</span>
+  <span class="nt">package_version</span><span class="p">:</span>
+    <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">scipy</span>
+    <span class="c1"># Optionally version can be stated.</span>
+    <span class="c1"># Optionally index_url can be stated.</span>
+    <span class="c1"># Optionally develop can be stated.</span>
+  <span class="nt">state</span><span class="p">:</span>
+    <span class="nt">package_version_from</span><span class="p">:</span>
+      <span class="p p-Indicator">-</span> <span class="nt">name</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">tensorflow</span>
+        <span class="nt">version</span><span class="p">:</span> <span class="s">&#39;&gt;=2.1,&lt;=2.3&#39;</span>
+        <span class="nt">index_url</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">https://pypi.org/simple</span>
+        <span class="nt">develop</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">run</span><span class="p">:</span>
+  <span class="c1"># multi_package_resolution: false</span>
+  <span class="nt">stack_info</span><span class="p">:</span>
+    <span class="p p-Indicator">-</span> <span class="nt">type</span><span class="p">:</span> <span class="l l-Scalar l-Scalar-Plain">WARNING</span>
+      <span class="nt">message</span><span class="p">:</span> <span class="s">&quot;TensorFlow</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">versions</span><span class="nv"> </span><span class="s">&gt;=2.1&lt;=2.3</span><span class="nv"> </span><span class="s">stated</span><span class="nv"> </span><span class="s">SciPy</span><span class="nv"> </span><span class="s">as</span><span class="nv"> </span><span class="s">a</span><span class="nv"> </span><span class="s">dependency</span><span class="nv"> </span><span class="s">but</span><span class="nv"> </span><span class="s">it</span><span class="nv"> </span><span class="s">is</span><span class="nv"> </span><span class="s">not</span><span class="nv"> </span><span class="s">used</span><span class="nv"> </span><span class="s">in</span><span class="nv"> </span><span class="s">the</span><span class="nv"> </span><span class="s">codebase&quot;</span>
+      <span class="nt">link</span><span class="p">:</span> <span class="s">&quot;https://github.com/tensorflow/tensorflow/issues/35709&quot;</span>
+</pre></div>
+</div>
+</div>
+<p>The pipeline unit accepts also <code class="docutils literal notranslate"><span class="pre">match.state.resolved_dependencies</span></code> that
+states a list of packages that should be present in the resolved state in order
+to skip the given package from inclusion in the stack. Unlike
+<code class="docutils literal notranslate"><span class="pre">package_version_from</span></code>, no relations are checked. Naturally, presence of
+packages in the <code class="docutils literal notranslate"><span class="pre">package_version_from</span></code> is checked in the resolver’s state.</p>
 </section>
 <section id="strides">
 <h2>Strides<a class="headerlink" href="#strides" title="Permalink to this headline">¶</a></h2>
@@ -1705,6 +1759,7 @@ are optional. If not provided, any values are accepted. An example link for
 <li><a class="reference internal" href="#step-run-eager-stop-pipeline">Step <code class="docutils literal notranslate"><span class="pre">run.eager_stop_pipeline</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#skippackage-step">SkipPackage step</a></li>
 <li><a class="reference internal" href="#strides">Strides</a><ul>
 <li><a class="reference internal" href="#stride-match">Stride <code class="docutils literal notranslate"><span class="pre">match</span></code></a></li>
 <li><a class="reference internal" href="#stride-run-log">Stride <code class="docutils literal notranslate"><span class="pre">run.log</span></code></a></li>

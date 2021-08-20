@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.prescription.v1.step &#8212; Thoth Adviser 0.40.0 documentation</title>
+    <title>thoth.adviser.prescription.v1.skip_package_step &#8212; Thoth Adviser 0.40.0 documentation</title>
     <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../../../" src="/assets/adviser/documentation_options.js"></script>
@@ -49,7 +49,7 @@
         <div class="bodywrapper">
           <div class="body" role="main">
             
-  <h1>Source code for thoth.adviser.prescription.v1.step</h1><div class="highlight"><pre>
+  <h1>Source code for thoth.adviser.prescription.v1.skip_package_step</h1><div class="highlight"><pre>
 <span></span><span class="ch">#!/usr/bin/env python3</span>
 <span class="c1"># thoth-adviser</span>
 <span class="c1"># Copyright(C) 2021 Fridolin Pokorny</span>
@@ -67,28 +67,28 @@
 <span class="c1"># You should have received a copy of the GNU General Public License</span>
 <span class="c1"># along with this program. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
 
-<span class="sd">&quot;&quot;&quot;A base class for implementing steps.&quot;&quot;&quot;</span>
+<span class="sd">&quot;&quot;&quot;A prescription step implementing skipping a package in a dependency graph.&quot;&quot;&quot;</span>
 
-<span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 <span class="kn">import</span> <span class="nn">logging</span>
 
+<span class="kn">import</span> <span class="nn">attr</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.state</span> <span class="kn">import</span> <span class="n">State</span>
+<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
 <span class="kn">from</span> <span class="nn">voluptuous</span> <span class="kn">import</span> <span class="n">Any</span> <span class="k">as</span> <span class="n">SchemaAny</span>
 <span class="kn">from</span> <span class="nn">voluptuous</span> <span class="kn">import</span> <span class="n">Schema</span>
 <span class="kn">from</span> <span class="nn">voluptuous</span> <span class="kn">import</span> <span class="n">Required</span>
-<span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
-
-<span class="kn">from</span> <span class="nn">thoth.adviser.state</span> <span class="kn">import</span> <span class="n">State</span>
 <span class="kn">from</span> <span class="nn">packaging.specifiers</span> <span class="kn">import</span> <span class="n">SpecifierSet</span>
-<span class="kn">from</span> <span class="nn">.unit</span> <span class="kn">import</span> <span class="n">UnitPrescription</span>
-<span class="kn">from</span> <span class="nn">.schema</span> <span class="kn">import</span> <span class="n">PRESCRIPTION_STEP_MATCH_ENTRY_SCHEMA</span>
-<span class="kn">from</span> <span class="nn">.schema</span> <span class="kn">import</span> <span class="n">PRESCRIPTION_STEP_RUN_SCHEMA</span>
+
+<span class="kn">from</span> <span class="nn">.step</span> <span class="kn">import</span> <span class="n">StepPrescription</span>
+<span class="kn">from</span> <span class="nn">.schema</span> <span class="kn">import</span> <span class="n">PRESCRIPTION_SKIP_PACKAGE_STEP_RUN_SCHEMA</span>
+<span class="kn">from</span> <span class="nn">.schema</span> <span class="kn">import</span> <span class="n">PRESCRIPTION_SKIP_PACKAGE_STEP_MATCH_ENTRY_SCHEMA</span>
+
+<span class="kn">from</span> <span class="nn">...exceptions</span> <span class="kn">import</span> <span class="n">SkipPackage</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
     <span class="kn">from</span> <span class="nn">...pipeline_builder</span> <span class="kn">import</span> <span class="n">PipelineBuilderContext</span>
@@ -96,31 +96,24 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
-<div class="viewcode-block" id="StepPrescription"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.step.StepPrescription">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="k">class</span> <span class="nc">StepPrescription</span><span class="p">(</span><span class="n">UnitPrescription</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;Step base class implementation.</span>
-
-<span class="sd">    Configuration option `multi_package_resolution` states whether a step should be run if package</span>
-<span class="sd">    is resolved multiple times for the same stack.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="SkipPackageStepPrescription"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.skip_package_step.SkipPackageStepPrescription">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">class</span> <span class="nc">SkipPackageStepPrescription</span><span class="p">(</span><span class="n">StepPrescription</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Skip package prescription step unit implementation.&quot;&quot;&quot;</span>
 
     <span class="n">CONFIGURATION_SCHEMA</span><span class="p">:</span> <span class="n">Schema</span> <span class="o">=</span> <span class="n">Schema</span><span class="p">(</span>
         <span class="p">{</span>
             <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">):</span> <span class="n">SchemaAny</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
-            <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;match&quot;</span><span class="p">):</span> <span class="n">PRESCRIPTION_STEP_MATCH_ENTRY_SCHEMA</span><span class="p">,</span>
+            <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;match&quot;</span><span class="p">):</span> <span class="n">PRESCRIPTION_SKIP_PACKAGE_STEP_MATCH_ENTRY_SCHEMA</span><span class="p">,</span>
             <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;multi_package_resolution&quot;</span><span class="p">):</span> <span class="nb">bool</span><span class="p">,</span>
-            <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;run&quot;</span><span class="p">):</span> <span class="n">PRESCRIPTION_STEP_RUN_SCHEMA</span><span class="p">,</span>
+            <span class="n">Required</span><span class="p">(</span><span class="s2">&quot;run&quot;</span><span class="p">):</span> <span class="n">SchemaAny</span><span class="p">(</span><span class="n">PRESCRIPTION_SKIP_PACKAGE_STEP_RUN_SCHEMA</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
         <span class="p">}</span>
     <span class="p">)</span>
-
-    <span class="n">SCORE_MAX</span> <span class="o">=</span> <span class="mf">1.0</span>
-    <span class="n">SCORE_MIN</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>
 
     <span class="n">_specifier</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="n">SpecifierSet</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
     <span class="n">_index_url</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
     <span class="n">_develop</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">],</span> <span class="n">kw_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
 
-<div class="viewcode-block" id="StepPrescription.is_step_unit_type"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.step.StepPrescription.is_step_unit_type">[docs]</a>    <span class="nd">@staticmethod</span>
+<div class="viewcode-block" id="SkipPackageStepPrescription.is_step_unit_type"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.skip_package_step.SkipPackageStepPrescription.is_step_unit_type">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">is_step_unit_type</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Check if this unit is of type step.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="kc">True</span></div>
@@ -146,7 +139,7 @@
                 <span class="s2">&quot;run&quot;</span><span class="p">:</span> <span class="n">run</span><span class="p">,</span>
             <span class="p">}</span>
 
-<div class="viewcode-block" id="StepPrescription.should_include"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.step.StepPrescription.should_include">[docs]</a>    <span class="nd">@classmethod</span>
+<div class="viewcode-block" id="SkipPackageStepPrescription.should_include"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.skip_package_step.SkipPackageStepPrescription.should_include">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">should_include</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Check if the given pipeline unit should be included in the given pipeline configuration.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_should_include_base</span><span class="p">(</span><span class="n">builder_context</span><span class="p">):</span>
@@ -157,7 +150,7 @@
         <span class="k">yield from</span> <span class="p">()</span>
         <span class="k">return</span> <span class="kc">None</span></div>
 
-<div class="viewcode-block" id="StepPrescription.pre_run"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.step.StepPrescription.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<div class="viewcode-block" id="SkipPackageStepPrescription.pre_run"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.skip_package_step.SkipPackageStepPrescription.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Prepare before running this pipeline unit.&quot;&quot;&quot;</span>
         <span class="n">package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">match_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_version&quot;</span><span class="p">,</span> <span class="p">{})</span>
         <span class="n">version_specifier</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)</span>
@@ -169,10 +162,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_develop</span> <span class="o">=</span> <span class="n">package_version</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;develop&quot;</span><span class="p">)</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">pre_run</span><span class="p">()</span></div>
 
-<div class="viewcode-block" id="StepPrescription.run"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.step.StepPrescription.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span>
-        <span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span>
-    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]]]:</span>
-        <span class="sd">&quot;&quot;&quot;Run main entry-point for steps to filter and score packages.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="SkipPackageStepPrescription.run"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.v1.skip_package_step.SkipPackageStepPrescription.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">,</span> <span class="n">package_version</span><span class="p">:</span> <span class="n">PackageVersion</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Run main entry-point for steps to skip packages.&quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_index_url_check</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_index_url</span><span class="p">,</span> <span class="n">package_version</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">url</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
 
@@ -187,10 +178,7 @@
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_run_base</span><span class="p">()</span>
 
-        <span class="n">score</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;score&quot;</span><span class="p">)</span>
-        <span class="n">justification</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">run_prescription</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;justification&quot;</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">score</span><span class="p">,</span> <span class="n">justification</span></div></div>
+        <span class="k">raise</span> <span class="n">SkipPackage</span></div></div>
 </pre></div>
 
           </div>
