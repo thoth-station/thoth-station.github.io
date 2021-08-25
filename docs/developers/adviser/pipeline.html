@@ -16,7 +16,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Thoth’s resolver" href="resolver.html" />
-    <link rel="prev" title="Configuring and setting up adviser in a cluster" href="deployment.html" />
+    <link rel="prev" title="Configuring and setting up resolver in a cluster" href="deployment.html" />
 
    
   <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9">
@@ -46,7 +46,7 @@
           <a href="resolver.html" title="Thoth’s resolver"
              accesskey="N">next</a> |</li>
         <li class="right" >
-          <a href="deployment.html" title="Configuring and setting up adviser in a cluster"
+          <a href="deployment.html" title="Configuring and setting up resolver in a cluster"
              accesskey="P">previous</a> |</li>
         <li class="nav-item nav-item-0"><a href="index.html">Thoth Adviser 0.40.0 documentation</a> &#187;</li> 
       </ul>
@@ -120,6 +120,8 @@ computing recommendations:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">predictor</span></code> - an implementation of <a class="reference internal" href="thoth.adviser.html#thoth.adviser.predictor.Predictor" title="thoth.adviser.predictor.Predictor"><code class="xref py py-class docutils literal notranslate"><span class="pre">Predictor</span></code></a> to be used together with resolver to resolve software stacks</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">project</span></code> - instance of <code class="docutils literal notranslate"><span class="pre">Project</span></code> available in <code class="docutils literal notranslate"><span class="pre">thoth-python</span></code> library that provides direct dependencies and information about runtime environment used to run and build the application</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">recommendation_type</span></code> - type of targeted recommendations - see <a class="reference internal" href="thoth.adviser.html#thoth.adviser.enums.RecommendationType" title="thoth.adviser.enums.RecommendationType"><code class="xref py py-class docutils literal notranslate"><span class="pre">RecommendationType</span></code></a></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">prescription</span></code> - instance of <code class="docutils literal notranslate"><span class="pre">Prescription</span></code> stating loaded prescriptions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cli_parameters</span></code> - parameters passed in based on CLI invocation</p></li>
 </ul>
 <p>A similar method, <a class="reference internal" href="thoth.adviser.html#thoth.adviser.resolver.Resolver.get_dependency_monkey_instance" title="thoth.adviser.resolver.Resolver.get_dependency_monkey_instance"><code class="xref py py-func docutils literal notranslate"><span class="pre">Resolver.get_dependency_monkey_instance</span></code></a> obtains
 resolver for a <a class="reference internal" href="dependency_monkey.html#dependency-monkey"><span class="std std-ref">Dependency Monkey run</span></a>. When creating
@@ -161,7 +163,7 @@ see <a class="reference internal" href="boots.html#boots"><span class="std std-r
 executed, resolver resolves all the direct dependencies (that are sorted and
 filtered out based on <code class="docutils literal notranslate"><span class="pre">limit_latest_versions</span></code> configuration option) of the
 application and executes pipeline units of type <a class="reference internal" href="thoth.adviser.html#thoth.adviser.pseudonym.Pseudonym" title="thoth.adviser.pseudonym.Pseudonym"><code class="xref py py-class docutils literal notranslate"><span class="pre">Pseudonym</span></code></a> to compute “pseudonyms” for packages
-(packages providing same functionality but have different name of different
+(packages providing same functionality but have different name or different
 version identifier). See <a class="reference internal" href="pseudonyms.html#pseudonyms"><span class="std std-ref">pseudonyms section for more info</span></a>.</p>
 <p>The next pipeline units of type <a class="reference internal" href="thoth.adviser.html#thoth.adviser.sieve.Sieve" title="thoth.adviser.sieve.Sieve"><code class="xref py py-class docutils literal notranslate"><span class="pre">Sieve</span></code></a>
 filter out packages that should not be considered during resolver run. See
@@ -171,11 +173,12 @@ states that are formed out of all the combinations of packages in different
 versions that can occur in a software stack considering also pseydonyms
 computed. As packages in different versions are sorted based on their version
 string semantics, the very first combination has always the latest versions of
-all the packages (this fact is used for example in hill climbing in the
+all the packages (this fact is used for example in hill climbing or in the
 <a class="reference internal" href="predictors/annealing.html#annealing"><span class="std std-ref">adaptive simulated annealing approach</span></a>).  For each newly
 created initial state, there are run <a class="reference internal" href="steps.html#steps"><span class="std std-ref">pipeline steps</span></a> that decide
-whether inclusion of a package version is valid to a state - this is done for
-each and every package-version combination.</p>
+whether inclusion of a package version is valid to a state and if so, what is
+the quality of such a resolution step - this is done for each and every
+package-version combination.</p>
 <p>If all the steps on a state accept the given package, a newly created state
 (this <a class="reference internal" href="introduction.html#introduction-rl"><span class="std std-ref">corresponds to taking an action from a state to a new state in a Markov
 Decision Process</span></a>) is added to the resolver beam as a state
@@ -205,8 +208,8 @@ pipeline unit or predictor for Thoth’s adviser:</p>
 </ul>
 <p>Beam is an abstract data type maintained by resolver that keeps track of pool
 of states that are about to be (possibly) resolved. This pool can have
-<a class="reference internal" href="deployment.html#beam-width"><span class="std std-ref">restricted width</span></a> which limits number of states kept in
-memory and limits number of states considered during resolution.</p>
+<a class="reference internal" href="deployment.html#beam-width"><span class="std std-ref">restricted width</span></a> which limits the number of states
+kept in memory and limits number of states considered during resolution.</p>
 <p>It’s possible to request a history plot for the beam size and the highest rated
 stack score for introspection purposes using the <code class="docutils literal notranslate"><span class="pre">--plot</span></code> option or by
 calling <a class="reference internal" href="thoth.adviser.html#thoth.adviser.beam.Beam.plot" title="thoth.adviser.beam.Beam.plot"><code class="xref py py-func docutils literal notranslate"><span class="pre">Beam.plot</span></code></a>. The figure below
@@ -232,17 +235,19 @@ explored and consumption of too much CPU time (and actual time) to produce
 software stacks. See <a class="reference internal" href="deployment.html#beam-width"><span class="std std-ref">the section discussion beam width</span></a>.</p>
 </div>
 </section>
-<section id="pipeline-configuration-creation">
-<h2>Pipeline configuration creation<a class="headerlink" href="#pipeline-configuration-creation" title="Permalink to this headline">¶</a></h2>
-<p>Each pipeline unit provides a class method called <cite>should_include</cite> which is
+<section id="id1">
+<h2>Pipeline configuration creation<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>Each pipeline unit provides a class method called <code class="docutils literal notranslate"><span class="pre">should_include</span></code> which is
 executed on the <a class="reference internal" href="thoth.adviser.html#thoth.adviser.pipeline_config.PipelineConfig" title="thoth.adviser.pipeline_config.PipelineConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">pipeline</span> <span class="pre">configuration</span> <span class="pre">creation</span></code></a> (that states a list of boots,
 pseudonyms, sieves, steps, strides and wraps to be included in the pipeline).
-The class method returns a dictionary stating unit configuration if the given
-unit should be used (an empty dictionary if no configuration changes to the
-default unit configuration are done), a special value of <cite>None</cite> indicates the
-given pipeline unit should not be added to the pipeline configuration.</p>
+Similarly, prescription pipeline units provide <code class="docutils literal notranslate"><span class="pre">should_include</span></code> directive
+that is mapped to <code class="docutils literal notranslate"><span class="pre">should_include</span></code> class method under the hood.  The class
+method returns a dictionary stating unit configuration if the given unit should
+be used (an empty dictionary if no configuration changes to the default unit
+configuration are done), a special value of <code class="docutils literal notranslate"><span class="pre">None</span></code> indicates the given
+pipeline unit should not be added to the pipeline configuration.</p>
 <a class="reference external image-reference" href="/assets/adviser/pipeline_builder.gif"><img alt="Pipeline builder building the pipeline configuration." src="/assets/pipeline_builder.gif" /></a>
-<p>The <cite>should_include</cite> unit class method is in fact called multiple times during
+<p>The <code class="docutils literal notranslate"><span class="pre">should_include</span></code> unit class method is in fact called multiple times during
 the pipeline configuration construction. The pipeline builder iterates over all
 the pipeline units available in adviser implementation and asks if they
 should be included in the pipeline configuration until no change to the
@@ -269,7 +274,7 @@ TensorFlow application:</p>
        <span class="c1"># units are present in the pipeline configuration.</span>
        <span class="k">return</span> <span class="kc">None</span>
 
-    <span class="k">if</span> <span class="n">context</span><span class="o">.</span><span class="n">library_usage</span> <span class="ow">and</span> <span class="s2">&quot;tf.nn.conv2d&quot;</span> <span class="ow">in</span> <span class="n">context</span><span class="o">.</span><span class="n">library_usage</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tensorflow&quot;</span><span class="p">,</span> <span class="p">{}):</span>
+    <span class="k">if</span> <span class="n">context</span><span class="o">.</span><span class="n">library_usage</span> <span class="ow">and</span> <span class="s2">&quot;tensorflow.nn.conv2d&quot;</span> <span class="ow">in</span> <span class="n">context</span><span class="o">.</span><span class="n">library_usage</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tensorflow&quot;</span><span class="p">,</span> <span class="p">{}):</span>
        <span class="c1"># As an example - adjust parameter `score_factor&#39; of this pipeline</span>
        <span class="c1"># unit to 2.0, which will override the default one.</span>
        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;score_factor&quot;</span><span class="p">:</span> <span class="mf">2.0</span><span class="p">}</span>
@@ -283,9 +288,11 @@ and so on respecting the relative order of sieves in the pipeline configuration
 (the order in which they were included). This logic applies to all pipeline
 unit types - <a class="reference internal" href="boots.html#boots"><span class="std std-ref">boots</span></a>, <a class="reference internal" href="pseudonyms.html#pseudonyms"><span class="std std-ref">pseudonymns</span></a>,
 <a class="reference internal" href="sieves.html#sieves"><span class="std std-ref">sieves</span></a>, <a class="reference internal" href="steps.html#steps"><span class="std std-ref">steps</span></a>, <a class="reference internal" href="strides.html#strides"><span class="std std-ref">strides</span></a> and
-<a class="reference internal" href="wraps.html#wraps"><span class="std std-ref">wraps</span></a>.</p>
+<a class="reference internal" href="wraps.html#wraps"><span class="std std-ref">wraps</span></a>. In case of prescription pipeline units, use
+<code class="docutils literal notranslate"><span class="pre">should_include.dependencies</span></code> to respect dependencies on other units. See
+<a class="reference internal" href="prescription/should_include.html#prescription-should-include"><span class="std std-ref">relevant documentation for more info</span></a>.</p>
 <p>Moreover, pipeline units can be specific to a package. This was introduced as
-an optimization to group these pipeline units based on packages they operate on
+an optimization to group pipeline units based on packages they operate on
 not to call them ineffectively on packages that are not relevant in the
 resolution process.  Note pipeline units can be called thousand times during
 the resolution process so this optimization matters a lot.</p>
@@ -385,7 +392,7 @@ used</span></a>.</p>
 <li><a class="reference internal" href="#">State expansion pipeline</a><ul>
 <li><a class="reference internal" href="#pipeline-and-resolver-execution">Pipeline and resolver execution</a></li>
 <li><a class="reference internal" href="#context-and-beam">Context and Beam</a></li>
-<li><a class="reference internal" href="#pipeline-configuration-creation">Pipeline configuration creation</a></li>
+<li><a class="reference internal" href="#id1">Pipeline configuration creation</a></li>
 <li><a class="reference internal" href="#instrumentation-of-resolver-s-pipeline-units">Instrumentation of resolver’s pipeline units</a></li>
 <li><a class="reference internal" href="#prescription-pipeline-units">Prescription pipeline units</a></li>
 <li><a class="reference internal" href="#static-source-code-analysis-library-usage">Static source code analysis - library usage</a></li>
@@ -396,7 +403,7 @@ used</span></a>.</p>
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation index</a><ul>
-      <li>Previous: <a href="deployment.html" title="previous chapter">Configuring and setting up adviser in a cluster</a></li>
+      <li>Previous: <a href="deployment.html" title="previous chapter">Configuring and setting up resolver in a cluster</a></li>
       <li>Next: <a href="resolver.html" title="next chapter">Thoth’s resolver</a></li>
   </ul></li>
 </ul>
