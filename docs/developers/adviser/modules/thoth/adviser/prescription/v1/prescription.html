@@ -71,6 +71,7 @@
 
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">pickle</span>
 <span class="kn">import</span> <span class="nn">yaml</span>
 <span class="kn">from</span> <span class="nn">itertools</span> <span class="kn">import</span> <span class="n">chain</span>
 
@@ -334,22 +335,31 @@
             <span class="n">prescription</span><span class="p">,</span> <span class="n">prescription_name</span><span class="p">,</span> <span class="n">prescription_release</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">popleft</span><span class="p">()</span>
 
             <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">prescription</span><span class="p">):</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="n">prescription</span><span class="o">.</span><span class="n">endswith</span><span class="p">((</span><span class="s2">&quot;.yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;.yml&quot;</span><span class="p">)):</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Skipping file </span><span class="si">%r</span><span class="s2">: not a YAML file&quot;</span><span class="p">,</span> <span class="n">prescription</span><span class="p">)</span>
-                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">prescription</span><span class="o">.</span><span class="n">endswith</span><span class="p">((</span><span class="s2">&quot;.yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;.yml&quot;</span><span class="p">)):</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading prescriptions from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">prescription</span><span class="p">)</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">prescription</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
+                        <span class="k">try</span><span class="p">:</span>
+                            <span class="n">prescription_instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span>
+                                <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">,</span> <span class="n">Loader</span><span class="o">=</span><span class="n">yaml</span><span class="o">.</span><span class="n">CLoader</span><span class="p">),</span>
+                                <span class="n">prescription_instance</span><span class="o">=</span><span class="n">prescription_instance</span><span class="p">,</span>
+                                <span class="n">prescription_name</span><span class="o">=</span><span class="n">prescription_name</span><span class="p">,</span>
+                                <span class="n">prescription_release</span><span class="o">=</span><span class="n">prescription_release</span><span class="p">,</span>
+                            <span class="p">)</span>
+                        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to load prescription from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">prescription</span><span class="p">)</span>
+                            <span class="k">raise</span>
+                <span class="k">elif</span> <span class="n">prescription</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.pickle&quot;</span><span class="p">):</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading prescriptions from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">prescription</span><span class="p">)</span>
+                    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">prescription</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">fp</span><span class="p">:</span>
+                        <span class="n">prescription_instance</span> <span class="o">=</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">fp</span><span class="p">)</span>
 
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Loading prescriptions from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">prescription</span><span class="p">)</span>
-                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">prescription</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">config_file</span><span class="p">:</span>
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="n">prescription_instance</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span>
-                            <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">config_file</span><span class="p">,</span> <span class="n">Loader</span><span class="o">=</span><span class="n">yaml</span><span class="o">.</span><span class="n">CLoader</span><span class="p">),</span>
-                            <span class="n">prescription_instance</span><span class="o">=</span><span class="n">prescription_instance</span><span class="p">,</span>
-                            <span class="n">prescription_name</span><span class="o">=</span><span class="n">prescription_name</span><span class="p">,</span>
-                            <span class="n">prescription_release</span><span class="o">=</span><span class="n">prescription_release</span><span class="p">,</span>
+                    <span class="k">for</span> <span class="n">prescription_info</span> <span class="ow">in</span> <span class="n">prescription_instance</span><span class="o">.</span><span class="n">prescriptions</span><span class="p">:</span>
+                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                            <span class="s2">&quot;Loaded prescriptions </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">prescription_info</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">prescription_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
                         <span class="p">)</span>
-                    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-                        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Failed to load prescription from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">prescription</span><span class="p">)</span>
-                        <span class="k">raise</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Skipping file </span><span class="si">%r</span><span class="s2">: not a YAML nor Pickle file&quot;</span><span class="p">,</span> <span class="n">prescription</span><span class="p">)</span>
+                    <span class="k">continue</span>
 
             <span class="k">elif</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">prescription</span><span class="p">):</span>
                 <span class="n">prescription_metadata_file_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">prescription</span><span class="p">,</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_PRESCRIPTION_METADATA_FILE</span><span class="p">)</span>
