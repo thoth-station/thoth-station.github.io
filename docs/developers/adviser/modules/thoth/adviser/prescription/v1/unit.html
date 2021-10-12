@@ -73,10 +73,12 @@
 <span class="kn">import</span> <span class="nn">logging</span>
 <span class="kn">import</span> <span class="nn">re</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Type</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
@@ -88,8 +90,9 @@
 
 <span class="kn">import</span> <span class="nn">attr</span>
 
-<span class="kn">from</span> <span class="nn">thoth.adviser.exceptions</span> <span class="kn">import</span> <span class="n">NotAcceptable</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.cpu_db</span> <span class="kn">import</span> <span class="n">CPUDatabase</span>
 <span class="kn">from</span> <span class="nn">thoth.adviser.exceptions</span> <span class="kn">import</span> <span class="n">EagerStopPipeline</span>
+<span class="kn">from</span> <span class="nn">thoth.adviser.exceptions</span> <span class="kn">import</span> <span class="n">NotAcceptable</span>
 <span class="kn">from</span> <span class="nn">thoth.adviser.state</span> <span class="kn">import</span> <span class="n">State</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
 <span class="kn">from</span> <span class="nn">thoth.python</span> <span class="kn">import</span> <span class="n">PackageVersion</span>
@@ -98,7 +101,6 @@
 <span class="kn">from</span> <span class="nn">...unit</span> <span class="kn">import</span> <span class="n">Unit</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span>
     <span class="kn">from</span> <span class="nn">...pipeline_builder</span> <span class="kn">import</span> <span class="n">PipelineBuilderContext</span>
 
 
@@ -120,6 +122,73 @@
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_list</span><span class="o">.</span><span class="fm">__contains__</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
 
         <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_list</span><span class="p">[</span><span class="s2">&quot;not&quot;</span><span class="p">]</span><span class="o">.</span><span class="fm">__contains__</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">_ValueListBaseImage</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;A class that overrides `in` to transparently handle included and excluded base images.&quot;&quot;&quot;</span>
+
+    <span class="c1"># Image name mapped to image tag; the &quot;_not&quot; flag specifies if images were declared as part of &quot;not&quot;.</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;_images&quot;</span><span class="p">,</span> <span class="s2">&quot;_not&quot;</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]]]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Initialize self.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Set</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="nb">bool</span><span class="p">]]]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="n">image_listing</span> <span class="o">=</span> <span class="n">obj</span><span class="p">[</span><span class="s2">&quot;not&quot;</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_not</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">image_listing</span> <span class="o">=</span> <span class="n">obj</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_not</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="n">images</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">image_listing</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">item</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+                <span class="k">continue</span>
+
+            <span class="n">images</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">image</span> <span class="ow">in</span> <span class="n">images</span><span class="p">:</span>
+            <span class="n">tag_exp_set</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">image</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">tag_exp_set</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">tag_exp_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="p">[</span><span class="n">image</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">tag_exp_set</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">image</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">tag_exp_set</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">))</span>  <span class="c1"># Means any tag.</span>
+                <span class="k">continue</span>
+
+            <span class="n">tag</span> <span class="o">=</span> <span class="n">image</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">tag</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;*&quot;</span><span class="p">):</span>
+                <span class="n">tag_exp_set</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="n">tag</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
+                <span class="k">continue</span>
+
+            <span class="n">tag_exp_set</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span> <span class="o">==</span> <span class="n">tag</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__contains__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">item</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Check if the given item (base image) is in the provided listing.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">item</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># Match `None` image in the image listing.</span>
+            <span class="k">if</span> <span class="n">item</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="p">:</span>
+                <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_not</span>
+
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_not</span>
+
+        <span class="n">parts</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>  <span class="c1"># No tag specified.</span>
+            <span class="k">return</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_not</span> <span class="k">else</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span>
+
+        <span class="n">image</span><span class="p">,</span> <span class="n">tag</span> <span class="o">=</span> <span class="n">parts</span>
+        <span class="n">tag_expressions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_images</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">tag_expressions</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_not</span>
+
+        <span class="k">for</span> <span class="n">tag_exp</span> <span class="ow">in</span> <span class="n">tag_expressions</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">tag_exp</span><span class="p">(</span><span class="n">tag</span><span class="p">):</span>
+                <span class="k">return</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_not</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_not</span>
 
 
 <div class="viewcode-block" id="UnitPrescription"><a class="viewcode-back" href="../../../../../thoth.adviser.prescription.v1.html#thoth.adviser.prescription.UnitPrescription">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -425,6 +494,7 @@
             <span class="c1"># CPU/GPU</span>
             <span class="n">cpu_families</span> <span class="o">=</span> <span class="n">hardware_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu_families&quot;</span><span class="p">)</span>
             <span class="n">cpu_models</span> <span class="o">=</span> <span class="n">hardware_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu_models&quot;</span><span class="p">)</span>
+            <span class="n">cpu_flags</span> <span class="o">=</span> <span class="n">hardware_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu_flags&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]</span>
             <span class="n">gpu_models</span> <span class="o">=</span> <span class="n">hardware_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gpu_models&quot;</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">cpu_families</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_family</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ValueList</span><span class="p">(</span><span class="n">cpu_families</span><span class="p">):</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching CPU family used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_family</span><span class="p">)</span>
@@ -437,6 +507,48 @@
             <span class="k">if</span> <span class="n">gpu_models</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">hw_used</span><span class="o">.</span><span class="n">gpu_model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ValueList</span><span class="p">(</span><span class="n">gpu_models</span><span class="p">):</span>
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching GPU model used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">hw_used</span><span class="o">.</span><span class="n">gpu_model</span><span class="p">)</span>
                 <span class="k">return</span> <span class="kc">False</span>
+
+            <span class="k">if</span> <span class="n">cpu_flags</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_family</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_model</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                        <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: CPU family (</span><span class="si">%s</span><span class="s2">) or CPU model (</span><span class="si">%s</span><span class="s2">) not provided, cannot check CPU flags </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                        <span class="n">unit_name</span><span class="p">,</span>
+                        <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_family</span><span class="p">,</span>
+                        <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_model</span><span class="p">,</span>
+                        <span class="n">cpu_flags</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">False</span>
+
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cpu_flags</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">cpu_flag</span> <span class="ow">in</span> <span class="n">cpu_flags</span><span class="p">[</span><span class="s2">&quot;not&quot;</span><span class="p">]:</span>
+                        <span class="k">if</span> <span class="n">CPUDatabase</span><span class="o">.</span><span class="n">provides_flag</span><span class="p">(</span><span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_family</span><span class="p">,</span> <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_model</span><span class="p">,</span> <span class="n">cpu_flag</span><span class="p">):</span>
+                            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: CPU flag </span><span class="si">%r</span><span class="s2"> is provided by CPU family </span><span class="si">%s</span><span class="s2"> and CPU model </span><span class="si">%s</span><span class="s2">, not registering unit&quot;</span><span class="p">,</span>
+                                <span class="n">unit_name</span><span class="p">,</span>
+                                <span class="n">cpu_flag</span><span class="p">,</span>
+                                <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_family</span><span class="p">,</span>
+                                <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_model</span><span class="p">,</span>
+                            <span class="p">)</span>
+                            <span class="k">return</span> <span class="kc">False</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">cpu_flag</span> <span class="ow">in</span> <span class="n">cpu_flags</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="ow">not</span> <span class="n">CPUDatabase</span><span class="o">.</span><span class="n">provides_flag</span><span class="p">(</span><span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_family</span><span class="p">,</span> <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_model</span><span class="p">,</span> <span class="n">cpu_flag</span><span class="p">):</span>
+                            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                                <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching CPU flag </span><span class="si">%r</span><span class="s2"> for CPU family </span><span class="si">%s</span><span class="s2"> and CPU model </span><span class="si">%s</span><span class="s2">, not registering unit&quot;</span><span class="p">,</span>
+                                <span class="n">unit_name</span><span class="p">,</span>
+                                <span class="n">cpu_flag</span><span class="p">,</span>
+                                <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_family</span><span class="p">,</span>
+                                <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_model</span><span class="p">,</span>
+                            <span class="p">)</span>
+                            <span class="k">return</span> <span class="kc">False</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Used CPU family </span><span class="si">%s</span><span class="s2"> and CPU model </span><span class="si">%s</span><span class="s2"> provides all CPU flags required </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="n">unit_name</span><span class="p">,</span>
+                    <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_family</span><span class="p">,</span>
+                    <span class="n">hw_used</span><span class="o">.</span><span class="n">cpu_model</span><span class="p">,</span>
+                    <span class="n">cpu_flags</span><span class="p">,</span>
+                <span class="p">)</span>
 
         <span class="c1"># Software present.</span>
         <span class="n">runtime_used</span> <span class="o">=</span> <span class="n">builder_context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span>
@@ -507,7 +619,7 @@
             <span class="k">return</span> <span class="kc">False</span>
 
         <span class="n">base_images</span> <span class="o">=</span> <span class="n">runtime_environment_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;base_images&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">base_images</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ValueList</span><span class="p">(</span><span class="n">base_images</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">base_images</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_ValueListBaseImage</span><span class="p">(</span><span class="n">base_images</span><span class="p">):</span>
             <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2">: Not matching base image used (using </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">unit_name</span><span class="p">,</span> <span class="n">runtime_used</span><span class="o">.</span><span class="n">base_image</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">False</span>
 
