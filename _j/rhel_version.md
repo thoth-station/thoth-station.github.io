@@ -10,7 +10,7 @@ environments. Any minor release identifier will be discarded.
 RHEL/UBI releases guarantee ABI compatibility of native dependencies shipped.
 Information about any minor releases will not be used in recommendations.
 
-## Affected packages:
+## Affected packages
 
 This message is not specific to any package.
 

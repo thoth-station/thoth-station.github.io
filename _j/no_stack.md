@@ -23,7 +23,7 @@ curl -X GET \
   "https://khemenu.thoth-station.ninja/api/v1/advise/python/<adviser-id>/log"
 ```
 
-## Affected packages:
+## Affected packages
 
 This error message produced is not specific to any package.
 

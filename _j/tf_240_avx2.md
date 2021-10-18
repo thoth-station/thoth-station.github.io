@@ -16,7 +16,7 @@ enabled, it core dumps on the package import.
 Illegal instruction (core dumped)
 ```
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow==2.4.0``
 

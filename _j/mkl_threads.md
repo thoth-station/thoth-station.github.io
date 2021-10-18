@@ -25,7 +25,7 @@ export KMP_BLOCKTIME=1
 export KMP_AFFINITY=granularity=fine,compact,1,0
 ```
 
-## Affected packages:
+## Affected packages
 
  * ``intel-tensorflow``
  * ``pytorch``

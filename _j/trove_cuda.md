@@ -13,7 +13,7 @@ CUDA versions, but the used CUDA version is not listed.
 Check package information (e.g. by following link to PyPI) to see compatible
 CUDA versions according to the package maintainer.
 
-## Affected packages:
+## Affected packages
 
 Justification information lists affected packages.
 

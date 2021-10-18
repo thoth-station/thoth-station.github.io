@@ -8,7 +8,7 @@ Intel's distribution of TensorFlow can improve performance of machine learning m
 
 Intel's distribution of TensorFlow can improve performance of machine learning models.
 
-## Affected packages:
+## Affected packages
 
  * [``intel-tensorflow``][2]
  * [``tensorflow``][3]

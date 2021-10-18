@@ -16,7 +16,7 @@ tries to find a CVE-free software stack.
 The recommendation engine uses [PyUP Safety DB][2] which gets periodically
 updated on the recommendation engine side.
 
-## Affected packages:
+## Affected packages
 
 See the justification reported for the listing of affected packages.
 

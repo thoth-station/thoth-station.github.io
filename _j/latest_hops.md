@@ -24,7 +24,7 @@ The reasons why packages could not be resolved to their latest versions:
 
 * the most recent packages do not work in the target runtime environment
 
-## Affected packages:
+## Affected packages
 
 The warning produced is not related to any specific package.
 

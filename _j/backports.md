@@ -13,7 +13,7 @@ often installed conditionally by using a proper environment marker (e.g.
 ``importlib-metadata; python_version < 3.8`` for [``importlib-metadata``
 package][importlib_metadata]).
 
-## Affected packages:
+## Affected packages
 
  * [``enum34``][enum34]
  * [``functools``][functools32]

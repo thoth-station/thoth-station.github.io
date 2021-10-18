@@ -20,7 +20,7 @@ ImportError: numpy.core.umath failed to import
 F tensorflow/python/lib/core/bfloat16.cc:714 Check failed: PyBfloat16_Type.tp_base != nullptr Aborted (core dumped
 ```
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow==2.4``
  * ``tensorflow-cpu==2.4``

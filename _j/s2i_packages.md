@@ -16,7 +16,7 @@ An example can be TensorFlow shipped inside Jupyter Notebook images. If users
 run such a Jupyter Notebook, the TensorFlow that is shipped with Jupyter
 Notebook (runtime environment used) is used.
 
-## Affected packages:
+## Affected packages
 
 See the resolution log for more information on affected packages.
 

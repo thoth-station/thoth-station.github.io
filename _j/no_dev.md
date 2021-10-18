@@ -29,7 +29,7 @@ thamos advise
 Note this can add significant overhead to the resolution process. See [Thamos
 documentation for more info][1].
 
-## Affected packages:
+## Affected packages
 
 This message is not related to any specific packages.
 

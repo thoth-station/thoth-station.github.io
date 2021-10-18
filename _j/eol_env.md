@@ -13,7 +13,7 @@ another runtime environment for up to date recommendations.
 
 Follow [release notes][0] for updates and changes in runtime environments.
 
-## Affected packages:
+## Affected packages
 
 The warning produced is not related to a specific package.
 

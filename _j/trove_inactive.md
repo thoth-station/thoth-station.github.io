@@ -11,7 +11,7 @@ The system detected that the package maintainer stated inactive development
 status. Using inactive project might cause troubles with fixing bugs or when
 users ask for new feature requests.
 
-## Affected packages:
+## Affected packages
 
 Justification information lists affected packages.
 

@@ -13,7 +13,7 @@ client timeout configuration. The root cause can be:
 2. Parts of the backend infrastructure might be down, check [Thoth's status page][2] for more info.
 3. The service is overloaded.
 
-## Affected packages:
+## Affected packages
 
 This error is not specific to any package.
 

@@ -10,7 +10,7 @@ Thoth configuration file has missing CPU information. This information is
 needed when performing recommendations specific to hardware used (especially
 performance related recommendations).
 
-## Affected packages:
+## Affected packages
 
 This message is not specific to any package.
 

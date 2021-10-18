@@ -16,7 +16,7 @@ AttributeError: module 'gast' has no attribute 'Num'
 The issue is in update in gast package to 0.3.0 where ``Num`` constant was
 removed. See [the corresponding commit][1].
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow<=1.14``
  * ``tensorflow-cpu<=1.14``

@@ -14,7 +14,7 @@ By using Thoth's s2i users can be sure about packages that are available in the
 container environment. Moreover, these container images provide information
 about ABI symbols available and are well optimized.
 
-## Affected packages:
+## Affected packages
 
 This issue is not specific to a package.
 

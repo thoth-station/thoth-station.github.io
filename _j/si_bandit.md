@@ -12,7 +12,7 @@ known issues. These issues are classified by severity and confidence — both on
 the recommendation type is `security` adviser will remove any packages which have bandit security issues which score
 HIGH-HIGH for severity-confidence.
 
-## Affected packages:
+## Affected packages
 
 This message can be shown for any package and does not need to be specific for any package.
 

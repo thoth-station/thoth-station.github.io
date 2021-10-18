@@ -21,7 +21,7 @@ Check [the compatibility section of Thoth's documentation for more info][2].
 
 See [Thamos documentation for more info][1].
 
-## Affected packages:
+## Affected packages
 
 This message is not specific to any package.
 

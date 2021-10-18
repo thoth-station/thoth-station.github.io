@@ -17,7 +17,7 @@ by multiple issues. Besides Python 2 and Python 3 incompatibilities in
 ``setup.py``, issues like missing native dependencies in the environment (e.g.
 C toolchain to build native extensions) are also applicable.
 
-## Affected packages:
+## Affected packages
 
 This warning is not tight to any specific package.
 

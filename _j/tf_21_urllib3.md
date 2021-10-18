@@ -53,7 +53,7 @@ Traceback (most recent call last):
 ImportError: cannot import name 'range'
 ```
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow==2.1``
  * ``urllib3>=1.2<=1.5``

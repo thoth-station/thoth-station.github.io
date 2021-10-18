@@ -22,7 +22,7 @@ removed from the resolution process:
 thamos log
 ```
 
-## Affected packages:
+## Affected packages
 
  * [``tensorflow``][3]
  * [``tensorflow-gpu``][4]

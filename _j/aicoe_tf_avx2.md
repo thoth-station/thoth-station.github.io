@@ -13,7 +13,7 @@ would turn on AVX2 instructions. TensorFlow builds on the [AICoE index][1] are
 built with compiler options to enable AVX2 instructions in the resulting
 artifact installed.
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow``
 

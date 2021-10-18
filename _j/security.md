@@ -10,7 +10,7 @@ Thoth's recommendation engine automatically gathers security related
 information. The gathered data are used to recommend packages that have low
 security risk. See [bandit related scans for more info][1].
 
-## Affected packages:
+## Affected packages
 
 This pipeline unit is not specific to any concrete package.
 

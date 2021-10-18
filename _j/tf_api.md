@@ -18,7 +18,7 @@ Resolver found a matching TensorFlow release offering symbols used by the
 user's application and discarded one or mutliple releases that did not offer
 required library symbols.
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow``
  * ``tensorflow-gpu``

@@ -11,7 +11,7 @@ Builds provided by Intel are published on PyPI as [``intel-tensorflow``
 package][1]. This package can be used as an alternative to [``tensorflow``][2]
 and [``tensorflow-cpu``][3] packages.
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow``
  * ``tensorflow-cpu``

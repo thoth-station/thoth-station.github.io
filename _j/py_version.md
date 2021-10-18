@@ -16,7 +16,7 @@ versa.
 
 It's recommended to state Python version explictly.
 
-## Affected packages:
+## Affected packages
 
 This warning is not specific to any package.
 

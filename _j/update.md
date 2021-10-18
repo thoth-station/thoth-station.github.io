@@ -12,7 +12,7 @@ the application stack. An example could be a new TensorFlow release which
 triggers the resolution that explicitly keeps the new TensorFlow release in the
 resolved stack. This operation is similar to ``pipenv update``.
 
-## Affected packages:
+## Affected packages
 
 See the resolution log on more information about the package newly released and
 packages filtered out based by this sieve.

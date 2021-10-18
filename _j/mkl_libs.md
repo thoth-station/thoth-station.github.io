@@ -11,7 +11,7 @@ Intel's build of TensorFlow requires Intel® Performance Libraries installed in
 the runtime environment. If these libraries are not present, the performance of
 TensorFlow is degradated significantly.
 
-## Affected packages:
+## Affected packages
 
  * ``intel-tensorflow``
 

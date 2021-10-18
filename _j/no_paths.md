@@ -24,7 +24,7 @@ consider adjusting [beam and it's width][beam] if the resolution process should
 take into account more states. This configuration option is not available to
 users but is configured by the service operator.
 
-## Affected packages:
+## Affected packages
 
 This warning is not specific to any package.
 

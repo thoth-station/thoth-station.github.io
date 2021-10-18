@@ -19,7 +19,7 @@ matched with preaggregated API symbols. No recommendations of specific
 TensorFlow release will be done but resolver can still resolve a software
 stack.
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow``
  * ``tensorflow-gpu``

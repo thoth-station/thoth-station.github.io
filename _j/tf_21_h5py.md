@@ -9,7 +9,7 @@ TensorFlow in versions 2.1 and 2.3 overpins [h5py][2] library.
 Package [h5py][2] causes runtime errors when installed as a dependency for a
 TensorFlow 2.1 stack. See the [reported upstream issue for more info][1].
 
-## Affected packages:
+## Affected packages
 
  * ``intel-tensorflow==2.1``
  * ``tensorflow==2.1``

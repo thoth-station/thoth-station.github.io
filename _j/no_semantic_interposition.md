@@ -12,7 +12,7 @@ speed ups. The Python interpreter shipped is built with
 ``-fno-semantic-interposition``. By enabling this flag during build time, the
 application performance can increase by as much as 30%.
 
-## Affected packages:
+## Affected packages
 
 This recommendation is not specific to any package.
 

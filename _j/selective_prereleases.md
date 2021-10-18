@@ -18,7 +18,7 @@ black = true
 
 See [Thoth's selective pre-releases feature for more info][1].
 
-## Affected packages:
+## Affected packages
 
 See the logged message for affected package information.
 

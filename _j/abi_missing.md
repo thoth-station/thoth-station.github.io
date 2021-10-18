@@ -10,7 +10,7 @@ symbols needed.
 The container image analyses run did not detect ABI symbols needed for the
 given package. The package reported will not run in the runtime environment.
 
-## Affected packages:
+## Affected packages
 
 This warning message is not specific to any package.
 
