@@ -12,12 +12,9 @@ dependency required by user's stack. As the direct dependency was not analyzed
 yet, Thoth cannot resolve the dependency graph to deliver a pinned down
 software stack.
 
-On the backend side, this prioritizes analysis of the missing package so that
-users can receive recommendations as soon as possible.
+## Affected packages
 
-## Affected packages:
-
-This message is not specific to any specific package.
+See the resolver log for more information on affected packages.
 
 ## Severity
 
@@ -25,8 +22,7 @@ This message is not specific to any specific package.
 
 ## Issue fix
 
-Get back to Thoth in a while. Thoth backend analyzes the software to provide
-recommendations.
+Request analyses using the following [GitHub issue template][3].
 
 Note that this can happen also when the requested package is not available on PyPI
 (e.g. typo), or no longer available as it was deleted by package maintainers.
@@ -46,6 +42,8 @@ types](http://thoth-station.ninja/recommendation-types).
 
  * [Thoth solver][1]
  * [PyPI][2]
+ * [GitHub request template][3]
 
 [1]: https://github.com/thoth-station/solver
 [2]: https://pypi.org/
+[3]: https://tinyurl.com/thoth-unresolved
