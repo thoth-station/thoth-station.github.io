@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.57.1 documentation</title>
+    <title>thoth.storages.graph.postgres &#8212; Thoth Storages 0.57.2 documentation</title>
     <link rel="stylesheet" href="/assets/storages/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/storages/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="/assets/storages/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Storages 0.57.1 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Storages 0.57.2 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -2720,7 +2720,7 @@
         <span class="n">only_if_package_seen</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Register the given Python package index in the graph database.&quot;&quot;&quot;</span>
-        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">,</span> <span class="n">session</span><span class="o">.</span><span class="n">begin</span><span class="p">(</span><span class="n">subtransactions</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
             <span class="n">python_package_index</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">url</span> <span class="o">==</span> <span class="n">url</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
             <span class="k">if</span> <span class="n">python_package_index</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
@@ -2733,14 +2733,20 @@
                 <span class="p">)</span>
                 <span class="k">return</span> <span class="kc">True</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="o">.</span><span class="n">id</span> <span class="o">==</span> <span class="n">python_package_index</span><span class="o">.</span><span class="n">id</span><span class="p">)</span><span class="o">.</span><span class="n">update</span><span class="p">(</span>
-                    <span class="p">{</span>
-                        <span class="s2">&quot;warehouse_api_url&quot;</span><span class="p">:</span> <span class="n">warehouse_api_url</span><span class="p">,</span>
-                        <span class="s2">&quot;verify_ssl&quot;</span><span class="p">:</span> <span class="n">verify_ssl</span><span class="p">,</span>
-                        <span class="s2">&quot;enabled&quot;</span><span class="p">:</span> <span class="n">enabled</span><span class="p">,</span>
-                        <span class="s2">&quot;only_if_package_seen&quot;</span><span class="p">:</span> <span class="n">only_if_package_seen</span><span class="p">,</span>
-                    <span class="p">}</span>
+                <span class="n">insert_stmt</span> <span class="o">=</span> <span class="n">insert</span><span class="p">(</span><span class="n">PythonPackageIndex</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="o">**</span><span class="n">python_package_index</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(</span><span class="n">without_id</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+
+                <span class="n">do_update_stmt</span> <span class="o">=</span> <span class="n">insert_stmt</span><span class="o">.</span><span class="n">on_conflict_do_update</span><span class="p">(</span>
+                    <span class="n">index_elements</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span>
+                    <span class="n">set_</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span>
+                        <span class="n">warehouse_api_url</span><span class="o">=</span><span class="n">warehouse_api_url</span><span class="p">,</span>
+                        <span class="n">verify_ssl</span><span class="o">=</span><span class="n">verify_ssl</span><span class="p">,</span>
+                        <span class="n">enabled</span><span class="o">=</span><span class="n">enabled</span><span class="p">,</span>
+                        <span class="n">only_if_package_seen</span><span class="o">=</span><span class="n">only_if_package_seen</span><span class="p">,</span>
+                    <span class="p">),</span>
                 <span class="p">)</span>
+
+                <span class="n">session</span><span class="o">.</span><span class="n">execute</span><span class="p">(</span><span class="n">do_update_stmt</span><span class="p">)</span>
+
                 <span class="k">return</span> <span class="kc">False</span></div>
 
 <div class="viewcode-block" id="GraphDatabase.delete_python_package_index"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.delete_python_package_index">[docs]</a>    <span class="k">def</span> <span class="nf">delete_python_package_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">index_url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -7054,7 +7060,7 @@
 
             <span class="k">return</span> <span class="p">[{</span><span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">i</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;package_version&quot;</span><span class="p">:</span> <span class="n">i</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="s2">&quot;location&quot;</span><span class="p">:</span> <span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]}</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">query</span><span class="o">.</span><span class="n">all</span><span class="p">()]</span></div>
 
-<div class="viewcode-block" id="GraphDatabase.get_python_package_version_import_packages_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_python_package_version_import_packages_all">[docs]</a>    <span class="k">def</span> <span class="nf">get_python_package_version_import_packages_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">import_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<div class="viewcode-block" id="GraphDatabase.get_python_package_version_import_packages_all"><a class="viewcode-back" href="../../../../thoth.storages.graph.html#thoth.storages.graph.postgres.GraphDatabase.get_python_package_version_import_packages_all">[docs]</a>    <span class="k">def</span> <span class="nf">get_python_package_version_import_packages_all</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">import_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve Python package name for the given import package name.&quot;&quot;&quot;</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session_scope</span><span class="p">()</span> <span class="k">as</span> <span class="n">session</span><span class="p">:</span>
             <span class="n">query</span> <span class="o">=</span> <span class="p">(</span>
