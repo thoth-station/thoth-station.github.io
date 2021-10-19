@@ -2,18 +2,18 @@
 title: A security vulnerability found for a package
 ---
 
-One or more packages in the software stack have security vulnerability.
+One or more packages in the software stack have a security vulnerability.
 
 ## Issue description
 
 The recommendation engine found a package that has assigned one or multiple
-CVEs. See [What is CVE?][3] for more information on the security and possible
+CVEs. See [What is CVE?][2] for more information on the security and possible
 implications.
 
-If the recommendation type is set to secure, the recommendation engine always
-tries to find a CVE-free software stack.
+If the recommendation type is set to ``secure``, the recommendation engine
+always tries to find a CVE-free software stack.
 
-The recommendation engine uses [PyUP Safety DB][2] which gets periodically
+The recommendation engine uses [PyPA/advisory-db][1] which gets periodically
 updated on the recommendation engine side.
 
 ## Affected packages:
@@ -41,8 +41,9 @@ recommendation engine always tries to find a CVE-free software stack.
 
 ## Recommendation types
 
-All the recommendation types can produce this warning, except for latest:
+All the recommendation types can produce this warning:
 
+ * latest
  * performance
  * security
  * stable
@@ -53,10 +54,8 @@ listed](http://thoth-station.ninja/recommendation-types).
 
 ## Related
 
- * [PyUp][1]
- * [PyUp Safety DB][2]
- * [What is CVE?][3]
+ * [PyPA/advisory-db][1]
+ * [What is CVE?][2]
 
-[1]: https://pyup.io/
-[2]: https://github.com/pyupio/safety-db
-[3]: https://www.redhat.com/en/topics/security/what-is-cve
+[1]: https://github.com/pypa/advisory-db
+[2]: https://www.redhat.com/en/topics/security/what-is-cve
