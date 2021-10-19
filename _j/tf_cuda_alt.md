@@ -11,7 +11,7 @@ The runtime environment used provides CUDA which enables running
 [``tensorflow-gpu``][1]. The resolution process will include package
 [``tensorflow-gpu``][1] as an alternative to [``tensorflow``][2].
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow``
  * ``tensorflow-gpu``

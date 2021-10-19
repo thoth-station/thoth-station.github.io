@@ -10,7 +10,7 @@ support this Python version.
 Some TensorFlow releases are not compatible with Python 3.9. The resolver will
 remove these based on the runtime configuration provided.
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow<=2.4``
  * ``intel-tensorflow<=2.4``

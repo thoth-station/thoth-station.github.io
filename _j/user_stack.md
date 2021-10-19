@@ -34,7 +34,7 @@ use other features, such as ``thamos graph`` which relies on the dependency
 graph structure computed on the backend. As user's stack was not resolved on
 the backend, its structure cannot be shown.
 
-## Affected packages:
+## Affected packages
 
 This informative message is not related to any specific package.
 

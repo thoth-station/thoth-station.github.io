@@ -12,7 +12,7 @@ the pipeline unit.
 This means Thoth's recommendation engine knowledge is not up-to-date with the
 most recent TensorFlow releases.
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow``
  * ``tensorflow-gpu``

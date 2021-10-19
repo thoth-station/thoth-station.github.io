@@ -14,7 +14,7 @@ In such case, see the resolution log for more information.
 This message can be also produced if there were detected changes in the user's
 stack based on hash computed on requirements file.
 
-## Affected packages:
+## Affected packages
 
 See the resolution log for more info.
 

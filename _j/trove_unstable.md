@@ -14,7 +14,7 @@ indicate unsuitable use of a Python package.
 Check package information (e.g. by following link to PyPI) to see more
 information about the given package.
 
-## Affected packages:
+## Affected packages
 
 Justification information lists affected packages.
 

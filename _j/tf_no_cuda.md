@@ -12,7 +12,7 @@ TensorFlow is supported with specific CUDA versions. See supported
 [TensorFlow/CUDA matrix][1] to make sure TensorFlow works with CUDA installed
 in the runtime environment.
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow``
  * ``tensorflow-gpu``

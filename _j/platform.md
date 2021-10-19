@@ -12,7 +12,7 @@ recommendations for the platform specified.
 **WARNING:** If no platform is provided, the recommendation engine defaults to
 ``linux-x86_64``.
 
-## Affected packages:
+## Affected packages
 
 This message is not specific to any package.
 

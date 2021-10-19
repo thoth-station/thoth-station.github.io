@@ -32,7 +32,7 @@ curl -X GET \
 See [Thamos documentation for more info][1] on how to state configuration
 options in ``.thoth.yaml``.
 
-## Affected packages:
+## Affected packages
 
 The error is not specific to any package but rather to the runtime environment
 configuration used.

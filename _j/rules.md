@@ -9,7 +9,7 @@ One or multiple packages were removed based on Python solver rules configured.
 The given package was not considered during the resolution process as a rule
 that discards the given package was configured.
 
-## Affected packages:
+## Affected packages
 
 See logs for affected packages.
 

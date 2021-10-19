@@ -10,7 +10,7 @@ environment or any older Python version.
 Package Pandas dropped Python 3.6 support starting versions >1.2.0. You should
 use an older release.
 
-## Affected packages:
+## Affected packages
 
  * ``pandas>=1.2.0``
 

@@ -10,7 +10,7 @@ The recommendation engine will not take into account CUDA present in the
 runtime environment for TensorFlow as the CUDA version identifier supplied is
 not known to the recommendation engine.
 
-## Affected packages:
+## Affected packages
 
  * ``tensorflow``
  * ``tensorflow-gpu``

@@ -34,7 +34,7 @@ disable_index_adjustment = true
 Package ``tensorflow`` will be installed from the ``aicoe-tensorflow`` index as
 stated. See [Thoth's strict indexes configuration for more info][1].
 
-## Affected packages:
+## Affected packages
 
 See the logged message for affected package information.
 

@@ -14,7 +14,7 @@ listing. By providing a constraint on a certain package, the constraint is
 applied *only if* the given package is available in the resolved stack. The
 constraint does not enforce package presence, unlike for direct requirements.
 
-## Affected packages:
+## Affected packages
 
 See the resolution log or justification provided to see affected packages.
 

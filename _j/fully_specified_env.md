@@ -11,7 +11,7 @@ If one of the mandatory configuration entries is missing, resolver cannot give
 recommendations on software packages. The resolution of Python packages can
 vary based on runtime environment used.
 
-## Affected packages:
+## Affected packages
 
 This error message is not specific to pacakges used.
 

@@ -10,7 +10,7 @@ base.
 One or more packages were not found in the knowledge base. This results in a
 resolution failure as the application stack cannot be resolved.
 
-## Affected packages:
+## Affected packages
 
 See the resolution log for a list of packages that are not known:
 

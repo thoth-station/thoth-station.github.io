@@ -35,7 +35,7 @@ In the example above, only ``aicoe-tensorflow`` and ``pypi`` package sources
 will be used for obtaining packages.  See [Thoth's strict indexes
 configuration][1].
 
-## Affected packages:
+## Affected packages
 
 See the logged message for affected package information.
 

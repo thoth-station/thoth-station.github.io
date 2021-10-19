@@ -10,7 +10,7 @@ Linux® (RHEL) instead of the ones from the Universal Base Image (UBI).
 Recommendations produced will be compatible with RHEL. This has no
 impact if UBI is used as a software environment.
 
-## Affected packages:
+## Affected packages
 
 This message is not specific to any package.
 

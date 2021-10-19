@@ -26,7 +26,7 @@ curl -X GET \
   "https://khemenu.thoth-station.ninja/api/v1/advise/python/<adviser-id>/log"
 ```
 
-## Affected packages:
+## Affected packages
 
 This message can be shown for any package and does not need to be specific for any package.
 

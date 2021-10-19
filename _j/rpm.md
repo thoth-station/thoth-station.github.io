@@ -11,7 +11,7 @@ A Python package requires a native dependency in a form of a RPM being present i
 the runtime environment. However, the required RPM package is not present. That
 means the Python package will not work in the runtime environment.
 
-## Affected packages:
+## Affected packages
 
 See resolution log for information about affected package.
 

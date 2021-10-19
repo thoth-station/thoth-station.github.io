@@ -9,7 +9,7 @@ would be produced in such cases.
 
 This issue is very specific to the error raised. Refer to logs to get more information.
 
-## Affected packages:
+## Affected packages
 
 This error can be raised for any package and does not need to be specific for any package.
 
