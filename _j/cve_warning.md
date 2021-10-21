@@ -17,7 +17,7 @@ information in justifications for known vulnerabilities associated with the
 resolved version.
 
 If a project has a large number of vulnerabilities reported, it might
-indicate a possible future vulnerability disclosures. It might worth to keep an
+indicate possible future vulnerability disclosures. It might worth to keep an
 eye on the application that uses the given project and be additionally guided
 with respect to security. See Thoth's [security
 advisories](http://thoth-station.ninja/recommendation-types) for more info.
