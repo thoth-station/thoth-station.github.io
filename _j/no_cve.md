@@ -7,7 +7,7 @@ No known security vulnerability found for the given package release.
 ## Issue description
 
 The recommendation engine did not find any known CVE vulnerabilities for the
-given Python package. See [What is CVE?][2] for more information on the
+given Python package. See [What is a CVE?][2] for more information on the
 security and possible implications.
 
 **NOTE:** If the recommendation type is set to secure, the recommendation
