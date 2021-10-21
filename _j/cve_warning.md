@@ -16,7 +16,7 @@ necessarily affect the version present in the resolved lock file - see CVE
 information in justifications for known vulnerabilities associated with the
 resolved version.
 
-If a project has known considerably large vulnerabilities reported, it might
+If a project has a large number of vulnerabilities reported, it might
 indicate a possible future vulnerability disclosures. It might worth to keep an
 eye on the application that uses the given project and be additionally guided
 with respect to security. See Thoth's [security
