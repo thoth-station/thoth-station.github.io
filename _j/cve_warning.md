@@ -12,7 +12,7 @@ are actively used and have active community that reports vulnerabilities.
 
 This justification notifies you that the project is known to have
 vulnerabilities reported in one or more releases but the vulnerabilities do not
-necessary affect the version present in the resolved lock file - see CVE
+necessarily affect the version present in the resolved lock file - see CVE
 information in justifications for known vulnerabilities associated with the
 resolved version.
 
