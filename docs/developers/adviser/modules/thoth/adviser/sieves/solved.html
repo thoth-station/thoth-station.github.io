@@ -70,8 +70,13 @@
 <span class="sd">&quot;&quot;&quot;A sieve for filtering out build time/installation errors of Python packages.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">operator</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">DefaultDict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Set</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span>
@@ -93,6 +98,11 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
+<span class="k">def</span> <span class="nf">_default_dict_factory</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">DefaultDict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">DefaultDict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]]:</span>
+    <span class="sd">&quot;&quot;&quot;Instantiate default dictionary mapping package name -&gt; index URL -&gt; list of versions.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">defaultdict</span><span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">defaultdict</span><span class="p">,</span> <span class="nb">list</span><span class="p">))</span>  <span class="c1"># type: ignore</span>
+
+
 <div class="viewcode-block" id="SolvedSieve"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.solved.SolvedSieve">[docs]</a><span class="nd">@attr</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">slots</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="k">class</span> <span class="nc">SolvedSieve</span><span class="p">(</span><span class="n">Sieve</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Filter out build time/installation errors of Python packages.&quot;&quot;&quot;</span>
@@ -104,6 +114,10 @@
     <span class="n">_JUSTIFICATION_LINK</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;install_error&quot;</span><span class="p">)</span>
 
     <span class="n">_messages_logged</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">factory</span><span class="o">=</span><span class="nb">set</span><span class="p">,</span> <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">_packages_filtered</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">ib</span><span class="p">(</span>
+        <span class="n">factory</span><span class="o">=</span><span class="n">_default_dict_factory</span><span class="p">,</span>
+        <span class="n">init</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
 
 <div class="viewcode-block" id="SolvedSieve.should_include"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.solved.SolvedSieve.should_include">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">should_include</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
@@ -118,7 +132,21 @@
 <div class="viewcode-block" id="SolvedSieve.pre_run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.solved.SolvedSieve.pre_run">[docs]</a>    <span class="k">def</span> <span class="nf">pre_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Initialize this pipeline unit before each run.&quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_messages_logged</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_packages_filtered</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">pre_run</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="SolvedSieve.post_run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.solved.SolvedSieve.post_run">[docs]</a>    <span class="k">def</span> <span class="nf">post_run</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Post-run method for wrapping up the work.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">package_name</span><span class="p">,</span> <span class="n">package_items</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_packages_filtered</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">)):</span>
+            <span class="k">for</span> <span class="n">index_url</span><span class="p">,</span> <span class="n">version</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">package_items</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span> <span class="n">key</span><span class="o">=</span><span class="n">operator</span><span class="o">.</span><span class="n">itemgetter</span><span class="p">(</span><span class="mi">0</span><span class="p">)):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;The following versions of </span><span class="si">{</span><span class="n">package_name</span><span class="si">!r}</span><span class="s2"> from </span><span class="si">{</span><span class="n">index_url</span><span class="si">!r}</span><span class="s2"> were &quot;</span>
+                        <span class="s2">&quot;removed due to installation issues in the target environment: &quot;</span> <span class="o">+</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">version</span><span class="p">),</span>
+                        <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">)</span></div>
 
 <div class="viewcode-block" id="SolvedSieve.run"><a class="viewcode-back" href="../../../../thoth.adviser.sieves.html#thoth.adviser.sieves.solved.SolvedSieve.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">package_versions</span><span class="p">:</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">PackageVersion</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Filter out packages based on build time/installation issues..&quot;&quot;&quot;</span>
@@ -148,14 +176,8 @@
                     <span class="n">message</span> <span class="o">=</span> <span class="p">(</span>
                         <span class="sa">f</span><span class="s2">&quot;Removing package </span><span class="si">{</span><span class="n">package_tuple</span><span class="si">}</span><span class="s2"> due to installation time error in the software environment&quot;</span>
                     <span class="p">)</span>
-                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK</span><span class="p">)</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">stack_info</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-                        <span class="p">{</span>
-                            <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span>
-                            <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="n">message</span><span class="p">,</span>
-                            <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK</span><span class="p">,</span>
-                        <span class="p">}</span>
-                    <span class="p">)</span>
+                    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> - see </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_packages_filtered</span><span class="p">[</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]][</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">]]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">package_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
                 <span class="k">continue</span>
 
             <span class="k">yield</span> <span class="n">package_version</span></div></div>
