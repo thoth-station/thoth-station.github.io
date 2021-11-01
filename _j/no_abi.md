@@ -8,7 +8,7 @@ symbols cannot be done.
 
 ## Issue description
 
-Thoth analyses container images to give better guidenance with respect to ABI
+Thoth analyzes container images to give better guidance with respect to ABI
 symbols needed for packages installed into it. As the container image was not
 analyzed by Thoth container image analysis, the recommendation engine cannot
 provide recommendations specific to ABI symbols present in containerized
