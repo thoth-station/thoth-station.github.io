@@ -24,7 +24,11 @@ The warning produced is not related to a specific package.
 ## Issue fix
 
 Please switch to a supported runtime environment. See [release notes for more
-info][0].
+info][0]. You can list available environments using Thamos CLI:
+
+```
+thamos environments
+```
 
 ## Pipeline units
 
