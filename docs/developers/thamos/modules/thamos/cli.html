@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.cli &#8212; Thamos 1.20.0 documentation</title>
+    <title>thamos.cli &#8212; Thamos 1.22.0 documentation</title>
     <link rel="stylesheet" href="/assets/thamos/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/thamos/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="/assets/thamos/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.20.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.22.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -100,16 +100,20 @@
 <span class="kn">from</span> <span class="nn">thamos.exceptions</span> <span class="kn">import</span> <span class="n">NoRuntimeEnvironmentError</span>
 <span class="kn">from</span> <span class="nn">thamos.config</span> <span class="kn">import</span> <span class="n">config</span> <span class="k">as</span> <span class="n">configuration</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">advise_here</span> <span class="k">as</span> <span class="n">thoth_advise_here</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">add_requirements_to_project</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">collect_support_information_dict</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_log</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_package_from_imported_packages</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_status</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">install</span> <span class="k">as</span> <span class="n">thamos_install</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">list_python_package_indexes</span>
-<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">list_thoth_s2i</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">list_python_environments</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">list_thoth_container_images</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">load_files</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">provenance_check</span> <span class="k">as</span> <span class="n">thoth_provenance_check</span>
-<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">write_configuration</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">print_dependency_graph</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_verified_packages_from_static_analysis</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">write_configuration</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">write_files</span>
 <span class="kn">from</span> <span class="nn">thamos.utils</span> <span class="kn">import</span> <span class="n">workdir</span>
 <span class="kn">from</span> <span class="nn">thamos</span> <span class="kn">import</span> <span class="n">__version__</span> <span class="k">as</span> <span class="n">thamos_version</span>
@@ -153,7 +157,7 @@
     <span class="k">return</span> <span class="n">wrapper</span></div>
 
 
-<span class="k">def</span> <span class="nf">_print_report</span><span class="p">(</span><span class="n">report</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">json_output</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">_print_report</span><span class="p">(</span><span class="n">report</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">json_output</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Print reasoning to user.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">json_output</span><span class="p">:</span>
         <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
@@ -268,6 +272,7 @@
 <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
     <span class="s2">&quot;--workdir&quot;</span><span class="p">,</span>
     <span class="s2">&quot;-d&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;DIR&quot;</span><span class="p">,</span>
     <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
     <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Adjust working directory for sub-commands.&quot;</span><span class="p">,</span>
@@ -275,6 +280,7 @@
 <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
     <span class="s2">&quot;--thoth-host&quot;</span><span class="p">,</span>
     <span class="s2">&quot;-t&quot;</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;HOST&quot;</span><span class="p">,</span>
     <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
     <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Use selected host instead of the one stated in the configuration file.&quot;</span><span class="p">,</span>
@@ -1168,7 +1174,7 @@
     <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span> <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;ERROR&quot;</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
 
 
-<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;s2i&quot;</span><span class="p">)</span>
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;images&quot;</span><span class="p">)</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
     <span class="s2">&quot;--output-format&quot;</span><span class="p">,</span>
@@ -1178,14 +1184,14 @@
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify output format for the status report.&quot;</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
-<span class="k">def</span> <span class="nf">s2i</span><span class="p">(</span><span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D412</span>
-    <span class="sd">&quot;&quot;&quot;Check available Thoth Source-To-Image containers.</span>
+<span class="k">def</span> <span class="nf">images</span><span class="p">(</span><span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D412</span>
+    <span class="sd">&quot;&quot;&quot;Check available Thoth container images.</span>
 
 <span class="sd">    Examples:</span>
 
-<span class="sd">      thamos s2i --output-format json</span>
+<span class="sd">      thamos images --output-format json</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="n">list_thoth_s2i</span><span class="p">()</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">list_thoth_container_images</span><span class="p">()</span>
 
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;yaml&quot;</span><span class="p">:</span>
         <span class="n">yaml</span><span class="o">.</span><span class="n">safe_dump</span><span class="p">({</span><span class="s2">&quot;s2i&quot;</span><span class="p">:</span> <span class="n">result</span><span class="p">},</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
@@ -1213,7 +1219,7 @@
             <span class="n">row</span> <span class="o">=</span> <span class="p">[]</span>
             <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">header_sorted</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;info&quot;</span><span class="p">:</span>
-                    <span class="n">image_name</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;thoth_s2i_image_name&quot;</span><span class="p">)</span>
+                    <span class="n">image_name</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;thoth_image_name&quot;</span><span class="p">)</span>
                     <span class="n">row</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">jl</span><span class="p">(</span><span class="n">image_name</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
                     <span class="k">continue</span>
 
@@ -1329,28 +1335,12 @@
 
 <span class="sd">      thamos add &#39;importlib-metadata; python_version &lt; &quot;3.8&quot;&#39;</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">project</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get_project</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">,</span> <span class="n">missing_dir_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">req</span> <span class="ow">in</span> <span class="n">requirement</span><span class="p">:</span>
-        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-            <span class="s2">&quot;Adding </span><span class="si">%r</span><span class="s2"> to </span><span class="si">%s</span><span class="s2"> requirements of runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-            <span class="n">req</span><span class="p">,</span>
-            <span class="s2">&quot;development&quot;</span> <span class="k">if</span> <span class="n">dev</span> <span class="k">else</span> <span class="s2">&quot;default&quot;</span><span class="p">,</span>
-            <span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
-        <span class="p">)</span>
-        <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">add_requirement</span><span class="p">(</span>
-            <span class="n">req</span><span class="p">,</span> <span class="n">is_dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span> <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">True</span>
-        <span class="p">)</span>
-        <span class="n">runtime_environment_config</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">(</span>
-            <span class="n">runtime_environment</span>
-        <span class="p">)</span>
-        <span class="n">python_version</span> <span class="o">=</span> <span class="n">runtime_environment_config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;python_version&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">python_version</span><span class="p">:</span>
-            <span class="n">project</span><span class="o">.</span><span class="n">set_python_version</span><span class="p">(</span><span class="n">python_version</span><span class="p">)</span>
-
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-        <span class="s2">&quot;Changes done might require triggering new advise to resolve dependencies&quot;</span>
+    <span class="n">add_requirements_to_project</span><span class="p">(</span>
+        <span class="n">requirement</span><span class="o">=</span><span class="n">requirement</span><span class="p">,</span>
+        <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
+        <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span>
+        <span class="n">dev</span><span class="o">=</span><span class="n">dev</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="n">configuration</span><span class="o">.</span><span class="n">save_project</span><span class="p">(</span><span class="n">project</span><span class="p">)</span>
 
 
 <span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;remove&quot;</span><span class="p">)</span>
@@ -1432,6 +1422,117 @@
     <span class="k">else</span><span class="p">:</span>
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">output_file</span><span class="p">:</span>
             <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">info</span><span class="p">,</span> <span class="n">output_file</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;whatprovides&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--output-format&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-o&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Choice</span><span class="p">([</span><span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;table&quot;</span><span class="p">]),</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;table&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify output format for the status report.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">argument</span><span class="p">(</span><span class="s2">&quot;import_name&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nd">@handle_cli_exception</span>
+<span class="k">def</span> <span class="nf">whatprovides</span><span class="p">(</span><span class="n">import_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D412</span>
+    <span class="sd">&quot;&quot;&quot;For a given import returns list of packages with matching modules.</span>
+
+<span class="sd">    Examples:</span>
+
+<span class="sd">      thamos whatprovides sklearn</span>
+
+<span class="sd">      thamos whatprovides sklearn.linear_model.*</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Returning information on package </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">import_name</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">get_package_from_imported_packages</span><span class="p">(</span><span class="n">import_name</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;yaml&quot;</span><span class="p">:</span>
+        <span class="n">yaml</span><span class="o">.</span><span class="n">safe_dump</span><span class="p">({</span><span class="s2">&quot;packages&quot;</span><span class="p">:</span> <span class="n">result</span><span class="p">},</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;json&quot;</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">({</span><span class="s2">&quot;packages&quot;</span><span class="p">:</span> <span class="n">result</span><span class="p">},</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_print_report</span><span class="p">(</span>
+            <span class="n">result</span><span class="p">,</span>
+            <span class="n">json_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Packages for </span><span class="si">{</span><span class="n">import_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;discover&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--src-path&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-s&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;.&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_SOURCE_PATH&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify path to consider to discover packages.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify runtime environment to which the given package should be added.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@handle_cli_exception</span>
+<span class="k">def</span> <span class="nf">discover</span><span class="p">(</span>
+    <span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">src_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D412</span>
+    <span class="sd">&quot;&quot;&quot;Discover packages used in the project or in the file.</span>
+
+<span class="sd">    Examples:</span>
+
+<span class="sd">      thamos discover</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Obtain list of imports using invectio and verify package from PyPI</span>
+    <span class="n">verified_packages</span> <span class="o">=</span> <span class="n">get_verified_packages_from_static_analysis</span><span class="p">(</span><span class="n">src_path</span><span class="o">=</span><span class="n">src_path</span><span class="p">)</span>
+
+    <span class="c1"># Update requirements files (Pipfile/Pipfile.lock) or requirements.txt (requirements logic)</span>
+    <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">verified_packages</span><span class="p">:</span>
+        <span class="n">add_requirements_to_project</span><span class="p">(</span>
+            <span class="n">requirement</span><span class="o">=</span><span class="p">[</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]],</span>
+            <span class="n">runtime_environment</span><span class="o">=</span><span class="n">runtime_environment</span><span class="p">,</span>
+            <span class="n">index_url</span><span class="o">=</span><span class="n">package</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">],</span>
+            <span class="n">dev</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;environments&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--output-format&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-o&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">Choice</span><span class="p">([</span><span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;yaml&quot;</span><span class="p">,</span> <span class="s2">&quot;table&quot;</span><span class="p">]),</span>
+    <span class="n">default</span><span class="o">=</span><span class="s2">&quot;table&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify output format for the status report.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
+<span class="nd">@handle_cli_exception</span>
+<span class="k">def</span> <span class="nf">environments_</span><span class="p">(</span><span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D412</span>
+    <span class="sd">&quot;&quot;&quot;Show available Python environments.</span>
+
+<span class="sd">    Examples:</span>
+
+<span class="sd">      thamos environments</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">environments</span> <span class="o">=</span> <span class="n">list_python_environments</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;yaml&quot;</span><span class="p">:</span>
+        <span class="n">yaml</span><span class="o">.</span><span class="n">safe_dump</span><span class="p">({</span><span class="s2">&quot;environment&quot;</span><span class="p">:</span> <span class="n">environments</span><span class="p">},</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;json&quot;</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">({</span><span class="s2">&quot;environment&quot;</span><span class="p">:</span> <span class="n">environments</span><span class="p">},</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">_print_report</span><span class="p">(</span>
+            <span class="n">environments</span><span class="p">,</span>
+            <span class="n">json_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Python environments&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
 
 
 <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span> <span class="ow">and</span> <span class="n">cli</span><span class="p">()</span>

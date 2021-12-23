@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.package_extract.image &#8212; Thoth Package Extract 1.2.0 documentation</title>
+    <title>thoth.package_extract.image &#8212; Thoth Package Extract 1.3.0 documentation</title>
     <link rel="stylesheet" href="/assets/package-extract/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/package-extract/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/package-extract/documentation_options.js"></script>
@@ -32,7 +32,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Package Extract 1.2.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Package Extract 1.3.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -79,6 +79,7 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">deque</span>
 
+<span class="kn">import</span> <span class="nn">toml</span>
 <span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="kn">import</span> <span class="n">run_command</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">cwd</span>
 <span class="kn">from</span> <span class="nn">pip._internal.operations.freeze</span> <span class="kn">import</span> <span class="n">freeze</span>
@@ -706,6 +707,40 @@
     <span class="k">return</span> <span class="n">result</span>
 
 
+<span class="k">def</span> <span class="nf">_get_aicoe_ci</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Obtain information propagated from AICoE-CI during the image build.&quot;&quot;&quot;</span>
+    <span class="n">aicoe_ci_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;opt&quot;</span><span class="p">,</span> <span class="s2">&quot;aicoe-ci&quot;</span><span class="p">)</span>
+
+    <span class="n">pipfile_content</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">pipfile_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">aicoe_ci_path</span><span class="p">,</span> <span class="s2">&quot;Pipfile&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">pipfile_path</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">pipfile_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">pipfile_content</span> <span class="o">=</span> <span class="n">toml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span>
+                <span class="s2">&quot;Failed to obtain dependency information from Pipfile located at </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">pipfile_path</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="n">pipfile_lock_content</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">pipfile_lock_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">aicoe_ci_path</span><span class="p">,</span> <span class="s2">&quot;Pipfile.lock&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">pipfile_lock_path</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">pipfile_lock_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">pipfile_lock_content</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span>
+                <span class="s2">&quot;Failed to obtain dependency information from Pipfile.lock located at </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">pipfile_lock_path</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;requirements&quot;</span><span class="p">:</span> <span class="n">pipfile_content</span><span class="p">,</span>
+        <span class="s2">&quot;requirements_lock&quot;</span><span class="p">:</span> <span class="n">pipfile_lock_content</span><span class="p">,</span>
+    <span class="p">}</span>
+
+
 <div class="viewcode-block" id="run_analyzers"><a class="viewcode-back" href="../../../thoth.package_extract.html#thoth.package_extract.image.run_analyzers">[docs]</a><span class="k">def</span> <span class="nf">run_analyzers</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Run analyzers on the given path (directory) and extract found packages.&quot;&quot;&quot;</span>
     <span class="n">path</span> <span class="o">=</span> <span class="n">quote</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
@@ -728,6 +763,7 @@
         <span class="s2">&quot;python-interpreters&quot;</span><span class="p">:</span> <span class="n">_get_python_interpreters</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
         <span class="s2">&quot;cuda-version&quot;</span><span class="p">:</span> <span class="n">_get_cuda_version</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
         <span class="s2">&quot;python-packages&quot;</span><span class="p">:</span> <span class="n">_get_python_packages</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
+        <span class="s2">&quot;aicoe-ci&quot;</span><span class="p">:</span> <span class="n">_get_aicoe_ci</span><span class="p">(</span><span class="n">path</span><span class="p">),</span>
     <span class="p">}</span></div>
 </pre></div>
 
