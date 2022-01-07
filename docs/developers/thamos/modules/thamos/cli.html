@@ -96,6 +96,7 @@
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">cwd</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">ThothAdviserIntegrationEnum</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
+<span class="kn">from</span> <span class="nn">thamos.exceptions</span> <span class="kn">import</span> <span class="n">ConfigurationError</span>
 <span class="kn">from</span> <span class="nn">thamos.exceptions</span> <span class="kn">import</span> <span class="n">NoProjectDirError</span>
 <span class="kn">from</span> <span class="nn">thamos.exceptions</span> <span class="kn">import</span> <span class="n">NoRuntimeEnvironmentError</span>
 <span class="kn">from</span> <span class="nn">thamos.config</span> <span class="kn">import</span> <span class="n">config</span> <span class="k">as</span> <span class="n">configuration</span>
@@ -105,6 +106,7 @@
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_log</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_package_from_imported_packages</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_status</span>
+<span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">get_last_analysis_id</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">install</span> <span class="k">as</span> <span class="n">thamos_install</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">list_python_package_indexes</span>
 <span class="kn">from</span> <span class="nn">thamos.lib</span> <span class="kn">import</span> <span class="n">list_python_environments</span>
@@ -140,6 +142,29 @@
 <span class="p">}</span>
 
 
+<span class="n">_REPORT_TRANSLATION_TABLE_INDEXES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="s2">&quot;Python package index URL&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;verify_ssl&quot;</span><span class="p">:</span> <span class="s2">&quot;Verify SSL&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+
+<span class="n">_REPORT_TRANSLATION_TABLE_IMAGES</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;cuda_version&quot;</span><span class="p">:</span> <span class="s2">&quot;CUDA version&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;datetime&quot;</span><span class="p">:</span> <span class="s2">&quot;Analysis datetime&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;env_image_name&quot;</span><span class="p">:</span> <span class="s2">&quot;Image name&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;env_image_tag&quot;</span><span class="p">:</span> <span class="s2">&quot;Image tag&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;environment_name&quot;</span><span class="p">:</span> <span class="s2">&quot;Environment name&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;environment_type&quot;</span><span class="p">:</span> <span class="s2">&quot;Environment type&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;image_sha&quot;</span><span class="p">:</span> <span class="s2">&quot;Container image SHA&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;os_name&quot;</span><span class="p">:</span> <span class="s2">&quot;OS name&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;os_version&quot;</span><span class="p">:</span> <span class="s2">&quot;OS version&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;package_extract_document_id&quot;</span><span class="p">:</span> <span class="s2">&quot;Container image analysis&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;python_version&quot;</span><span class="p">:</span> <span class="s2">&quot;Python version&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;thoth_image_name&quot;</span><span class="p">:</span> <span class="s2">&quot;Thoth container image name&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;thoth_image_version&quot;</span><span class="p">:</span> <span class="s2">&quot;Thoth container image version&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+
 <div class="viewcode-block" id="handle_cli_exception"><a class="viewcode-back" href="../../thamos.html#thamos.cli.handle_cli_exception">[docs]</a><span class="k">def</span> <span class="nf">handle_cli_exception</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Callable</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Callable</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Suppress exception in CLI if debug mode was not turned on.&quot;&quot;&quot;</span>
     <span class="c1"># noqa</span>
@@ -157,7 +182,14 @@
     <span class="k">return</span> <span class="n">wrapper</span></div>
 
 
-<span class="k">def</span> <span class="nf">_print_report</span><span class="p">(</span><span class="n">report</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">json_output</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">_print_report</span><span class="p">(</span>
+    <span class="n">report</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">json_output</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">title</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">show_header</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">translation_table</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Print reasoning to user.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">json_output</span><span class="p">:</span>
         <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">report</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
@@ -165,7 +197,7 @@
 
     <span class="n">console</span> <span class="o">=</span> <span class="n">Console</span><span class="p">()</span>
     <span class="n">table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">(</span>
-        <span class="n">show_header</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">show_header</span><span class="o">=</span><span class="n">show_header</span><span class="p">,</span>
         <span class="n">header_style</span><span class="o">=</span><span class="s2">&quot;bold green&quot;</span><span class="p">,</span>
         <span class="n">title</span><span class="o">=</span><span class="n">title</span><span class="p">,</span>
         <span class="n">box</span><span class="o">=</span><span class="n">box</span><span class="o">.</span><span class="n">MINIMAL_DOUBLE_HEAD</span><span class="p">,</span>
@@ -182,11 +214,11 @@
     <span class="c1"># Remove fields that can be an array - these are addition details that are supressed from the table output.</span>
     <span class="n">header</span> <span class="o">=</span> <span class="n">header</span> <span class="o">-</span> <span class="n">to_remove</span>
 
+    <span class="n">translation_table</span> <span class="o">=</span> <span class="n">translation_table</span> <span class="ow">or</span> <span class="p">{}</span>
     <span class="n">header_list</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">header_list</span><span class="p">:</span>
-        <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span>
-            <span class="n">item</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">capitalize</span><span class="p">(),</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;cyan&quot;</span><span class="p">,</span> <span class="n">overflow</span><span class="o">=</span><span class="s2">&quot;fold&quot;</span>
-        <span class="p">)</span>
+        <span class="n">item</span> <span class="o">=</span> <span class="n">translation_table</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="ow">or</span> <span class="n">item</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span>
+        <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">overflow</span><span class="o">=</span><span class="s2">&quot;fold&quot;</span><span class="p">)</span>
 
     <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">report</span><span class="p">:</span>
         <span class="n">row</span> <span class="o">=</span> <span class="p">[]</span>
@@ -473,7 +505,6 @@
         <span class="n">ctx</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">_error_virtual_environment</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">)</span>
-        <span class="nb">print</span><span class="p">(</span><span class="n">virtualenv_path</span><span class="p">)</span>
 
 
 <span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;purge&quot;</span><span class="p">)</span>
@@ -910,24 +941,16 @@
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">analysis_id</span><span class="p">:</span>
         <span class="k">with</span> <span class="n">workdir</span><span class="p">():</span>
-            <span class="n">status_dict</span> <span class="o">=</span> <span class="n">get_status</span><span class="p">()</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">status_dict</span> <span class="o">=</span> <span class="n">get_status</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">)</span>
+            <span class="n">analysis_id</span> <span class="o">=</span> <span class="n">get_last_analysis_id</span><span class="p">()</span>
+
+    <span class="n">status_dict</span> <span class="o">=</span> <span class="n">get_status</span><span class="p">(</span><span class="n">analysis_id</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="ow">not</span> <span class="n">output_format</span> <span class="ow">or</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;table&quot;</span><span class="p">:</span>
-        <span class="n">table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">()</span>
-
-        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">status_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-            <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span>
-                <span class="n">key</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">capitalize</span><span class="p">(),</span>
-                <span class="n">style</span><span class="o">=</span><span class="s2">&quot;cyan&quot;</span><span class="p">,</span>
-                <span class="n">overflow</span><span class="o">=</span><span class="s2">&quot;fold&quot;</span><span class="p">,</span>
-            <span class="p">)</span>
-
-        <span class="n">table</span><span class="o">.</span><span class="n">add_row</span><span class="p">(</span><span class="o">*</span><span class="n">status_dict</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
-
-        <span class="n">console</span> <span class="o">=</span> <span class="n">Console</span><span class="p">()</span>
-        <span class="n">console</span><span class="o">.</span><span class="n">print</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">justify</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">)</span>
+        <span class="n">_print_report</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">status_dict</span><span class="p">],</span>
+            <span class="n">json_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;The current status for </span><span class="si">{</span><span class="n">analysis_id</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
         <span class="k">return</span>
     <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;json&quot;</span><span class="p">:</span>
         <span class="n">output</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">status_dict</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
@@ -1140,36 +1163,11 @@
         <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;table&quot;</span><span class="p">:</span>
-        <span class="n">table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">()</span>
-
-        <span class="n">header</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-                <span class="n">header</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
-
-        <span class="n">header_sorted</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">header_sorted</span><span class="p">:</span>
-            <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span>
-                <span class="n">element</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">capitalize</span><span class="p">(),</span>
-                <span class="n">style</span><span class="o">=</span><span class="s2">&quot;cyan&quot;</span><span class="p">,</span>
-                <span class="n">overflow</span><span class="o">=</span><span class="s2">&quot;fold&quot;</span><span class="p">,</span>
-            <span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
-            <span class="n">row</span> <span class="o">=</span> <span class="p">[]</span>
-            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">header_sorted</span><span class="p">:</span>
-                <span class="n">entry</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
-                <span class="k">if</span> <span class="ow">not</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_NO_EMOJI&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span>
-                    <span class="n">entry</span><span class="p">,</span> <span class="nb">str</span>
-                <span class="p">):</span>
-                    <span class="n">entry</span> <span class="o">=</span> <span class="n">_EMOJI</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="n">entry</span><span class="p">)</span>
-
-                <span class="n">row</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span> <span class="k">if</span> <span class="n">entry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
-
-            <span class="n">table</span><span class="o">.</span><span class="n">add_row</span><span class="p">(</span><span class="o">*</span><span class="n">row</span><span class="p">)</span>
-
-        <span class="n">console</span> <span class="o">=</span> <span class="n">Console</span><span class="p">()</span>
-        <span class="n">console</span><span class="o">.</span><span class="n">print</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">justify</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">)</span>
+        <span class="n">_print_report</span><span class="p">(</span>
+            <span class="n">result</span><span class="p">,</span>
+            <span class="n">json_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Runtime environment and configuration check results&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
 
     <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span> <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;ERROR&quot;</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
 
@@ -1183,15 +1181,68 @@
     <span class="n">default</span><span class="o">=</span><span class="s2">&quot;table&quot;</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify output format for the status report.&quot;</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--os-name&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-n&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;OS_NAME&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Operating system name filter.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--os-version&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-v&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;OS_VERSION&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Operating system version filter.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--python-version&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-p&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;PY_VERSION&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Python interpreter version filter.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--cuda-version&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;CUDA_VERSION&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;CUDA version filter.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--image-name&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;IMAGE_NAME&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Filter based on image name.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
-<span class="k">def</span> <span class="nf">images</span><span class="p">(</span><span class="n">output_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D412</span>
+<span class="k">def</span> <span class="nf">images</span><span class="p">(</span>
+    <span class="n">output_format</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">os_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">os_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">python_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">cuda_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">image_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D412</span>
     <span class="sd">&quot;&quot;&quot;Check available Thoth container images.</span>
 
 <span class="sd">    Examples:</span>
 
 <span class="sd">      thamos images --output-format json</span>
+
+<span class="sd">      thamos images --os-name fedora --os-version 35 --python-version 3.9</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="n">list_thoth_container_images</span><span class="p">()</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">list_thoth_container_images</span><span class="p">(</span>
+        <span class="n">os_name</span><span class="o">=</span><span class="n">os_name</span><span class="p">,</span>
+        <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
+        <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span><span class="p">,</span>
+        <span class="n">cuda_version</span><span class="o">=</span><span class="n">cuda_version</span><span class="p">,</span>
+        <span class="n">image_name</span><span class="o">=</span><span class="n">image_name</span><span class="p">,</span>
+    <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;yaml&quot;</span><span class="p">:</span>
         <span class="n">yaml</span><span class="o">.</span><span class="n">safe_dump</span><span class="p">({</span><span class="s2">&quot;s2i&quot;</span><span class="p">:</span> <span class="n">result</span><span class="p">},</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
@@ -1199,37 +1250,21 @@
         <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">({</span><span class="s2">&quot;s2i&quot;</span><span class="p">:</span> <span class="n">result</span><span class="p">},</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;table&quot;</span><span class="p">:</span>
-        <span class="n">table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">()</span>
-
-        <span class="n">header</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-                <span class="n">header</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+            <span class="n">table_content</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">key</span> <span class="o">=</span> <span class="n">_REPORT_TRANSLATION_TABLE_IMAGES</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+                    <span class="n">key</span><span class="p">,</span> <span class="n">key</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span>
+                <span class="p">)</span>
+                <span class="n">key</span> <span class="o">=</span> <span class="n">Text</span><span class="o">.</span><span class="n">from_markup</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">style</span><span class="o">=</span><span class="s2">&quot;green bold&quot;</span><span class="p">)</span>
+                <span class="c1"># Here, key value are ignored. This is a trick to have &quot;table header&quot; as the first column.</span>
+                <span class="n">table_content</span><span class="o">.</span><span class="n">extend</span><span class="p">([{</span><span class="s2">&quot;key&quot;</span><span class="p">:</span> <span class="n">key</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">value</span><span class="p">}])</span>
 
-        <span class="n">header_sorted</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
-        <span class="n">header_sorted</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;info&quot;</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">header_sorted</span><span class="p">:</span>
-            <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span>
-                <span class="n">item</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">capitalize</span><span class="p">(),</span>
-                <span class="n">style</span><span class="o">=</span><span class="s2">&quot;cyan&quot;</span><span class="p">,</span>
-                <span class="n">overflow</span><span class="o">=</span><span class="s2">&quot;fold&quot;</span><span class="p">,</span>
+            <span class="n">_print_report</span><span class="p">(</span>
+                <span class="n">table_content</span><span class="p">,</span>
+                <span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;Container image </span><span class="si">{</span><span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;environment_name&#39;</span><span class="p">,</span> <span class="s1">&#39;UNKNOWN&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">show_header</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
-            <span class="n">row</span> <span class="o">=</span> <span class="p">[]</span>
-            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">header_sorted</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;info&quot;</span><span class="p">:</span>
-                    <span class="n">image_name</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;thoth_image_name&quot;</span><span class="p">)</span>
-                    <span class="n">row</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">jl</span><span class="p">(</span><span class="n">image_name</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span>
-                    <span class="k">continue</span>
-
-                <span class="n">entry</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
-                <span class="n">row</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span> <span class="k">if</span> <span class="n">entry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
-
-            <span class="n">table</span><span class="o">.</span><span class="n">add_row</span><span class="p">(</span><span class="o">*</span><span class="n">row</span><span class="p">)</span>
-
-        <span class="n">console</span> <span class="o">=</span> <span class="n">Console</span><span class="p">()</span>
-        <span class="n">console</span><span class="o">.</span><span class="n">print</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">justify</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">)</span>
 
     <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">1</span> <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;ERROR&quot;</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">)</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span>
 
@@ -1254,35 +1289,18 @@
         <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">({</span><span class="s2">&quot;indexes&quot;</span><span class="p">:</span> <span class="n">result</span><span class="p">},</span> <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
         <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">output_format</span> <span class="o">==</span> <span class="s2">&quot;table&quot;</span><span class="p">:</span>
-        <span class="n">table</span> <span class="o">=</span> <span class="n">Table</span><span class="p">()</span>
-
-        <span class="n">header</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
-                <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;warehouse_api_url&quot;</span><span class="p">:</span>
-                    <span class="k">continue</span>
-                <span class="n">header</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+            <span class="n">item</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;warehouse_api_url&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">item</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="c1"># Substitute booleans as rich does not interpret them.</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+                    <span class="n">item</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
 
-        <span class="n">header_sorted</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">header_sorted</span><span class="p">:</span>
-            <span class="n">table</span><span class="o">.</span><span class="n">add_column</span><span class="p">(</span>
-                <span class="n">item</span><span class="o">.</span><span class="n">capitalize</span><span class="p">()</span>
-                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span>
-                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;Url&quot;</span><span class="p">,</span> <span class="s2">&quot;URL&quot;</span><span class="p">)</span>
-                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;ssl&quot;</span><span class="p">,</span> <span class="s2">&quot;SSL&quot;</span><span class="p">)</span>
-                <span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;api&quot;</span><span class="p">,</span> <span class="s2">&quot;API&quot;</span><span class="p">)</span>
-            <span class="p">)</span>
-
-        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">result</span><span class="p">:</span>
-            <span class="n">row</span> <span class="o">=</span> <span class="p">[]</span>
-            <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">header_sorted</span><span class="p">:</span>
-                <span class="n">entry</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
-                <span class="n">row</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span> <span class="k">if</span> <span class="n">entry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">&quot;-&quot;</span><span class="p">)</span>
-
-            <span class="n">table</span><span class="o">.</span><span class="n">add_row</span><span class="p">(</span><span class="o">*</span><span class="n">row</span><span class="p">)</span>
-
-        <span class="n">console</span> <span class="o">=</span> <span class="n">Console</span><span class="p">()</span>
-        <span class="n">console</span><span class="o">.</span><span class="n">print</span><span class="p">(</span><span class="n">table</span><span class="p">,</span> <span class="n">justify</span><span class="o">=</span><span class="s2">&quot;center&quot;</span><span class="p">)</span>
+        <span class="n">_print_report</span><span class="p">(</span>
+            <span class="n">result</span><span class="p">,</span>
+            <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Python package indexes available for consuming packages&quot;</span><span class="p">,</span>
+            <span class="n">translation_table</span><span class="o">=</span><span class="n">_REPORT_TRANSLATION_TABLE_INDEXES</span><span class="p">,</span>
+        <span class="p">)</span>
 
     <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 
@@ -1533,6 +1551,76 @@
             <span class="n">json_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Python environments&quot;</span><span class="p">,</span>
         <span class="p">)</span>
+
+
+<span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;verify&quot;</span><span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">pass_context</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--runtime-environment&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-r&quot;</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;NAME&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_RUNTIME_ENVIRONMENT&quot;</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Specify runtime environment from which the given package should be removed.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="nd">@handle_cli_exception</span>
+<span class="k">def</span> <span class="nf">verify</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D412</span>
+    <span class="sd">&quot;&quot;&quot;Verify the hash in Pipfile.lock is up-to-date in runtime environments configured.</span>
+
+<span class="sd">    Examples:</span>
+
+<span class="sd">        thamos verify</span>
+
+<span class="sd">        thamos verify --runtime-environment &quot;training&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span> <span class="o">!=</span> <span class="s2">&quot;pipenv&quot;</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+            <span class="s2">&quot;Cannot verify hash of the lock file as the project uses requirements format </span><span class="si">%r</span><span class="s2">, please switch &quot;</span>
+            <span class="s2">&quot;to &#39;pipenv&#39; to have the ability to check the lock file hash&quot;</span><span class="p">,</span>
+            <span class="n">configuration</span><span class="o">.</span><span class="n">requirements_format</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">runtime_environment</span><span class="p">:</span>
+        <span class="n">runtime_environments</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">configuration</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">)</span>
+        <span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">runtime_environments</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">list_runtime_environments</span><span class="p">()</span>
+
+    <span class="n">any_error</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">for</span> <span class="n">runtime_environment_config</span> <span class="ow">in</span> <span class="n">runtime_environments</span><span class="p">:</span>
+        <span class="n">runtime_environment_name</span> <span class="o">=</span> <span class="n">runtime_environment_config</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">project</span> <span class="o">=</span> <span class="n">configuration</span><span class="o">.</span><span class="n">get_project</span><span class="p">(</span><span class="n">runtime_environment_name</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">ConfigurationError</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;Failed to obtain configuration for runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">runtime_environment_name</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">any_error</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                <span class="s2">&quot;No lock file found for runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">runtime_environment_name</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">any_error</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile</span><span class="o">.</span><span class="n">hash</span><span class="p">()</span> <span class="o">!=</span> <span class="n">project</span><span class="o">.</span><span class="n">pipfile_lock</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">hash</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;Pipfile.lock is out-of-date. Run `thamos advise` to update.&quot;</span><span class="p">)</span>
+            <span class="n">any_error</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">continue</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">&quot;Pipfile.lock is up-to-date for runtime environment </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">runtime_environment_name</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="n">any_error</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">)</span>
 
 
 <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span> <span class="ow">and</span> <span class="n">cli</span><span class="p">()</span>
