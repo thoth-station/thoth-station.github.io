@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.wraps.thoth_search_package &#8212; Thoth Adviser 0.50.0 documentation</title>
+    <title>thoth.adviser.wraps.thoth_search_package &#8212; Thoth Adviser 0.52.1 documentation</title>
     <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="/assets/adviser/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Adviser 0.50.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Adviser 0.52.1 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -74,6 +74,7 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">urllib.parse</span> <span class="kn">import</span> <span class="n">quote</span>
 
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">..state</span> <span class="kn">import</span> <span class="n">State</span>
@@ -83,7 +84,9 @@
     <span class="kn">from</span> <span class="nn">..pipeline_builder</span> <span class="kn">import</span> <span class="n">PipelineBuilderContext</span>
 
 <span class="n">_THOTH_SEARCH_PACKAGE_URL</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span>
-    <span class="s2">&quot;THOTH_SEARCH_PACKAGE_URL&quot;</span><span class="p">,</span> <span class="s2">&quot;https://thoth-station.ninja/thoth-search/package/</span><span class="si">{package_name}</span><span class="s2">/</span><span class="si">{package_version}</span><span class="s2">&quot;</span>
+    <span class="s2">&quot;THOTH_SEARCH_PACKAGE_URL&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;https://thoth-station.ninja/thoth-search/package/</span><span class="si">{package_name}</span><span class="s2">/&quot;</span>
+    <span class="s2">&quot;</span><span class="si">{package_version}</span><span class="s2">/</span><span class="si">{index_url}</span><span class="s2">/</span><span class="si">{os_name}</span><span class="s2">/</span><span class="si">{os_version}</span><span class="s2">/</span><span class="si">{python_version}</span><span class="s2">&quot;</span><span class="p">,</span>
 <span class="p">)</span>
 
 
@@ -105,12 +108,18 @@
 
 <div class="viewcode-block" id="ThothSearchPackageWrap.run"><a class="viewcode-back" href="../../../../thoth.adviser.wraps.html#thoth.adviser.wraps.thoth_search_package.ThothSearchPackageWrap.run">[docs]</a>    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Add a link to Thoth Search UI for each resolved package.&quot;&quot;&quot;</span>
+        <span class="n">runtime_environment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">project</span><span class="o">.</span><span class="n">runtime_environment</span>
         <span class="k">for</span> <span class="n">package_version_tuple</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">resolved_dependencies</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="n">state</span><span class="o">.</span><span class="n">justification</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                 <span class="p">{</span>
                     <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
                     <span class="s2">&quot;link&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_search_package_url</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-                        <span class="n">package_name</span><span class="o">=</span><span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">package_version</span><span class="o">=</span><span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                        <span class="n">package_name</span><span class="o">=</span><span class="n">quote</span><span class="p">(</span><span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span>
+                        <span class="n">package_version</span><span class="o">=</span><span class="n">quote</span><span class="p">(</span><span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">safe</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">),</span>
+                        <span class="n">index_url</span><span class="o">=</span><span class="n">quote</span><span class="p">(</span><span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="n">safe</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">),</span>
+                        <span class="n">os_name</span><span class="o">=</span><span class="n">quote</span><span class="p">(</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
+                        <span class="n">os_version</span><span class="o">=</span><span class="n">quote</span><span class="p">(</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">operating_system</span><span class="o">.</span><span class="n">version</span><span class="p">),</span>
+                        <span class="n">python_version</span><span class="o">=</span><span class="n">quote</span><span class="p">(</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">python_version</span><span class="p">),</span>
                     <span class="p">),</span>
                     <span class="s2">&quot;message&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Browse Thoth Search UI for &#39;</span><span class="si">{</span><span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">==</span><span class="si">{</span><span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">,</span>
                     <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package_version_tuple</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>

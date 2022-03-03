@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thamos.lib &#8212; Thamos 1.23.0 documentation</title>
+    <title>thamos.lib &#8212; Thamos 1.27.2 documentation</title>
     <link rel="stylesheet" href="/assets/thamos/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/thamos/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../" src="/assets/thamos/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.23.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.27.2 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -120,11 +120,14 @@
 <span class="kn">from</span> <span class="nn">.swagger_client</span> <span class="kn">import</span> <span class="n">PythonPackagesApi</span>
 <span class="kn">from</span> <span class="nn">.swagger_client.models</span> <span class="kn">import</span> <span class="n">AnalysisResultResponse</span>
 <span class="kn">from</span> <span class="nn">.config</span> <span class="kn">import</span> <span class="n">config</span> <span class="k">as</span> <span class="n">thoth_config</span>
-<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">UnknownAnalysisType</span>
-<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="ne">TimeoutError</span>
+<span class="kn">from</span> <span class="nn">.discover</span> <span class="kn">import</span> <span class="n">discover_all</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">ApiError</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NoDevRequirements</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NoMatchingPackage</span>
 <span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">NoRequirementsFile</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">PedanticRunVerificationError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="ne">TimeoutError</span>
+<span class="kn">from</span> <span class="nn">.exceptions</span> <span class="kn">import</span> <span class="n">UnknownAnalysisType</span>
 
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Dict</span>
 
@@ -136,7 +139,7 @@
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 <span class="n">_RETRY_ON_ERROR_COUNT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_RETRY_ON_ERROR_COUNT&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
 <span class="n">_RETRY_ON_ERROR_SLEEP</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_RETRY_ON_ERROR_SLEEP&quot;</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">))</span>
-<span class="n">_THAMOS_TIMEOUT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_TIMEOUT&quot;</span><span class="p">,</span> <span class="mi">2000</span><span class="p">))</span>
+<span class="n">_THAMOS_TIMEOUT</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_TIMEOUT&quot;</span><span class="p">,</span> <span class="mi">2700</span><span class="p">))</span>
 <span class="n">_THAMOS_TOKEN</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_TOKEN&quot;</span><span class="p">)</span>
 <span class="n">_SOURCE</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">&quot;adviser&quot;</span><span class="p">:</span> <span class="s2">&quot;advise/python&quot;</span><span class="p">,</span>
@@ -423,7 +426,7 @@
     <span class="o">*</span><span class="p">,</span>
     <span class="n">runtime_environment_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">constraints</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="n">src_path</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">src_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
     <span class="n">recommendation_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">dev</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">no_static_analysis</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -453,7 +456,7 @@
         <span class="n">pipfile_lock</span><span class="o">=</span><span class="n">pipfile_lock</span><span class="p">,</span>
         <span class="n">constraints</span><span class="o">=</span><span class="n">constraints</span><span class="p">,</span>
         <span class="n">recommendation_type</span><span class="o">=</span><span class="n">recommendation_type</span><span class="p">,</span>
-        <span class="n">src_path</span><span class="o">=</span><span class="n">src_path</span> <span class="k">if</span> <span class="n">src_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">thoth_config</span><span class="o">.</span><span class="n">config_path</span><span class="p">,</span>
+        <span class="n">src_path</span><span class="o">=</span><span class="n">src_path</span><span class="p">,</span>
         <span class="n">runtime_environment</span><span class="o">=</span><span class="n">thoth_config</span><span class="o">.</span><span class="n">get_runtime_environment</span><span class="p">(</span>
             <span class="n">runtime_environment_name</span>
         <span class="p">),</span>
@@ -651,8 +654,7 @@
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Adviser check metadata: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">metadata</span><span class="p">)</span>
-
-    <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]</span></div>
+    <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">error</span></div>
 
 
 <div class="viewcode-block" id="advise_here"><a class="viewcode-back" href="../../thamos.html#thamos.lib.advise_here">[docs]</a><span class="k">def</span> <span class="nf">advise_here</span><span class="p">(</span>
@@ -857,7 +859,8 @@
         <span class="k">return</span> <span class="kc">None</span>
 
     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Provenance check metadata: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">metadata</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">],</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]</span></div>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">],</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="provenance_check_here"><a class="viewcode-back" href="../../thamos.html#thamos.lib.provenance_check_here">[docs]</a><span class="k">def</span> <span class="nf">provenance_check_here</span><span class="p">(</span>
@@ -1130,7 +1133,7 @@
         <span class="n">api_instance</span> <span class="o">=</span> <span class="n">AdviseApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
         <span class="n">method</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_advise_python</span>  <span class="c1"># type: ignore</span>
         <span class="n">response</span> <span class="o">=</span> <span class="n">_retrieve_analysis_result</span><span class="p">(</span><span class="n">method</span><span class="p">,</span> <span class="n">analysis_id</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;error&quot;</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">response</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">error</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">UnknownAnalysisType</span><span class="p">(</span>
             <span class="s2">&quot;Cannot determine analysis type from identifier: </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">analysis_id</span>
@@ -1258,21 +1261,22 @@
     <span class="n">python_version</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">cuda_version</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">image_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">library_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">symbol</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">package_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">rpm_package_name</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
     <span class="sd">&quot;&quot;&quot;Get available Thoth container images.&quot;&quot;&quot;</span>
-    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">filtering</span> <span class="o">=</span> <span class="nb">locals</span><span class="p">()</span>
+    <span class="n">filtering</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;api_client&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">filtering</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">filtering</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">}</span>
 
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="n">page</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
         <span class="n">images</span> <span class="o">=</span> <span class="p">(</span>
             <span class="n">ContainerImagesApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
-            <span class="o">.</span><span class="n">list_thoth_container_images</span><span class="p">(</span>
-                <span class="n">os_name</span><span class="o">=</span><span class="n">os_name</span><span class="p">,</span>
-                <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
-                <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span><span class="p">,</span>
-                <span class="n">cuda_version</span><span class="o">=</span><span class="n">cuda_version</span><span class="p">,</span>
-                <span class="n">image_name</span><span class="o">=</span><span class="n">image_name</span><span class="p">,</span>
-            <span class="p">)</span>
+            <span class="o">.</span><span class="n">list_thoth_container_images</span><span class="p">(</span><span class="n">page</span><span class="o">=</span><span class="n">page</span><span class="p">,</span> <span class="o">**</span><span class="n">filtering</span><span class="p">)</span>
             <span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;container_images&quot;</span><span class="p">]</span>
         <span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">images</span><span class="p">:</span>
@@ -1301,14 +1305,33 @@
 
 <div class="viewcode-block" id="get_package_from_imported_packages"><a class="viewcode-back" href="../../thamos.html#thamos.lib.get_package_from_imported_packages">[docs]</a><span class="nd">@with_api_client</span>
 <span class="k">def</span> <span class="nf">get_package_from_imported_packages</span><span class="p">(</span>
-    <span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span> <span class="n">import_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span>
+    <span class="n">import_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">raise_on_error</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
     <span class="sd">&quot;&quot;&quot;Get all (package_name, package_version, index_url) triplets for given import package name.&quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="p">(</span>
-        <span class="n">PythonPackagesApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
-        <span class="o">.</span><span class="n">get_package_from_imported_packages</span><span class="p">(</span><span class="n">import_name</span><span class="p">)</span>
-        <span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;package_names&quot;</span><span class="p">]</span>
-    <span class="p">)</span></div>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">PythonPackagesApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">get_package_from_imported_packages</span><span class="p">(</span><span class="n">import_name</span><span class="p">)</span>
+            <span class="o">.</span><span class="n">to_dict</span><span class="p">()[</span><span class="s2">&quot;package_names&quot;</span><span class="p">]</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="n">ApiException</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="n">error_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Failed to obtain package for import </span><span class="si">{</span><span class="n">import_name</span><span class="si">!r}</span><span class="s2"> (HTTP status </span><span class="si">{</span><span class="n">exc</span><span class="o">.</span><span class="n">status</span><span class="si">}</span><span class="s2">)&quot;</span>
+        <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">body</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">error_message</span> <span class="o">+=</span> <span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;: </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">exc</span><span class="o">.</span><span class="n">body</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;utf-8&#39;</span><span class="p">))[</span><span class="s1">&#39;error&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+            <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">decoder</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s2">&quot;Failed to decode backend response (HTTP status </span><span class="si">%r</span><span class="s2">)&quot;</span><span class="p">,</span> <span class="n">exc</span><span class="o">.</span><span class="n">status</span>
+                <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">raise_on_error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NoMatchingPackage</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span> <span class="kn">from</span> <span class="nn">exc</span>
+
+        <span class="k">return</span> <span class="p">[]</span></div>
 
 
 <div class="viewcode-block" id="get_verified_packages_from_static_analysis"><a class="viewcode-back" href="../../thamos.html#thamos.lib.get_verified_packages_from_static_analysis">[docs]</a><span class="k">def</span> <span class="nf">get_verified_packages_from_static_analysis</span><span class="p">(</span>
@@ -1317,6 +1340,7 @@
     <span class="n">without_standard_imports</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">without_builtin_imports</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">without_builtins</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">raise_on_error</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
     <span class="sd">&quot;&quot;&quot;Get verified packages from invectio static analysis result.&quot;&quot;&quot;</span>
     <span class="c1"># 1. Obtain list of imports using invectio</span>
@@ -1341,54 +1365,45 @@
     <span class="k">for</span> <span class="n">import_name</span> <span class="ow">in</span> <span class="n">packages</span><span class="p">:</span>
         <span class="n">unique_packages</span><span class="p">:</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
 
-        <span class="k">try</span><span class="p">:</span>
-            <span class="n">imported_packages</span> <span class="o">=</span> <span class="n">get_package_from_imported_packages</span><span class="p">(</span><span class="n">import_name</span><span class="p">)</span>
-        <span class="k">except</span> <span class="n">ApiException</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">exc</span><span class="o">.</span><span class="n">status</span> <span class="o">==</span> <span class="mi">404</span><span class="p">:</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;No matching package found for import </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">import_name</span><span class="p">)</span>
-                <span class="k">continue</span>
-
-            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-                <span class="s2">&quot;Failed to obtain package for import </span><span class="si">%r</span><span class="s2"> (HTTP code </span><span class="si">%d</span><span class="s2">): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
-                <span class="n">import_name</span><span class="p">,</span>
-                <span class="n">exc</span><span class="o">.</span><span class="n">status</span><span class="p">,</span>
-                <span class="n">exc</span><span class="o">.</span><span class="n">body</span><span class="p">,</span>
-            <span class="p">)</span>
+        <span class="n">imported_packages</span> <span class="o">=</span> <span class="n">get_package_from_imported_packages</span><span class="p">(</span>
+            <span class="n">import_name</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="n">raise_on_error</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">imported_packages</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="s2">&quot;No package for import </span><span class="si">%r</span><span class="s2"> found&quot;</span><span class="p">,</span> <span class="n">import_name</span><span class="p">)</span>
             <span class="k">continue</span>
 
-        <span class="k">if</span> <span class="n">imported_packages</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">imported_packages</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span>
-                    <span class="n">p</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">unique_packages</span>
-                <span class="p">]:</span>
+        <span class="k">for</span> <span class="n">package</span> <span class="ow">in</span> <span class="n">imported_packages</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span>
+                <span class="n">p</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">unique_packages</span>
+            <span class="p">]:</span>
+                <span class="n">unique_packages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">],</span>
+                        <span class="s2">&quot;index_url&quot;</span><span class="p">:</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">],</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">existing_indexes</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">p</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">]</span>
+                    <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">unique_packages</span>
+                    <span class="k">if</span> <span class="n">p</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span>
+                <span class="p">]</span>
+
+                <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">existing_indexes</span><span class="p">:</span>
                     <span class="n">unique_packages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
                         <span class="p">{</span>
                             <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">],</span>
                             <span class="s2">&quot;index_url&quot;</span><span class="p">:</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">],</span>
                         <span class="p">}</span>
                     <span class="p">)</span>
-                <span class="k">else</span><span class="p">:</span>
-                    <span class="n">existing_indexes</span> <span class="o">=</span> <span class="p">[</span>
-                        <span class="n">p</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">]</span>
-                        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">unique_packages</span>
-                        <span class="k">if</span> <span class="n">p</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">]</span>
-                    <span class="p">]</span>
 
-                    <span class="k">if</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">existing_indexes</span><span class="p">:</span>
-                        <span class="n">unique_packages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-                            <span class="p">{</span>
-                                <span class="s2">&quot;package_name&quot;</span><span class="p">:</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">],</span>
-                                <span class="s2">&quot;index_url&quot;</span><span class="p">:</span> <span class="n">package</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">],</span>
-                            <span class="p">}</span>
-                        <span class="p">)</span>
-
-            <span class="k">for</span> <span class="n">unique_package</span> <span class="ow">in</span> <span class="n">unique_packages</span><span class="p">:</span>
-                <span class="n">verified_packages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unique_package</span><span class="p">)</span>
-                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                    <span class="s2">&quot;Package name </span><span class="si">%r</span><span class="s2"> identified for import </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-                    <span class="n">unique_package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">],</span>
-                    <span class="n">import_name</span><span class="p">,</span>
-                <span class="p">)</span>
+        <span class="k">for</span> <span class="n">unique_package</span> <span class="ow">in</span> <span class="n">unique_packages</span><span class="p">:</span>
+            <span class="n">verified_packages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">unique_package</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">&quot;Package name </span><span class="si">%r</span><span class="s2"> identified for import </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="n">unique_package</span><span class="p">[</span><span class="s2">&quot;package_name&quot;</span><span class="p">],</span>
+                <span class="n">import_name</span><span class="p">,</span>
+            <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">verified_packages</span></div>
 
@@ -1707,6 +1722,108 @@
         <span class="s2">&quot;Changes done might require triggering new advise to resolve dependencies&quot;</span>
     <span class="p">)</span>
     <span class="n">thoth_config</span><span class="o">.</span><span class="n">save_project</span><span class="p">(</span><span class="n">project</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="check_runtime_environment_run"><a class="viewcode-back" href="../../thamos.html#thamos.lib.check_runtime_environment_run">[docs]</a><span class="k">def</span> <span class="nf">check_runtime_environment_run</span><span class="p">(</span><span class="n">runtime_environment</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;Check the runtime environment matches runtime environment declared in the config file.&quot;&quot;&quot;</span>
+    <span class="n">discovered</span> <span class="o">=</span> <span class="n">discover_all</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;base_image&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="n">discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;base_image&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PedanticRunVerificationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Base image configured </span><span class="si">{</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;base_image&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> does not match &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;base image discovered </span><span class="si">{</span><span class="n">discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;base_image&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cuda_version&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="n">discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cuda_version&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PedanticRunVerificationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;CUDA version configured </span><span class="si">{</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;cuda_version&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> does not match &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;CUDA version discovered </span><span class="si">{</span><span class="n">discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;cuda_version&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;platform&quot;</span><span class="p">,</span> <span class="s2">&quot;linux-x86_64&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="n">discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">&quot;platform&quot;</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PedanticRunVerificationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Platform configured </span><span class="si">{</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;platform&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> does not match &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;platform discovered </span><span class="si">{</span><span class="n">discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;platform&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;python_version&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="n">discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;python_version&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PedanticRunVerificationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Python version configured </span><span class="si">{</span><span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;python_version&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> does not match &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Python version discovered </span><span class="si">{</span><span class="n">discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;python_version&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">hw_discovered</span> <span class="o">=</span> <span class="n">discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;hardware&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+    <span class="n">hw_configured</span> <span class="o">=</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;hardware&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">hw_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu_family&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">hw_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">&quot;cpu_family&quot;</span>
+    <span class="p">)</span> <span class="o">!=</span> <span class="n">hw_discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu_family&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PedanticRunVerificationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;CPU family configured </span><span class="si">{</span><span class="n">hw_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;cpu_family&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> does not match &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;CPU family discovered </span><span class="si">{</span><span class="n">hw_discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;cpu_family&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">hw_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu_model&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">hw_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">&quot;cpu_model&quot;</span>
+    <span class="p">)</span> <span class="o">!=</span> <span class="n">hw_discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cpu_model&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PedanticRunVerificationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;CPU model configured </span><span class="si">{</span><span class="n">hw_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;cpu_model&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> does not match &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;CPU model discovered </span><span class="si">{</span><span class="n">hw_discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;cpu_model&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">hw_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gpu_model&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">hw_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+        <span class="s2">&quot;gpu_model&quot;</span>
+    <span class="p">)</span> <span class="o">!=</span> <span class="n">hw_discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gpu_model&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PedanticRunVerificationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;GPU model configured </span><span class="si">{</span><span class="n">hw_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;gpu_model&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> does not match &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;GPU model discovered </span><span class="si">{</span><span class="n">hw_discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;gpu_model&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">os_discovered</span> <span class="o">=</span> <span class="n">discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;operating_system&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+    <span class="n">os_configured</span> <span class="o">=</span> <span class="n">runtime_environment</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;operating_system&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">{}</span>
+    <span class="k">if</span> <span class="n">os_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="n">os_discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PedanticRunVerificationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Operating system name configured </span><span class="si">{</span><span class="n">os_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> does not match &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;operating system name discovered </span><span class="si">{</span><span class="n">os_discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;name&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">os_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="n">os_discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PedanticRunVerificationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Operating system version configured </span><span class="si">{</span><span class="n">os_configured</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;version&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2"> does not match &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;operating system version discovered </span><span class="si">{</span><span class="n">os_discovered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;version&#39;</span><span class="p">)</span><span class="si">!r}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Runtime environment configured matches runtime environment used&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="load_dot_env"><a class="viewcode-back" href="../../thamos.html#thamos.lib.load_dot_env">[docs]</a><span class="k">def</span> <span class="nf">load_dot_env</span><span class="p">(</span><span class="n">dot_env_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Load .env file and parse its content.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">dot_env_path</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No .env file at </span><span class="si">%r</span><span class="s2"> found&quot;</span><span class="p">,</span> <span class="n">dot_env_path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{}</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Loading environment variables from </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">dot_env_path</span><span class="p">)</span>
+
+    <span class="n">env</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">dot_env_path</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">line_no</span><span class="p">,</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">()):</span>
+            <span class="n">line</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">line</span> <span class="ow">or</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;#&quot;</span><span class="p">):</span>  <span class="c1"># Skip comments.</span>
+                <span class="k">continue</span>
+
+            <span class="n">parts</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+                    <span class="s2">&quot;Failed to parse </span><span class="si">%r</span><span class="s2"> content at line </span><span class="si">%d</span><span class="s2">, ignoring...&quot;</span><span class="p">,</span>
+                    <span class="n">dot_env_path</span><span class="p">,</span>
+                    <span class="n">line_no</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="n">env</span><span class="p">[</span><span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">env</span></div>
 </pre></div>
 
           </div>

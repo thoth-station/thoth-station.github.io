@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.solvers &#8212; Thoth Storages 0.66.0 documentation</title>
+    <title>thoth.storages.solvers &#8212; Thoth Storages 0.70.0 documentation</title>
     <link rel="stylesheet" href="/assets/storages/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/storages/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/storages/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Storages 0.66.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Storages 0.70.0 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -69,6 +69,10 @@
 
 <span class="sd">&quot;&quot;&quot;Adapter for storing solver results onto a persistence remote store.&quot;&quot;&quot;</span>
 
+<span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">date</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
+
 <span class="kn">from</span> <span class="nn">.result_base</span> <span class="kn">import</span> <span class="n">ResultStorageBase</span>
 
 
@@ -80,7 +84,67 @@
 <div class="viewcode-block" id="SolverResultsStore.get_solver_name_from_document_id"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.solvers.SolverResultsStore.get_solver_name_from_document_id">[docs]</a>    <span class="nd">@staticmethod</span>
     <span class="k">def</span> <span class="nf">get_solver_name_from_document_id</span><span class="p">(</span><span class="n">solver_document_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
         <span class="sd">&quot;&quot;&quot;Retrieve solver name from solver&#39;s document id.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">solver_document_id</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">2</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span></div></div>
+        <span class="k">return</span> <span class="n">solver_document_id</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">2</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="SolverResultsStore.get_document_listing"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.solvers.SolverResultsStore.get_document_listing">[docs]</a>    <span class="k">def</span> <span class="nf">get_document_listing</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">os_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">os_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">python_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">start_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">end_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">include_end_date</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Get listing of documents available in Ceph as a generator.</span>
+
+<span class="sd">        Additional parameters can filter results. If start_date is supplied</span>
+<span class="sd">        and no end_date is supplied explicitly, the current date is</span>
+<span class="sd">        considered as end_date (inclusively).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">start_date</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">os_name</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">os_version</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">python_version</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Date filter can be used only when specific solvers are requested&quot;</span><span class="p">)</span>
+
+            <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;solver-</span><span class="si">{</span><span class="n">os_name</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">os_version</span><span class="si">}</span><span class="s2">-py</span><span class="si">{</span><span class="n">python_version</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">for</span> <span class="n">prefix_addition</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iter_dates_prefix_addition</span><span class="p">(</span>
+                <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span> <span class="n">start_date</span><span class="o">=</span><span class="n">start_date</span><span class="p">,</span> <span class="n">end_date</span><span class="o">=</span><span class="n">end_date</span><span class="p">,</span> <span class="n">include_end_date</span><span class="o">=</span><span class="n">include_end_date</span>
+            <span class="p">):</span>
+                <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">(</span><span class="n">prefix_addition</span><span class="p">):</span>
+                    <span class="k">yield</span> <span class="n">document_id</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">i</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">(</span><span class="n">os_name</span><span class="p">,</span> <span class="n">os_version</span><span class="p">,</span> <span class="n">python_version</span><span class="p">)):</span>
+                <span class="n">prefix</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;solver-</span><span class="si">{</span><span class="n">os_name</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">os_version</span><span class="si">}</span><span class="s2">-py</span><span class="si">{</span><span class="n">python_version</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">(</span><span class="n">prefix</span><span class="p">):</span>
+                    <span class="k">yield</span> <span class="n">document_id</span>
+            <span class="k">elif</span> <span class="nb">all</span><span class="p">(</span><span class="n">i</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">(</span><span class="n">os_name</span><span class="p">,</span> <span class="n">os_version</span><span class="p">,</span> <span class="n">python_version</span><span class="p">)):</span>
+                <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">ceph</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+                    <span class="k">yield</span> <span class="n">document_id</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;None or all parameters for os_name, os_version, python_version have to be supplied&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="SolverResultsStore.get_document_count"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.solvers.SolverResultsStore.get_document_count">[docs]</a>    <span class="k">def</span> <span class="nf">get_document_count</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">os_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">os_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">python_version</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">start_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">end_date</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">date</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">include_end_date</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;Get number of documents present.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span>
+            <span class="mi">1</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">(</span>
+                <span class="n">os_name</span><span class="o">=</span><span class="n">os_name</span><span class="p">,</span>
+                <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
+                <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span><span class="p">,</span>
+                <span class="n">start_date</span><span class="o">=</span><span class="n">start_date</span><span class="p">,</span>
+                <span class="n">end_date</span><span class="o">=</span><span class="n">end_date</span><span class="p">,</span>
+                <span class="n">include_end_date</span><span class="o">=</span><span class="n">include_end_date</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span></div></div>
 </pre></div>
 
           </div>

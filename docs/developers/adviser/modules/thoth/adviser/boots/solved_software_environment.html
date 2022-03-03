@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>thoth.adviser.boots.solved_software_environment &#8212; Thoth Adviser 0.50.0 documentation</title>
+    <title>thoth.adviser.boots.solved_software_environment &#8212; Thoth Adviser 0.52.1 documentation</title>
     <link rel="stylesheet" href="/assets/adviser/nameko.css" type="text/css" />
     <link rel="stylesheet" href="/assets/adviser/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="../../../../" src="/assets/adviser/documentation_options.js"></script>
@@ -39,7 +39,7 @@
         <li class="right" >
           <a href="../../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Adviser 0.50.0 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../../../index.html">Thoth Adviser 0.52.1 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../../../index.html" accesskey="U">Module code</a> &#187;</li> 
       </ul>
     </div>  
@@ -70,6 +70,7 @@
 <span class="sd">&quot;&quot;&quot;A boot to check for solved software environment before running any resolution.&quot;&quot;&quot;</span>
 
 <span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Generator</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
@@ -77,6 +78,7 @@
 
 <span class="kn">import</span> <span class="nn">attr</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">get_justification_link</span> <span class="k">as</span> <span class="n">jl</span>
+<span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">OpenShift</span>
 
 <span class="kn">from</span> <span class="nn">..boot</span> <span class="kn">import</span> <span class="n">Boot</span>
 <span class="kn">from</span> <span class="nn">..exceptions</span> <span class="kn">import</span> <span class="n">NotAcceptable</span>
@@ -92,6 +94,7 @@
     <span class="sd">&quot;&quot;&quot;A boot to check for solved software environment before running any resolution.&quot;&quot;&quot;</span>
 
     <span class="n">_JUSTIFICATION_LINK</span> <span class="o">=</span> <span class="n">jl</span><span class="p">(</span><span class="s2">&quot;solved_sw_env&quot;</span><span class="p">)</span>
+    <span class="n">_THOTH_ADVISER_DEPLOYMENT_CONFIGURED_SOLVERS</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_ADVISER_DEPLOYMENT_CONFIGURED_SOLVERS&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
 
 <div class="viewcode-block" id="SolvedSoftwareEnvironmentBoot.should_include"><a class="viewcode-back" href="../../../../thoth.adviser.boots.html#thoth.adviser.boots.solved_software_environment.SolvedSoftwareEnvironmentBoot.should_include">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">should_include</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">builder_context</span><span class="p">:</span> <span class="s2">&quot;PipelineBuilderContext&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
@@ -130,7 +133,22 @@
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> - </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">msg</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_JUSTIFICATION_LINK</span><span class="p">)</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Available configurations:&quot;</span><span class="p">)</span>
 
-        <span class="n">configurations</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">context</span><span class="o">.</span><span class="n">graph</span><span class="o">.</span><span class="n">get_solved_python_package_versions_software_environment_all</span><span class="p">()</span>
+        <span class="n">configurations</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">solvers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_THOTH_ADVISER_DEPLOYMENT_CONFIGURED_SOLVERS</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">solver</span> <span class="ow">in</span> <span class="n">solvers</span><span class="p">:</span>
+            <span class="n">solver</span> <span class="o">=</span> <span class="n">solver</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">solver</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">item</span> <span class="o">=</span> <span class="n">OpenShift</span><span class="o">.</span><span class="n">parse_python_solver_name</span><span class="p">(</span><span class="n">solver</span><span class="p">)</span>
+            <span class="n">configurations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">item</span><span class="p">[</span><span class="s2">&quot;os_name&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;rhel&quot;</span><span class="p">:</span>
+                <span class="c1"># Duplicate entry as we can also guide on the same UBI environment. UBI and RHEL are binary compatible.</span>
+                <span class="n">other_item</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+                <span class="n">other_item</span><span class="p">[</span><span class="s2">&quot;os_name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;ubi&quot;</span>
+                <span class="n">configurations</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">other_item</span><span class="p">)</span>
+
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{:&lt;16}</span><span class="s2"> </span><span class="si">{:&lt;16}</span><span class="s2"> </span><span class="si">{:&lt;8}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s2">&quot;OS name&quot;</span><span class="p">,</span> <span class="s2">&quot;OS version&quot;</span><span class="p">,</span> <span class="s2">&quot;Python version&quot;</span><span class="p">))</span>
         <span class="k">for</span> <span class="n">conf</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span>
             <span class="n">configurations</span><span class="p">,</span>
