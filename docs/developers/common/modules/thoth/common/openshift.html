@@ -1,17 +1,17 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>thoth.common.openshift &#8212; Thoth Common 0.36.1 documentation</title>
-    <link rel="stylesheet" href="/assets/common/nameko.css" type="text/css" />
-    <link rel="stylesheet" href="/assets/common/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/common/documentation_options.js"></script>
-    <script type="text/javascript" src="/assets/common/jquery.js"></script>
-    <script type="text/javascript" src="/assets/common/underscore.js"></script>
-    <script type="text/javascript" src="/assets/common/doctools.js"></script>
-    <script type="text/javascript" src="/assets/common/language_data.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>thoth.common.openshift &#8212; Thoth Common 0.36.2 documentation</title>
+    <link rel="stylesheet" type="text/css" href="/assets/common/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="/assets/common/nameko.css" />
+    <script data-url_root="../../../" id="documentation_options" src="/assets/common/documentation_options.js"></script>
+    <script src="/assets/common/jquery.js"></script>
+    <script src="/assets/common/underscore.js"></script>
+    <script src="/assets/common/doctools.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
 
@@ -39,8 +39,9 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Common 0.36.1 documentation</a> &#187;</li>
-          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Common 0.36.2 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">thoth.common.openshift</a></li> 
       </ul>
     </div>  
 
@@ -1133,6 +1134,36 @@
             <span class="p">},</span>
         <span class="p">)</span></div>
 
+<div class="viewcode-block" id="OpenShift.schedule_sync_job"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.schedule_sync_job">[docs]</a>    <span class="k">def</span> <span class="nf">schedule_sync_job</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">document_type</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">force_sync</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">graceful</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">job_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+        <span class="sd">&quot;&quot;&quot;Schedule graph sync for specific document id.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">middletier_namespace</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
+                <span class="s2">&quot;Unable to schedule graph-sync without middletier namespace being set&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">sync_id</span> <span class="o">=</span> <span class="n">job_id</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">generate_id</span><span class="p">(</span><span class="s2">&quot;sync&quot;</span><span class="p">)</span>
+        <span class="n">template_parameters</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;THOTH_SYNC_JOB_ID&quot;</span><span class="p">:</span> <span class="n">sync_id</span><span class="p">,</span>
+            <span class="s2">&quot;THOTH_DOCUMENT_TYPE&quot;</span><span class="p">:</span> <span class="n">document_type</span><span class="p">,</span>
+            <span class="s2">&quot;THOTH_SYNC_GRACEFUL&quot;</span><span class="p">:</span> <span class="n">graceful</span><span class="p">,</span>
+            <span class="s2">&quot;THOTH_SYNC_FORCE_SYNC&quot;</span><span class="p">:</span> <span class="n">force_sync</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">workflow_parameters</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_assign_workflow_parameters_for_ceph</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schedule_workflow</span><span class="p">(</span>
+            <span class="n">workflow</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">workflow_manager</span><span class="o">.</span><span class="n">submit_sync_job</span><span class="p">,</span>
+            <span class="n">parameters</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">&quot;template_parameters&quot;</span><span class="p">:</span> <span class="n">template_parameters</span><span class="p">,</span>
+                <span class="s2">&quot;workflow_parameters&quot;</span><span class="p">:</span> <span class="n">workflow_parameters</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">)</span></div>
+
 <div class="viewcode-block" id="OpenShift.create_config_map"><a class="viewcode-back" href="../../../thoth.common.html#thoth.common.openshift.OpenShift.create_config_map">[docs]</a>    <span class="k">def</span> <span class="nf">create_config_map</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">configmap_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
@@ -1544,7 +1575,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">prefixes</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">if</span> <span class="n">repository</span><span class="p">:</span>
-            <span class="n">prefixes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">repository</span><span class="p">)</span>
+            <span class="n">prefixes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">repository</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)))</span>
         <span class="k">if</span> <span class="n">create_knowledge</span><span class="p">:</span>
             <span class="n">prefixes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;analysis&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">mi_merge</span><span class="p">:</span>
@@ -1830,37 +1861,37 @@
 
         <span class="k">if</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;E&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span> <span class="o">**</span> <span class="mi">6</span>
+            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span><span class="o">**</span><span class="mi">6</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;P&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span> <span class="o">**</span> <span class="mi">5</span>
+            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span><span class="o">**</span><span class="mi">5</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;T&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span> <span class="o">**</span> <span class="mi">4</span>
+            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span><span class="o">**</span><span class="mi">4</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;G&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span> <span class="o">**</span> <span class="mi">3</span>
+            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span><span class="o">**</span><span class="mi">3</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;M&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
-            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span><span class="o">**</span><span class="mi">2</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;K&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
             <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1000</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;Ei&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
-            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">**</span> <span class="mi">6</span>
+            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">6</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;Pi&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
-            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">**</span> <span class="mi">5</span>
+            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">5</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;Ti&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
-            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">**</span> <span class="mi">4</span>
+            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">4</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;Gi&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
-            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">**</span> <span class="mi">3</span>
+            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">3</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;Mi&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
-            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">**</span> <span class="mi">2</span>
+            <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span><span class="o">**</span><span class="mi">2</span>
         <span class="k">elif</span> <span class="n">memory_spec</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;Ki&quot;</span><span class="p">):</span>
             <span class="n">parsed</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">memory_spec</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">])</span>
             <span class="k">return</span> <span class="n">parsed</span> <span class="o">*</span> <span class="mi">1024</span>
@@ -2121,6 +2152,7 @@
         <span class="p">)</span></div></div>
 </pre></div>
 
+            <div class="clearer"></div>
           </div>
         </div>
       </div>
@@ -2136,12 +2168,12 @@
   <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../../../search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
       <input type="submit" value="Go" />
     </form>
     </div>
 </div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
+<script>$('#searchbox').show(0);</script>
         </div>
       </div>
       <div class="clearer"></div>

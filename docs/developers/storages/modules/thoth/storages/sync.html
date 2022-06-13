@@ -1,17 +1,17 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>thoth.storages.sync &#8212; Thoth Storages 0.71.1 documentation</title>
-    <link rel="stylesheet" href="/assets/storages/nameko.css" type="text/css" />
-    <link rel="stylesheet" href="/assets/storages/pygments.css" type="text/css" />
-    <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="/assets/storages/documentation_options.js"></script>
-    <script type="text/javascript" src="/assets/storages/jquery.js"></script>
-    <script type="text/javascript" src="/assets/storages/underscore.js"></script>
-    <script type="text/javascript" src="/assets/storages/doctools.js"></script>
-    <script type="text/javascript" src="/assets/storages/language_data.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>thoth.storages.sync &#8212; Thoth Storages 0.72.2 documentation</title>
+    <link rel="stylesheet" type="text/css" href="/assets/storages/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="/assets/storages/nameko.css" />
+    <script data-url_root="../../../" id="documentation_options" src="/assets/storages/documentation_options.js"></script>
+    <script src="/assets/storages/jquery.js"></script>
+    <script src="/assets/storages/underscore.js"></script>
+    <script src="/assets/storages/doctools.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
 
@@ -39,8 +39,9 @@
         <li class="right" >
           <a href="../../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Storages 0.71.1 documentation</a> &#187;</li>
-          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li> 
+        <li class="nav-item nav-item-0"><a href="../../../index.html">Thoth Storages 0.72.2 documentation</a> &#187;</li>
+          <li class="nav-item nav-item-1"><a href="../../index.html" accesskey="U">Module code</a> &#187;</li>
+        <li class="nav-item nav-item-this"><a href="">thoth.storages.sync</a></li> 
       </ul>
     </div>  
 
@@ -77,6 +78,7 @@
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">List</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
 <span class="kn">from</span> <span class="nn">pathlib</span> <span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">random</span>
 
 <span class="kn">from</span> <span class="nn">.analyses</span> <span class="kn">import</span> <span class="n">AnalysisResultsStore</span>
 <span class="kn">from</span> <span class="nn">.advisers</span> <span class="kn">import</span> <span class="n">AdvisersResultsStore</span>
@@ -90,6 +92,7 @@
 <span class="kn">from</span> <span class="nn">.graph</span> <span class="kn">import</span> <span class="n">GraphDatabase</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">_RANDOMIZE_LISTING</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_STORAGES_RANDOMIZE_LISTING&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)))</span>
 
 
 <div class="viewcode-block" id="sync_adviser_documents"><a class="viewcode-back" href="../../../thoth.storages.html#thoth.storages.sync.sync_adviser_documents">[docs]</a><span class="k">def</span> <span class="nf">sync_adviser_documents</span><span class="p">(</span>
@@ -113,8 +116,13 @@
         <span class="n">adviser_store</span> <span class="o">=</span> <span class="n">AdvisersResultsStore</span><span class="p">()</span>
         <span class="n">adviser_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
+    <span class="n">listing</span> <span class="o">=</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">adviser_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">_RANDOMIZE_LISTING</span><span class="p">:</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">listing</span><span class="p">))</span>
+
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
-    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">adviser_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">listing</span><span class="p">:</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
 
         <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">adviser_document_id_exist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
@@ -165,8 +173,13 @@
         <span class="n">solver_store</span> <span class="o">=</span> <span class="n">SolverResultsStore</span><span class="p">()</span>
         <span class="n">solver_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
+    <span class="n">listing</span> <span class="o">=</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">_RANDOMIZE_LISTING</span><span class="p">:</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">listing</span><span class="p">))</span>
+
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
-    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">solver_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">listing</span><span class="p">:</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
         <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">solver_document_id_exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
             <span class="k">try</span><span class="p">:</span>
@@ -216,8 +229,13 @@
         <span class="n">revsolver_store</span> <span class="o">=</span> <span class="n">RevSolverResultsStore</span><span class="p">()</span>
         <span class="n">revsolver_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
+    <span class="n">listing</span> <span class="o">=</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">revsolver_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">_RANDOMIZE_LISTING</span><span class="p">:</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">listing</span><span class="p">))</span>
+
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
-    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">revsolver_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">listing</span><span class="p">:</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">is_local</span><span class="p">:</span>
@@ -265,8 +283,13 @@
         <span class="n">analysis_store</span> <span class="o">=</span> <span class="n">AnalysisResultsStore</span><span class="p">()</span>
         <span class="n">analysis_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
+    <span class="n">listing</span> <span class="o">=</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">analysis_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">_RANDOMIZE_LISTING</span><span class="p">:</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">listing</span><span class="p">))</span>
+
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
-    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">analysis_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">listing</span><span class="p">:</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
 
         <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">analysis_document_id_exist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
@@ -317,8 +340,13 @@
         <span class="n">provenance_check_store</span> <span class="o">=</span> <span class="n">ProvenanceResultsStore</span><span class="p">()</span>
         <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
+    <span class="n">listing</span> <span class="o">=</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">_RANDOMIZE_LISTING</span><span class="p">:</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">listing</span><span class="p">))</span>
+
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
-    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">provenance_check_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">listing</span><span class="p">:</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
 
         <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">provenance_checker_document_id_exist</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
@@ -371,8 +399,13 @@
         <span class="n">dependency_monkey_reports_store</span> <span class="o">=</span> <span class="n">DependencyMonkeyReportsStore</span><span class="p">()</span>
         <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
+    <span class="n">listing</span> <span class="o">=</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">_RANDOMIZE_LISTING</span><span class="p">:</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">listing</span><span class="p">))</span>
+
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
-    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">dependency_monkey_reports_store</span><span class="o">.</span><span class="n">get_document_listing</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">document_id</span> <span class="ow">in</span> <span class="n">listing</span><span class="p">:</span>
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
 
         <span class="k">if</span> <span class="n">force</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">graph</span><span class="o">.</span><span class="n">dependency_monkey_document_id_exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">document_id</span><span class="p">)):</span>
@@ -422,8 +455,13 @@
         <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
         <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
+    <span class="n">listing</span> <span class="o">=</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">InspectionStore</span><span class="o">.</span><span class="n">iter_inspections</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">_RANDOMIZE_LISTING</span><span class="p">:</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">listing</span><span class="p">))</span>
+
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
-    <span class="k">for</span> <span class="n">inspection_document_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">InspectionStore</span><span class="o">.</span><span class="n">iter_inspections</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">inspection_document_id</span> <span class="ow">in</span> <span class="n">listing</span><span class="p">:</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">is_local</span><span class="p">:</span>
             <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
@@ -524,8 +562,13 @@
         <span class="n">graph</span> <span class="o">=</span> <span class="n">GraphDatabase</span><span class="p">()</span>
         <span class="n">graph</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
 
+    <span class="n">listing</span> <span class="o">=</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">SecurityIndicatorsResultsStore</span><span class="o">.</span><span class="n">iter_security_indicators</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">_RANDOMIZE_LISTING</span><span class="p">:</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">listing</span><span class="p">))</span>
+
     <span class="n">processed</span><span class="p">,</span> <span class="n">synced</span><span class="p">,</span> <span class="n">skipped</span><span class="p">,</span> <span class="n">failed</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span>
-    <span class="k">for</span> <span class="n">security_indicator_id</span> <span class="ow">in</span> <span class="n">document_ids</span> <span class="ow">or</span> <span class="n">SecurityIndicatorsResultsStore</span><span class="o">.</span><span class="n">iter_security_indicators</span><span class="p">():</span>
+    <span class="k">for</span> <span class="n">security_indicator_id</span> <span class="ow">in</span> <span class="n">listing</span><span class="p">:</span>
 
         <span class="n">processed</span> <span class="o">+=</span> <span class="mi">1</span>
 
@@ -641,6 +684,7 @@
     <span class="k">return</span> <span class="n">stats</span></div>
 </pre></div>
 
+            <div class="clearer"></div>
           </div>
         </div>
       </div>
@@ -656,12 +700,12 @@
   <h3 id="searchlabel">Quick search</h3>
     <div class="searchformwrapper">
     <form class="search" action="../../../search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
       <input type="submit" value="Go" />
     </form>
     </div>
 </div>
-<script type="text/javascript">$('#searchbox').show(0);</script>
+<script>$('#searchbox').show(0);</script>
         </div>
       </div>
       <div class="clearer"></div>
