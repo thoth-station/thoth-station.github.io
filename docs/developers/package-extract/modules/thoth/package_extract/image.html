@@ -91,29 +91,11 @@
 <span class="kn">from</span> <span class="nn">.rpmlib</span> <span class="kn">import</span> <span class="n">parse_nvra</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
-
-<span class="n">_MERCATOR_BIN</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;MERCATOR_BIN&quot;</span><span class="p">,</span> <span class="s2">&quot;mercator&quot;</span><span class="p">)</span>
-<span class="n">_MERCATOR_HANDLERS_YAML</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span>
-    <span class="s2">&quot;MERCATOR_HANDLERS_YAML&quot;</span><span class="p">,</span> <span class="s2">&quot;/usr/local/share/mercator/handlers.yml&quot;</span>
-<span class="p">)</span>
 <span class="n">_HERE_DIR</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="vm">__file__</span><span class="p">))</span>
 <span class="n">_SKOPEO_EXEC_PATH</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span>
     <span class="s2">&quot;SKOPEO_EXEC_PATH&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_HERE_DIR</span><span class="p">,</span> <span class="s2">&quot;bin&quot;</span><span class="p">,</span> <span class="s2">&quot;skopeo&quot;</span><span class="p">)</span>
 <span class="p">)</span>
 <span class="n">_MAX_SYMLINKS</span> <span class="o">=</span> <span class="mi">50</span>
-
-
-<span class="k">def</span> <span class="nf">_normalize_mercator_output</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Normalize and filter mercator output.&quot;&quot;&quot;</span>
-    <span class="n">output</span> <span class="o">=</span> <span class="n">output</span> <span class="ow">or</span> <span class="p">{}</span>
-    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;items&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="p">[]:</span>
-        <span class="n">entry</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-
-        <span class="c1"># Now point to the correct path, absolute inside the image.</span>
-        <span class="k">if</span> <span class="s2">&quot;path&quot;</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">:</span>
-            <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;path&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;path&quot;</span><span class="p">][</span><span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="p">:]</span>
-
-    <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;items&quot;</span><span class="p">,</span> <span class="p">[])</span>
 
 
 <span class="k">def</span> <span class="nf">_parse_repoquery</span><span class="p">(</span><span class="n">output</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
@@ -163,19 +145,6 @@
         <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">rpm_package</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">result</span>
-
-
-<span class="k">def</span> <span class="nf">_run_mercator</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-    <span class="sd">&quot;&quot;&quot;Run mercator-go to find all packages that were installed inside an image.&quot;&quot;&quot;</span>
-    <span class="n">cmd</span> <span class="o">=</span> <span class="s2">&quot;</span><span class="si">{mercator_bin}</span><span class="s2"> -config </span><span class="si">{mercator_handlers_yaml}</span><span class="s2"> </span><span class="si">{path}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
-        <span class="n">mercator_bin</span><span class="o">=</span><span class="n">_MERCATOR_BIN</span><span class="p">,</span>
-        <span class="n">mercator_handlers_yaml</span><span class="o">=</span><span class="n">_MERCATOR_HANDLERS_YAML</span><span class="p">,</span>
-        <span class="n">path</span><span class="o">=</span><span class="n">path</span><span class="p">,</span>
-    <span class="p">)</span>
-    <span class="n">output</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span>
-        <span class="n">cmd</span><span class="p">,</span> <span class="n">env</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;MERCATOR_INTERPRET_SETUP_PY&quot;</span><span class="p">:</span> <span class="s2">&quot;true&quot;</span><span class="p">},</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">is_json</span><span class="o">=</span><span class="kc">True</span>
-    <span class="p">)</span><span class="o">.</span><span class="n">stdout</span>
-    <span class="k">return</span> <span class="n">_normalize_mercator_output</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">output</span><span class="p">)</span>
 
 
 <span class="k">def</span> <span class="nf">_run_rpm</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
@@ -758,7 +727,6 @@
     <span class="n">deb_packages</span> <span class="o">=</span> <span class="n">_run_dpkg_query</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="p">{</span>
-        <span class="s2">&quot;mercator&quot;</span><span class="p">:</span> <span class="n">_run_mercator</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">),</span>
         <span class="s2">&quot;rpm&quot;</span><span class="p">:</span> <span class="n">_run_rpm</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">),</span>
         <span class="s2">&quot;rpm-dependencies&quot;</span><span class="p">:</span> <span class="n">_run_rpm_repoquery</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">),</span>
         <span class="s2">&quot;deb&quot;</span><span class="p">:</span> <span class="n">deb_packages</span><span class="p">,</span>
