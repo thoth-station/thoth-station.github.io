@@ -164,6 +164,7 @@
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">SecurityIndicatorAggregatedRun</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">SoftwareEnvironment</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">VersionedSymbol</span>
+<span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">PythonPackageLicense</span>
 
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">Advised</span>
 <span class="kn">from</span> <span class="nn">.models</span> <span class="kn">import</span> <span class="n">DebDepends</span>
@@ -4793,6 +4794,8 @@
         <span class="n">python_version</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
         <span class="n">python_package_metadata_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">sync_only_entity</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">package_license</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">package_license_warning</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">PythonPackageVersion</span><span class="p">,</span> <span class="n">PythonPackageVersionEntity</span><span class="p">]:</span>
         <span class="sd">&quot;&quot;&quot;Create a Python package version.</span>
 
@@ -4827,6 +4830,8 @@
             <span class="n">os_version</span><span class="o">=</span><span class="n">os_version</span><span class="p">,</span>
             <span class="n">python_version</span><span class="o">=</span><span class="n">python_version</span><span class="p">,</span>
             <span class="n">entity_id</span><span class="o">=</span><span class="n">entity</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+            <span class="n">package_license</span><span class="o">=</span><span class="n">package_license</span><span class="p">,</span>
+            <span class="n">package_license_warning</span><span class="o">=</span><span class="n">package_license_warning</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="c1"># including this value in &quot;get_or_create&quot; will cause errors because it is not part of a unique entry</span>
@@ -6048,11 +6053,13 @@
                 <span class="n">package_version</span> <span class="o">=</span> <span class="n">python_package_info</span><span class="p">[</span><span class="s2">&quot;package_version_requested&quot;</span><span class="p">]</span>
                 <span class="n">index_url</span> <span class="o">=</span> <span class="n">python_package_info</span><span class="p">[</span><span class="s2">&quot;index_url&quot;</span><span class="p">]</span>
                 <span class="n">importlib_metadata</span> <span class="o">=</span> <span class="n">python_package_info</span><span class="p">[</span><span class="s2">&quot;importlib_metadata&quot;</span><span class="p">][</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
+                <span class="n">package_license</span> <span class="o">=</span> <span class="n">python_package_info</span><span class="p">[</span><span class="s2">&quot;package_license&quot;</span><span class="p">]</span>
 
                 <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-                    <span class="s2">&quot;Syncing solver result of package </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> from </span><span class="si">%r</span><span class="s2"> solved by </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;Syncing solver result of package </span><span class="si">%r</span><span class="s2"> in version </span><span class="si">%r</span><span class="s2"> license </span><span class="si">%r</span><span class="s2"> from </span><span class="si">%r</span><span class="s2"> solved by </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
                     <span class="n">package_name</span><span class="p">,</span>
                     <span class="n">package_version</span><span class="p">,</span>
+                    <span class="n">package_license</span><span class="p">,</span>
                     <span class="n">index_url</span><span class="p">,</span>
                     <span class="n">solver_info</span><span class="p">,</span>
                 <span class="p">)</span>
@@ -6091,6 +6098,14 @@
                         <span class="sa">f</span><span class="s2">&quot;No related columns for </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">importlib_metadata</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">!r}</span><span class="s2"> &quot;</span>
                         <span class="s2">&quot;found in PythonPackageMetadata table, the error is not fatal&quot;</span>
                     <span class="p">)</span>
+
+                <span class="n">license_metadata</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">PythonPackageLicense</span><span class="o">.</span><span class="n">get_or_create</span><span class="p">(</span>
+                    <span class="n">session</span><span class="p">,</span>
+                    <span class="n">license_name</span><span class="o">=</span><span class="n">package_license</span><span class="p">[</span><span class="s2">&quot;license&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;full_name&quot;</span><span class="p">),</span>
+                    <span class="n">license_identifier</span><span class="o">=</span><span class="n">package_license</span><span class="p">[</span><span class="s2">&quot;license&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;identifier_spdx&quot;</span><span class="p">),</span>
+                    <span class="n">license_version</span><span class="o">=</span><span class="n">package_license</span><span class="p">[</span><span class="s2">&quot;license_version&quot;</span><span class="p">],</span>
+                <span class="p">)</span>
+
                 <span class="k">try</span><span class="p">:</span>
                     <span class="n">python_package_version</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_python_package_version</span><span class="p">(</span>
                         <span class="n">session</span><span class="p">,</span>
@@ -6101,6 +6116,8 @@
                         <span class="n">python_version</span><span class="o">=</span><span class="n">ecosystem_solver</span><span class="o">.</span><span class="n">python_version</span><span class="p">,</span>
                         <span class="n">index_url</span><span class="o">=</span><span class="n">index_url</span><span class="p">,</span>
                         <span class="n">python_package_metadata_id</span><span class="o">=</span><span class="n">package_metadata</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                        <span class="n">package_license</span><span class="o">=</span><span class="n">license_metadata</span><span class="o">.</span><span class="n">id</span><span class="p">,</span>
+                        <span class="n">package_license_warning</span><span class="o">=</span><span class="n">package_license</span><span class="p">[</span><span class="s2">&quot;warning&quot;</span><span class="p">],</span>
                     <span class="p">)</span>
                 <span class="k">except</span> <span class="n">NoResultFound</span><span class="p">:</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="n">force</span><span class="p">:</span>
