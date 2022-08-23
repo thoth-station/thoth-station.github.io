@@ -80,6 +80,7 @@
 <span class="kn">import</span> <span class="nn">subprocess</span>
 <span class="kn">import</span> <span class="nn">sys</span>
 <span class="kn">import</span> <span class="nn">typing</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
 <span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">wraps</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
@@ -184,6 +185,49 @@
     <span class="s2">&quot;os_name&quot;</span><span class="p">:</span> <span class="s2">&quot;Operating system name&quot;</span><span class="p">,</span>
     <span class="s2">&quot;os_version&quot;</span><span class="p">:</span> <span class="s2">&quot;Operating system version&quot;</span><span class="p">,</span>
     <span class="s2">&quot;python_version&quot;</span><span class="p">:</span> <span class="s2">&quot;Python version&quot;</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">_REPORT_TRANSLATION_TABLE_SCORECARD_TAGS</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;binary-artifacts&quot;</span><span class="p">:</span> <span class="s2">&quot;projects have binary artifacts in the source repository&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-binary-artifacts&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT have binary artifacts in the source repository&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;unfixed-vulnerabilities&quot;</span><span class="p">:</span> <span class="s2">&quot;projects have open or unfixed vulnerabilities on the OSV service&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-unfixed-vulnerabilities&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT have open or unfixed vulnerabilities on the OSV service&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;code-review&quot;</span><span class="p">:</span> <span class="s2">&quot;projects require code review before the code is merged&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-code-review&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT require code review before the code is merged&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;actively-maintained&quot;</span><span class="p">:</span> <span class="s2">&quot;projects are actively maintained&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-actively-maintained&quot;</span><span class="p">:</span> <span class="s2">&quot;projects are NOT actively maintained&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;automatic-updates&quot;</span><span class="p">:</span> <span class="s2">&quot;projects use use tools for automatic dependency updates&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-automatic-updates&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT use use tools for automatic dependency updates&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;branch-protection&quot;</span><span class="p">:</span> <span class="s2">&quot;projects have branch protection setup&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-branch-protection&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT have branch protection setup&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;least-privileged-workflow&quot;</span><span class="p">:</span> <span class="s2">&quot;projects follow the principle of least privileged in GitHub workflows&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-least-privileged-workflow&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT follow the principle of least privileged in GitHub workflows&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;security-policy&quot;</span><span class="p">:</span> <span class="s2">&quot;projects have a security policy published&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-security-policy&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT have a security policy published&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;signed-releases&quot;</span><span class="p">:</span> <span class="s2">&quot;projects cryptographically sign released artifacts&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-signed-releases&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT cryptographically sign released artifacts&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;fuzzing&quot;</span><span class="p">:</span> <span class="s2">&quot;projects use fuzzing&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-fuzzing&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT use fuzzing&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;published-package&quot;</span><span class="p">:</span> <span class="s2">&quot;projects are published as packages&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-published-package&quot;</span><span class="p">:</span> <span class="s2">&quot;projects are NOT published as packages&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;cii&quot;</span><span class="p">:</span> <span class="s2">&quot;projects follow best CII practices&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-cii&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT follow best CII practices&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;pinned-dependencies&quot;</span><span class="p">:</span> <span class="s2">&quot;projects use pinned dependencies&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-pinned-dependencies&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT use pinned dependencies&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;multiple-companies-contributors&quot;</span><span class="p">:</span> <span class="s2">&quot;projects have a set of contributors from multiple companies&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-multiple-companies-contributors&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT have a set of contributors from multiple companies&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ci-tests&quot;</span><span class="p">:</span> <span class="s2">&quot;projects run CI tests before pull requests are merged&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-ci-tests&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT run CI tests before pull requests are merged&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;static-analysis&quot;</span><span class="p">:</span> <span class="s2">&quot;projects use static source code analysis&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-static-analysis&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT use static source code analysis&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;dangerous-patterns&quot;</span><span class="p">:</span> <span class="s2">&quot;projects GitHub Action workflows have dangerous code patterns&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-dangerous-patterns&quot;</span><span class="p">:</span> <span class="s2">&quot;projects GitHub Action workflows do NOT have dangerous code patterns&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;license&quot;</span><span class="p">:</span> <span class="s2">&quot;projects have published a license&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-license&quot;</span><span class="p">:</span> <span class="s2">&quot;projects have NOT published a license&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;webhook-token&quot;</span><span class="p">:</span> <span class="s2">&quot;projects have a token for webhooks configured in their&quot;</span>
+    <span class="s2">&quot; repository to authenticate the origins of requests&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;no-webhook-token&quot;</span><span class="p">:</span> <span class="s2">&quot;projects do NOT have a token for webhooks configured in their&quot;</span>
+    <span class="s2">&quot; repository to authenticate the origins of requests&quot;</span><span class="p">,</span>
 <span class="p">}</span>
 
 
@@ -337,6 +381,64 @@
             <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">click</span><span class="o">.</span><span class="n">echo</span><span class="p">(</span><span class="s2">&quot;No justification was made for the recommended stack&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<span class="k">def</span> <span class="nf">_compute_metrics_scorecards</span><span class="p">(</span><span class="n">report</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">OrderedDict</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Aggregate OSSF Scorecards information from report and compute metrics.&quot;&quot;&quot;</span>
+    <span class="n">nb_dependencies</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">scorecards_metrics</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">if</span> <span class="n">report</span><span class="p">[</span><span class="s2">&quot;products&quot;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">report</span><span class="p">[</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;dependency_graph&quot;</span><span class="p">][</span><span class="s2">&quot;nodes&quot;</span><span class="p">]:</span>
+        <span class="n">nb_dependencies</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">report</span><span class="p">[</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;dependency_graph&quot;</span><span class="p">][</span><span class="s2">&quot;nodes&quot;</span><span class="p">])</span>
+
+    <span class="k">for</span> <span class="n">justification</span> <span class="ow">in</span> <span class="n">report</span><span class="p">[</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;justification&quot;</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="s2">&quot;scorecard&quot;</span> <span class="ow">in</span> <span class="n">justification</span><span class="p">[</span><span class="s2">&quot;link&quot;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="s2">&quot;tag&quot;</span> <span class="ow">in</span> <span class="n">justification</span><span class="p">:</span>
+                <span class="n">message</span> <span class="o">=</span> <span class="n">_REPORT_TRANSLATION_TABLE_SCORECARD_TAGS</span><span class="p">[</span><span class="n">justification</span><span class="p">[</span><span class="s2">&quot;tag&quot;</span><span class="p">]]</span>
+
+            <span class="c1"># TO DO: Remove when corresponding prescriptions have been updated with tags</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">replacement_words</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;Project &quot;</span><span class="p">:</span> <span class="s2">&quot;projects &quot;</span><span class="p">,</span>
+                    <span class="s2">&quot; is &quot;</span><span class="p">:</span> <span class="s2">&quot; are &quot;</span><span class="p">,</span>
+                    <span class="s2">&quot; does &quot;</span><span class="p">:</span> <span class="s2">&quot; do &quot;</span><span class="p">,</span>
+                    <span class="s2">&quot; has &quot;</span><span class="p">:</span> <span class="s2">&quot; have &quot;</span><span class="p">,</span>
+                    <span class="s2">&quot; runs &quot;</span><span class="p">:</span> <span class="s2">&quot; run &quot;</span><span class="p">,</span>
+                    <span class="s2">&quot; requires &quot;</span><span class="p">:</span> <span class="s2">&quot; require &quot;</span><span class="p">,</span>
+                    <span class="s2">&quot; uses &quot;</span><span class="p">:</span> <span class="s2">&quot; use &quot;</span><span class="p">,</span>
+                    <span class="s2">&quot; follows &quot;</span><span class="p">:</span> <span class="s2">&quot; follow &quot;</span><span class="p">,</span>
+                    <span class="s2">&quot; signs &quot;</span><span class="p">:</span> <span class="s2">&quot; sign &quot;</span><span class="p">,</span>
+                    <span class="s2">&quot; NOT &quot;</span><span class="p">:</span> <span class="s2">&quot; not &quot;</span><span class="p">,</span>
+                <span class="p">}</span>
+                <span class="n">message</span> <span class="o">=</span> <span class="n">justification</span><span class="p">[</span><span class="s2">&quot;message&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+                <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">replacement_words</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">message</span> <span class="o">=</span> <span class="n">message</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span>
+
+            <span class="n">message</span> <span class="o">=</span> <span class="n">message</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;based&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="k">if</span> <span class="n">message</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">scorecards_metrics</span><span class="p">:</span>
+                <span class="n">scorecards_metrics</span><span class="p">[</span><span class="n">message</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">scorecards_metrics</span><span class="p">[</span><span class="n">message</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">scorecards_metrics</span> <span class="o">!=</span> <span class="p">{}:</span>
+
+        <span class="c1"># TO DO: find a better sorting logic based on tags</span>
+        <span class="k">return</span> <span class="n">OrderedDict</span><span class="p">(</span>
+            <span class="nb">sorted</span><span class="p">(</span>
+                <span class="p">{</span>
+                    <span class="n">k</span><span class="p">:</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span> <span class="o">*</span> <span class="n">nb_dependencies</span> <span class="o">/</span> <span class="mi">100</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">scorecards_metrics</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="p">}</span><span class="o">.</span><span class="n">items</span><span class="p">(),</span>
+                <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="s2">&quot;not&quot;</span> <span class="ow">in</span> <span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">return</span> <span class="kc">None</span>
 
 
 <div class="viewcode-block" id="AliasedGroup"><a class="viewcode-back" href="../../thamos.html#thamos.cli.AliasedGroup">[docs]</a><span class="k">class</span> <span class="nc">AliasedGroup</span><span class="p">(</span><span class="n">click</span><span class="o">.</span><span class="n">RichGroup</span><span class="p">):</span>
@@ -799,6 +901,15 @@
     <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Labels used to label the request.&quot;</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--scoring&quot;</span><span class="p">,</span>
+    <span class="n">envvar</span><span class="o">=</span><span class="s2">&quot;THAMOS_SHOW_METRICS&quot;</span><span class="p">,</span>
+    <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">show_default</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Experimental feature: show Thoth package scoring based on OSSF Security Scorecards&quot;</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="nd">@handle_cli_exception</span>
 <span class="k">def</span> <span class="nf">advise</span><span class="p">(</span>
     <span class="n">debug</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -814,6 +925,7 @@
     <span class="n">no_user_stack</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">install</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">labels</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">scoring</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">write_advised_manifest_changes</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: D412</span>
     <span class="sd">&quot;&quot;&quot;Ask Thoth for recommendations on the application stack.</span>
@@ -912,6 +1024,15 @@
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">_print_advise_justifications</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">json_output</span><span class="o">=</span><span class="n">json_output</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">scoring</span><span class="p">:</span>
+                    <span class="n">scorecards_metrics</span> <span class="o">=</span> <span class="n">_compute_metrics_scorecards</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="n">scorecards_metrics</span><span class="p">:</span>
+                        <span class="n">Console</span><span class="p">()</span><span class="o">.</span><span class="n">print</span><span class="p">(</span>
+                            <span class="s2">&quot;Based on OSSF Security Scorecards ( https://github.com/ossf/scorecard ) :</span><span class="se">\n\n</span><span class="s2">&quot;</span>
+                        <span class="p">)</span>
+                        <span class="k">for</span> <span class="n">message</span><span class="p">,</span> <span class="n">metric</span> <span class="ow">in</span> <span class="n">scorecards_metrics</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                            <span class="n">Console</span><span class="p">()</span><span class="o">.</span><span class="n">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;- </span><span class="si">{</span><span class="n">metric</span><span class="si">}</span><span class="s2">% of </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
             <span class="n">pipfile</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;project&quot;</span><span class="p">][</span><span class="s2">&quot;requirements&quot;</span><span class="p">]</span>
             <span class="n">pipfile_lock</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;report&quot;</span><span class="p">][</span><span class="s2">&quot;products&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;project&quot;</span><span class="p">][</span>
