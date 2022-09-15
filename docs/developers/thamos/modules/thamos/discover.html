@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>thamos.discover &#8212; Thamos 1.27.9 documentation</title>
+    <title>thamos.discover &#8212; Thamos 1.27.11 documentation</title>
     <link rel="stylesheet" type="text/css" href="/assets/thamos/pygments.css" />
     <link rel="stylesheet" type="text/css" href="/assets/thamos/nameko.css" />
     <script data-url_root="../../" id="documentation_options" src="/assets/thamos/documentation_options.js"></script>
@@ -42,7 +42,7 @@
         <li class="right" >
           <a href="../../py-modindex.html" title="Python Module Index"
              >modules</a> |</li>
-        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.27.9 documentation</a> &#187;</li>
+        <li class="nav-item nav-item-0"><a href="../../index.html">Thamos 1.27.11 documentation</a> &#187;</li>
           <li class="nav-item nav-item-1"><a href="../index.html" accesskey="U">Module code</a> &#187;</li>
         <li class="nav-item nav-item-this"><a href="">thamos.discover</a></li> 
       </ul>
@@ -73,33 +73,70 @@
 
 <span class="sd">&quot;&quot;&quot;Implementation discovery methods to detect the current environment and its configuration.&quot;&quot;&quot;</span>
 
+<span class="kn">import</span> <span class="nn">click</span>
+<span class="kn">import</span> <span class="nn">distro</span>
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">import</span> <span class="nn">sys</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">import</span> <span class="nn">typing</span>
 <span class="kn">import</span> <span class="nn">sysconfig</span>
 
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
 
+<span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="kn">import</span> <span class="n">run_command</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">map_os_name</span>
 <span class="kn">from</span> <span class="nn">thoth.common</span> <span class="kn">import</span> <span class="n">normalize_os_version</span>
 
-<span class="kn">import</span> <span class="nn">distro</span>
-<span class="kn">import</span> <span class="nn">click</span>
-<span class="kn">from</span> <span class="nn">thoth.analyzer</span> <span class="kn">import</span> <span class="n">run_command</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 <span class="n">_PROC_CPU_INFO</span> <span class="o">=</span> <span class="s2">&quot;/proc/cpuinfo&quot;</span>
 
 
-<div class="viewcode-block" id="discover_cuda_version"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_cuda_version">[docs]</a><span class="k">def</span> <span class="nf">discover_cuda_version</span><span class="p">(</span><span class="n">interactive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="c1"># Taken from https://github.com/rpm-software-management/yum/blob/master/rpmUtils/miscutils.py as rpmUtils was deprecated</span>
+<span class="k">def</span> <span class="nf">_split_rpm_filename</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Pass in a standard style rpm fullname.</span>
+
+<span class="sd">    Return a name, version, release, epoch, arch, e.g.::</span>
+<span class="sd">        foo-1.0-1.i386.rpm returns foo, 1.0, 1, i386</span>
+<span class="sd">        1:bar-9-123a.ia64.rpm returns bar, 9, 123a, 1, ia64</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">filename</span><span class="p">[</span><span class="o">-</span><span class="mi">4</span><span class="p">:]</span> <span class="o">==</span> <span class="s2">&quot;.rpm&quot;</span><span class="p">:</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[:</span><span class="o">-</span><span class="mi">4</span><span class="p">]</span>
+
+    <span class="n">arch_index</span> <span class="o">=</span> <span class="n">filename</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)</span>
+    <span class="n">arch</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[</span><span class="n">arch_index</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:]</span>
+
+    <span class="n">rel_index</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[:</span><span class="n">arch_index</span><span class="p">]</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+    <span class="n">rel</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[</span><span class="n">rel_index</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">arch_index</span><span class="p">]</span>
+
+    <span class="n">ver_index</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[:</span><span class="n">rel_index</span><span class="p">]</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+    <span class="n">ver</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[</span><span class="n">ver_index</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">rel_index</span><span class="p">]</span>
+
+    <span class="n">epoch_index</span> <span class="o">=</span> <span class="n">filename</span><span class="o">.</span><span class="n">find</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">epoch_index</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+        <span class="n">epoch</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">epoch</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[:</span><span class="n">epoch_index</span><span class="p">]</span>
+
+    <span class="n">name</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[</span><span class="n">epoch_index</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:</span> <span class="n">ver_index</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">name</span><span class="p">,</span> <span class="n">ver</span><span class="p">,</span> <span class="n">rel</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">arch</span>
+
+
+<div class="viewcode-block" id="discover_cuda_version"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_cuda_version">[docs]</a><span class="k">def</span> <span class="nf">discover_cuda_version</span><span class="p">(</span><span class="n">interactive</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
     <span class="sd">&quot;&quot;&quot;Check for CUDA version, if no CUDA is installed, return None.&quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_DISABLE_CUDA&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">))):</span>
+    <span class="n">thamos_disable_cuda</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THAMOS_DISABLE_CUDA&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">thamos_disable_cuda</span> <span class="o">==</span> <span class="s2">&quot;1&quot;</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
-            <span class="s2">&quot;Disabling CUDA based on THAMOS_DISABLE_CUDA environment variable that is set to </span><span class="si">%r</span><span class="s2">&quot;</span><span class="p">,</span>
-            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;THAMOS_DISABLE_CUDA&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;Disabling CUDA based on THAMOS_DISABLE_CUDA environment variable that is set to 1&quot;</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+        <span class="s2">&quot;Enabling CUDA based on THAMOS_DISABLE_CUDA environment variable that is set to 0&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
 
     <span class="n">result</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span><span class="s2">&quot;nvcc --version&quot;</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">return_code</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
@@ -127,6 +164,83 @@
     <span class="k">return</span> <span class="n">cuda_version</span></div>
 
 
+<div class="viewcode-block" id="discover_cudnn_version"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_cudnn_version">[docs]</a><span class="k">def</span> <span class="nf">discover_cudnn_version</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Discover CuDNN version and return None if not found.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span><span class="s2">&quot;nvcc --version&quot;</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">return_code</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No CUDA version detected&quot;</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Unable to detect CUDA version - nvcc returned non-zero version: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">for</span> <span class="n">cudnn_header_path</span> <span class="ow">in</span> <span class="p">[</span>
+        <span class="s2">&quot;/usr/local/cuda/include/cudnn.h&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;/usr/include/cudnn.h&quot;</span><span class="p">,</span>
+    <span class="p">]:</span>
+        <span class="n">cudnn_version_command</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;cat </span><span class="si">{</span><span class="n">cudnn_header_path</span><span class="si">}</span><span class="s2"> | grep CUDNN_MAJOR -A 10&quot;</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">cudnn_version_command</span><span class="o">.</span><span class="n">return_code</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Unable to locate cudnn.h at </span><span class="si">{</span><span class="n">cudnn_header_path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cudnn_version_header</span> <span class="o">=</span> <span class="n">cudnn_version_command</span><span class="o">.</span><span class="n">stdout</span>
+            <span class="n">major_version</span><span class="p">,</span> <span class="n">minor_version</span><span class="p">,</span> <span class="n">patch_level</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="mi">3</span>
+
+            <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">cudnn_version_header</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+                <span class="k">if</span> <span class="s2">&quot;CUDNN_MAJOR&quot;</span> <span class="ow">in</span> <span class="n">line</span> <span class="ow">and</span> <span class="n">major_version</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">cudnn_major_location</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;CUDNN_MAJOR&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span>
+                        <span class="s2">&quot;CUDNN_MAJOR&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">major_version</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="n">cudnn_major_location</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+                <span class="k">if</span> <span class="s2">&quot;CUDNN_MINOR&quot;</span> <span class="ow">in</span> <span class="n">line</span> <span class="ow">and</span> <span class="n">minor_version</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">cudnn_minor_location</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;CUDNN_MINOR&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span>
+                        <span class="s2">&quot;CUDNN_MINOR&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">minor_version</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="n">cudnn_minor_location</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+                <span class="k">if</span> <span class="s2">&quot;CUDNN_PATCHLEVEL&quot;</span> <span class="ow">in</span> <span class="n">line</span> <span class="ow">and</span> <span class="n">patch_level</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">cudnn_patchlevel_location</span> <span class="o">=</span> <span class="n">line</span><span class="o">.</span><span class="n">rfind</span><span class="p">(</span><span class="s2">&quot;CUDNN_PATCHLEVEL&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span>
+                        <span class="s2">&quot;CUDNN_PATCHLEVEL&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">patch_level</span> <span class="o">=</span> <span class="n">line</span><span class="p">[</span><span class="n">cudnn_patchlevel_location</span><span class="p">:]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">major_version</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No cuDNN major version detected in </span><span class="si">{</span><span class="n">cudnn_header_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">break</span>
+
+            <span class="n">cudnn_version</span> <span class="o">=</span> <span class="n">major_version</span>
+            <span class="k">if</span> <span class="n">minor_version</span><span class="p">:</span>
+                <span class="n">cudnn_version</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;.</span><span class="si">{</span><span class="n">minor_version</span><span class="si">}</span><span class="s2">&quot;</span>
+
+            <span class="k">if</span> <span class="n">patch_level</span><span class="p">:</span>
+                <span class="n">cudnn_version</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;.</span><span class="si">{</span><span class="n">patch_level</span><span class="si">}</span><span class="s2">&quot;</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Detected cuDNN version </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">cudnn_version</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">cudnn_version</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No cuDNN version detected&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="discover_mkl_version"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_mkl_version">[docs]</a><span class="k">def</span> <span class="nf">discover_mkl_version</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Discover MLK Python package version and return None if not found.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span><span class="s2">&quot;pip list | grep -F mkl&quot;</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">return_code</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No MKL Python package detected&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span></div>
+
+
 <div class="viewcode-block" id="discover_distribution"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_distribution">[docs]</a><span class="k">def</span> <span class="nf">discover_distribution</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;Get distribution identifier and distribution version.&quot;&quot;&quot;</span>
     <span class="n">distribution</span><span class="p">,</span> <span class="n">version</span><span class="p">,</span> <span class="o">*</span><span class="n">_</span> <span class="o">=</span> <span class="n">distro</span><span class="o">.</span><span class="n">linux_distribution</span><span class="p">(</span><span class="n">full_distribution_name</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
@@ -148,7 +262,7 @@
         <span class="s2">&quot;cpu_family&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
         <span class="s2">&quot;cpu_model&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
         <span class="s2">&quot;cpu_model_name&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-    <span class="p">}</span>  <span class="c1"># type: Dict[str, Union[str, int, None]]</span>
+    <span class="p">}</span>  <span class="c1"># type: Dict[str, Any]</span>
 
     <span class="k">try</span><span class="p">:</span>
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">_PROC_CPU_INFO</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">cpu_info_file</span><span class="p">:</span>
@@ -186,9 +300,7 @@
     <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
         <span class="n">_LOGGER</span><span class="o">.</span><span class="n">exception</span><span class="p">(</span><span class="s2">&quot;Failed to obtain CPU specific information: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">exc</span><span class="p">))</span>
 
-    <span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;cpu_model_name&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="c1"># Assign a text representation - unknown for config file.</span>
-        <span class="n">result</span><span class="p">[</span><span class="s2">&quot;cpu_model_name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Unknown&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="ow">or</span> <span class="s2">&quot;Unknown&quot;</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
 
     <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
         <span class="s2">&quot;Detected CPU: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">((</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span>
@@ -203,7 +315,7 @@
     <span class="k">return</span> <span class="n">platform</span></div>
 
 
-<div class="viewcode-block" id="discover_base_image"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_base_image">[docs]</a><span class="k">def</span> <span class="nf">discover_base_image</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<div class="viewcode-block" id="discover_base_image"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_base_image">[docs]</a><span class="k">def</span> <span class="nf">discover_base_image</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
     <span class="sd">&quot;&quot;&quot;Discover base image and its version.&quot;&quot;&quot;</span>
     <span class="c1"># IMAGE_NAME and IMAGE_TAG injected by AICoE-CI take precedence over Thoth s2i.</span>
     <span class="n">base_image_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;IMAGE_NAME&quot;</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;THOTH_S2I_NAME&quot;</span><span class="p">))</span>
@@ -231,21 +343,71 @@
     <span class="k">return</span> <span class="kc">None</span></div>
 
 
-<div class="viewcode-block" id="discover_all"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_all">[docs]</a><span class="k">def</span> <span class="nf">discover_all</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">typing</span><span class="o">.</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">typing</span><span class="o">.</span><span class="n">Any</span><span class="p">]:</span>
+<div class="viewcode-block" id="discover_rpm_package"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_rpm_package">[docs]</a><span class="k">def</span> <span class="nf">discover_rpm_package</span><span class="p">(</span><span class="n">package_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+    <span class="sd">&quot;&quot;&quot;Check for version of a RPM package and return None if not found.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;rpm -qa | grep </span><span class="si">{</span><span class="n">package_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">return_code</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No </span><span class="si">%s</span><span class="s2"> version detected&quot;</span><span class="p">,</span> <span class="n">package_name</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> not found in RPM packages&quot;</span><span class="p">,</span> <span class="n">package_name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+            <span class="n">name</span><span class="p">,</span> <span class="n">ver</span><span class="p">,</span> <span class="n">rel</span><span class="p">,</span> <span class="n">epoch</span><span class="p">,</span> <span class="n">arch</span> <span class="o">=</span> <span class="n">_split_rpm_filename</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="n">package_name</span><span class="p">:</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%s</span><span class="s2"> detected with version </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">package_name</span><span class="p">,</span> <span class="n">ver</span><span class="p">)</span>
+                <span class="k">return</span> <span class="p">{</span>
+                    <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+                    <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">ver</span><span class="p">,</span>
+                    <span class="s2">&quot;release&quot;</span><span class="p">:</span> <span class="n">rel</span><span class="p">,</span>
+                    <span class="s2">&quot;epoch&quot;</span><span class="p">:</span> <span class="n">epoch</span><span class="p">,</span>
+                    <span class="s2">&quot;architecture&quot;</span><span class="p">:</span> <span class="n">arch</span><span class="p">,</span>
+                <span class="p">}</span>
+
+    <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="discover_gpu_model"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_gpu_model">[docs]</a><span class="k">def</span> <span class="nf">discover_gpu_model</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="sd">&quot;&quot;&quot;Check for GPU model and return None if not found.&quot;&quot;&quot;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">run_command</span><span class="p">(</span><span class="s2">&quot;lspci | grep VGA&quot;</span><span class="p">,</span> <span class="n">raise_on_error</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">return_code</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;No GPU model detected&quot;</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+            <span class="s2">&quot;Unable to detect GPU model - &#39;lspci | grep VGA&#39; returned non-zero version: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">gpu_model</span> <span class="o">=</span> <span class="s2">&quot;VGA&quot;</span> <span class="o">+</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;VGA&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;GPU model detected: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">gpu_model</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">gpu_model</span></div>
+
+
+<div class="viewcode-block" id="discover_all"><a class="viewcode-back" href="../../thamos.html#thamos.discover.discover_all">[docs]</a><span class="k">def</span> <span class="nf">discover_all</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
     <span class="sd">&quot;&quot;&quot;Discover all the entries used in Thoth&#39;s configuration file.&quot;&quot;&quot;</span>
-    <span class="c1"># XXX: missing autodiscovery for OpenBLAS, OpenMPI, cuDNN, MKL, hardware.gpu_model</span>
     <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">&quot;cuda_version&quot;</span><span class="p">:</span> <span class="n">discover_cuda_version</span><span class="p">(),</span>
+        <span class="s2">&quot;cudnn_version&quot;</span><span class="p">:</span> <span class="n">discover_cudnn_version</span><span class="p">(),</span>
         <span class="s2">&quot;python_version&quot;</span><span class="p">:</span> <span class="n">discover_python_version</span><span class="p">(),</span>
         <span class="s2">&quot;platform&quot;</span><span class="p">:</span> <span class="n">discover_platform</span><span class="p">(),</span>
         <span class="s2">&quot;base_image&quot;</span><span class="p">:</span> <span class="n">discover_base_image</span><span class="p">(),</span>
-        <span class="s2">&quot;hardware&quot;</span><span class="p">:</span> <span class="n">discover_cpu</span><span class="p">(),</span>
+        <span class="s2">&quot;openmpi_version&quot;</span><span class="p">:</span> <span class="n">discover_rpm_package</span><span class="p">(</span><span class="s2">&quot;openmpi&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;openblas_version&quot;</span><span class="p">:</span> <span class="n">discover_rpm_package</span><span class="p">(</span><span class="s2">&quot;openblas&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;mkl_version&quot;</span><span class="p">:</span> <span class="n">discover_mkl_version</span><span class="p">(),</span>
     <span class="p">}</span>
 
     <span class="n">os_name</span><span class="p">,</span> <span class="n">os_version</span> <span class="o">=</span> <span class="n">discover_distribution</span><span class="p">()</span>
     <span class="n">result</span><span class="p">[</span><span class="s2">&quot;operating_system&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
         <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">os_name</span><span class="p">,</span>
         <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">os_version</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">result</span><span class="p">[</span><span class="s2">&quot;hardware&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="o">**</span><span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="ow">or</span> <span class="s2">&quot;null&quot;</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">discover_cpu</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()},</span>
+        <span class="s2">&quot;gpu_model&quot;</span><span class="p">:</span> <span class="n">discover_gpu_model</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">&quot;Unknown&quot;</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="k">return</span> <span class="n">result</span></div>
