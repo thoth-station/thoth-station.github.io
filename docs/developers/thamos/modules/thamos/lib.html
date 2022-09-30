@@ -375,7 +375,6 @@
         <span class="n">library_usage</span> <span class="o">=</span> <span class="n">gather_library_usage</span><span class="p">(</span>
             <span class="n">src_path</span><span class="p">,</span>
             <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-            <span class="n">ignored_subdirs</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;.venv&quot;</span><span class="p">],</span>
             <span class="n">without_standard_imports</span><span class="o">=</span><span class="n">without_standard_imports</span><span class="p">,</span>
             <span class="n">without_builtin_imports</span><span class="o">=</span><span class="n">without_builtin_imports</span><span class="p">,</span>
             <span class="n">without_builtins</span><span class="o">=</span><span class="n">without_builtins</span><span class="p">,</span>
@@ -1064,6 +1063,118 @@
             <span class="k">continue</span>
 
     <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="get_diff"><a class="viewcode-back" href="../../thamos.html#thamos.lib.get_diff">[docs]</a><span class="nd">@with_api_client</span>
+<span class="k">def</span> <span class="nf">get_diff</span><span class="p">(</span><span class="n">api_client</span><span class="p">:</span> <span class="n">ApiClient</span><span class="p">,</span> <span class="n">new_analysis_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">old_analysis_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Get the difference of two analyses justification stack - the analysis type must be of type &#39;adviser-&#39;.</span>
+
+<span class="sd">    If old_analysis_id is not provided, its get from the last thamos call which stores it in a temporary file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">api_instance</span> <span class="o">=</span> <span class="n">AdviseApi</span><span class="p">(</span><span class="n">api_client</span><span class="p">)</span>
+
+    <span class="c1"># get last used analysis ID if old not provided; raise exception if no last id</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">old_analysis_id</span><span class="p">:</span>
+        <span class="n">old_analysis_id</span> <span class="o">=</span> <span class="n">get_last_analysis_id</span><span class="p">()</span>
+
+    <span class="c1"># get old advise document; raise exception if id is invalid</span>
+    <span class="k">if</span> <span class="n">old_analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;adviser-&quot;</span><span class="p">):</span>
+        <span class="n">old_result</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_advise_python</span><span class="p">(</span><span class="n">old_analysis_id</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">UnknownAnalysisType</span><span class="p">(</span>
+            <span class="s2">&quot;Can only compare the differences between &#39;adviser-&#39; type ids.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># validate adviser id and get new document</span>
+    <span class="k">if</span> <span class="n">new_analysis_id</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">new_analysis_id</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;adviser-&quot;</span><span class="p">):</span>
+            <span class="n">new_result</span> <span class="o">=</span> <span class="n">api_instance</span><span class="o">.</span><span class="n">get_advise_python</span><span class="p">(</span><span class="n">new_analysis_id</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">UnknownAnalysisType</span><span class="p">(</span>
+                <span class="s2">&quot;Can only compare the differences between &#39;adviser-&#39; type ids.&quot;</span>
+            <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Missing a new analysis ID to compare to.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># get stack info and justification from response</span>
+    <span class="n">old_justifications</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">new_justifications</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">old_stack</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">new_stack</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">old_justifications</span> <span class="o">=</span> <span class="n">old_result</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">products</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">justification</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not get justifications from old advise document.&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">new_justifications</span> <span class="o">=</span> <span class="n">new_result</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">products</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">justification</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not get justifications from new advise document.&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">old_stack</span> <span class="o">=</span> <span class="n">old_result</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">stack_info</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not get stack info from old advise document.&quot;</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">new_stack</span> <span class="o">=</span> <span class="n">new_result</span><span class="o">.</span><span class="n">result</span><span class="o">.</span><span class="n">report</span><span class="o">.</span><span class="n">stack_info</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Could not get stack info from new advise document.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># helper function that compares justification types</span>
+    <span class="k">def</span> <span class="nf">compare_justification_list</span><span class="p">(</span><span class="n">old</span><span class="p">,</span> <span class="n">new</span><span class="p">):</span>
+        <span class="c1"># helper function that hashes a single justification</span>
+        <span class="k">def</span> <span class="nf">_hash_justification</span><span class="p">(</span><span class="n">justification</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span>
+                <span class="nb">str</span><span class="p">(</span><span class="n">justification</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;link&quot;</span><span class="p">))</span>
+                <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">justification</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">))</span>
+                <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">justification</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;message&quot;</span><span class="p">))</span>
+                <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">justification</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;package_name&quot;</span><span class="p">))</span>
+            <span class="p">)</span>
+
+        <span class="n">compare_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">justification</span> <span class="ow">in</span> <span class="n">old</span><span class="p">:</span>
+            <span class="n">hashed_justification</span> <span class="o">=</span> <span class="n">_hash_justification</span><span class="p">(</span><span class="n">justification</span><span class="p">)</span>
+            <span class="n">compare_dict</span><span class="p">[</span><span class="n">hashed_justification</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">justification</span><span class="p">,</span>
+                <span class="s2">&quot;old&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="s2">&quot;new&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="p">}</span>
+
+        <span class="k">for</span> <span class="n">justification</span> <span class="ow">in</span> <span class="n">new</span><span class="p">:</span>
+            <span class="n">hashed_justification</span> <span class="o">=</span> <span class="n">_hash_justification</span><span class="p">(</span><span class="n">justification</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">hashed_justification</span> <span class="ow">in</span> <span class="n">compare_dict</span><span class="p">:</span>
+                <span class="n">compare_dict</span><span class="p">[</span><span class="n">hashed_justification</span><span class="p">][</span><span class="s2">&quot;new&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">compare_dict</span><span class="p">[</span><span class="n">hashed_justification</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">justification</span><span class="p">,</span>
+                    <span class="s2">&quot;old&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+                    <span class="s2">&quot;new&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+                <span class="p">}</span>
+
+        <span class="c1"># recreated list with difference param and discard equal justifications</span>
+        <span class="n">reconstructed_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">compare_dict</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">compare_dict</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="s2">&quot;new&quot;</span><span class="p">]</span> <span class="ow">and</span> <span class="n">compare_dict</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="s2">&quot;old&quot;</span><span class="p">]:</span>
+                <span class="k">continue</span>
+            <span class="k">elif</span> <span class="n">compare_dict</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="s2">&quot;new&quot;</span><span class="p">]:</span>
+                <span class="n">difference</span> <span class="o">=</span> <span class="s2">&quot;ADDED&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">difference</span> <span class="o">=</span> <span class="s2">&quot;REMOVED&quot;</span>
+
+            <span class="n">reconstructed_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span><span class="o">**</span><span class="n">compare_dict</span><span class="p">[</span><span class="n">key</span><span class="p">][</span><span class="s2">&quot;value&quot;</span><span class="p">],</span> <span class="s2">&quot;difference&quot;</span><span class="p">:</span> <span class="n">difference</span><span class="p">}</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">reconstructed_list</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;stack_info&quot;</span><span class="p">:</span> <span class="n">compare_justification_list</span><span class="p">(</span><span class="n">old_stack</span><span class="p">,</span> <span class="n">new_stack</span><span class="p">),</span>
+        <span class="s2">&quot;justifications&quot;</span><span class="p">:</span> <span class="n">compare_justification_list</span><span class="p">(</span>
+            <span class="n">old_justifications</span><span class="p">,</span> <span class="n">new_justifications</span>
+        <span class="p">),</span>
+    <span class="p">}</span></div>
 
 
 <div class="viewcode-block" id="get_status"><a class="viewcode-back" href="../../thamos.html#thamos.lib.get_status">[docs]</a><span class="nd">@with_api_client</span>
